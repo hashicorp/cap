@@ -13,8 +13,7 @@ func ApplyOpts(opts interface{}, opt ...Option) {
 	}
 }
 
-// WithExpirySkew provides a expiry skew duration that is used for several
-// different types includeing: Token and State
+// WithExpirySkew provides an optional expiry skew duration for: Token,  State
 func WithExpirySkew(d time.Duration) Option {
 	return func(o interface{}) {
 		switch v := o.(type) {

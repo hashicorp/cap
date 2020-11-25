@@ -246,8 +246,7 @@ func getErrOpts(opt ...Option) errOptions {
 	return opts
 }
 
-// WithErrCode provides an option to provide an error to wrap when creating a
-// new error.
+// WithWrap provides an optional error to wrap for a new error
 func WithWrap(e error) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*errOptions); ok {
@@ -256,8 +255,7 @@ func WithWrap(e error) Option {
 	}
 }
 
-// WithMsg provides an option to provide a message when creating a new
-// error.
+// WithMsg provides an optional message for an error
 func WithMsg(msg string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*errOptions); ok {
@@ -266,7 +264,7 @@ func WithMsg(msg string) Option {
 	}
 }
 
-// WithOp provides an option to provide the operation that's raising/propagating
+// WithOp provides an optional operation (name) that's raising/propagating
 // the error.
 func WithOp(op Op) Option {
 	return func(o interface{}) {
@@ -276,7 +274,7 @@ func WithOp(op Op) Option {
 	}
 }
 
-// WithKind provides an option to provide the kind (category) of an error.
+// WithKind provides an optional Kind (category) for an error.
 func WithKind(k Kind) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*errOptions); ok {

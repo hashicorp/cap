@@ -49,7 +49,7 @@ type ProviderConfig struct {
 	Issuer string
 
 	// SupportedSigningAlgs is a list of supported signing algorithms. List of
-	// currently  supported algs: RS256, RS384, RS512, ES256, ES384, ES512,
+	// currently supported algs: RS256, RS384, RS512, ES256, ES384, ES512,
 	// PS256, PS384, PS512
 	SupportedSigningAlgs []string
 
@@ -91,7 +91,11 @@ func NewProviderConfig(issuer string, clientId, clientSecret string, rp Provider
 	return c, nil
 }
 
-// Validate the provider configuration
+// Validate the provider configuration.  Among other validations, it verifies
+// the issuer is not empty, but it doesn't verify the Issuer is discoverable via
+// an http request.  SupportedSigningAlgs is validated against the list of
+// currently supported algs: RS256, RS384, RS512, ES256, ES384, ES512, PS256,
+// PS384, PS512
 func (c *ProviderConfig) Validate() error {
 	const op = "oidc.Validate"
 	if c == nil {
@@ -122,8 +126,8 @@ func (c *ProviderConfig) Validate() error {
 	return nil
 }
 
-// HttpClient is a helper function that will create a new http client for the
-// provider configured.
+// HttpClient is a helper function that creates a new http client for the
+// provider configured
 func (c *ProviderConfig) HttpClient() (*http.Client, error) {
 	const op = "ProviderConfig.NewHTTPClient"
 	client, err := sdkHttp.NewClient(c.ProviderCA)
@@ -167,7 +171,7 @@ func getProviderConfigOpts(opt ...Option) providerConfigOptions {
 	return opts
 }
 
-// WithScopes provides a list of scopes
+// WithScopes provides an optional list of scopes for the provider's config
 func WithScopes(scopes []string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*providerConfigOptions); ok {
@@ -176,7 +180,7 @@ func WithScopes(scopes []string) Option {
 	}
 }
 
-// WithProviderCA provides an oidc provider CA cert
+// WithProviderCA provides an optional CA cert for the provider's config
 func WithProviderCA(cert string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*providerConfigOptions); ok {
@@ -185,16 +189,7 @@ func WithProviderCA(cert string) Option {
 	}
 }
 
-// WithStateReadWriter provides a read/writer for oidc state data
-func WithStateReadWriter(rw StateReadWriter) Option {
-	return func(o interface{}) {
-		if o, ok := o.(*providerConfigOptions); ok {
-			o.withStateReadWriter = rw
-		}
-	}
-}
-
-// WithLogger provides a logger
+// WithLogger provides an optional logger for the provider's config
 func WithLogger(l hclog.Logger) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*providerConfigOptions); ok {
