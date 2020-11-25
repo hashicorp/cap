@@ -26,7 +26,7 @@ type SuccessResponseFunc func(stateId string, t oidc.Token) []byte
 
 // ErrorResponseFunc is used by Callbacks to create a response when the
 // authorization code callback fails.
-
+//
 // The function receives the stateId returned as part of the oidc authentication
 // response.  It also gets parameters for the oidc authentication error response
 // and/or the callback error raised while processing the request.  The function
