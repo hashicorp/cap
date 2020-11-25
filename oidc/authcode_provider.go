@@ -120,6 +120,9 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, authenState State, resp
 	if p.config == nil {
 		return nil, NewError(ErrNilParameter, WithOp(op), WithKind(ErrInternal), WithMsg("provider config is nil"))
 	}
+	if authenState.Id != responseState {
+		return nil, NewError(ErrResponseStateInvalid, WithOp(op), WithKind(ErrParameterViolation), WithMsg("authen state and response state are not equal"))
+	}
 	if authenState.IsExpired() {
 		return nil, NewError(ErrExpiredState, WithOp(op), WithKind(ErrParameterViolation), WithMsg("authentication state is expired"))
 	}
@@ -140,7 +143,7 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, authenState State, resp
 
 	oauth2Token, err := oauth2Config.Exchange(exchangeCtx, responseCode)
 	if err != nil {
-		return nil, NewError(ErrRelyPartyAuthenFailed, WithOp(op), WithKind(ErrInternal), WithMsg("unable to exchange auth code with provider"), WithWrap(err))
+		return nil, NewError(ErrCodeExchangeFailed, WithOp(op), WithKind(ErrInternal), WithMsg("unable to exchange auth code with provider"), WithWrap(err))
 	}
 	t := &Token{
 		RefreshToken: oauth2Token.RefreshToken,
