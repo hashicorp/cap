@@ -146,21 +146,19 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, authenState State, resp
 		return nil, NewError(ErrCodeExchangeFailed, WithOp(op), WithKind(ErrInternal), WithMsg("unable to exchange auth code with provider"), WithWrap(err))
 	}
 	t := &Token{
-		RefreshToken: oauth2Token.RefreshToken,
-		AccessToken:  oauth2Token.AccessToken,
+		RefreshToken: RefreshToken(oauth2Token.RefreshToken),
+		AccessToken:  AccessToken(oauth2Token.AccessToken),
 		Expiry:       oauth2Token.Expiry,
 	}
 	idToken, ok := oauth2Token.Extra("id_token").(string)
 	if !ok {
 		return nil, NewError(ErrMissingIdToken, WithOp(op), WithKind(ErrInternal), WithMsg("id_token is missing from auth code exchange"), WithWrap(err))
 	}
-	t.IdToken = idToken
-
 	if err := p.VerifyIdToken(ctx, idToken, authenState.Nonce); err != nil {
 		return nil, NewError(ErrIdTokenVerificationFailed, WithOp(op), WithKind(ErrInternal), WithMsg("id_token failed verification"), WithWrap(err))
 	}
 
-	t.IdToken = idToken
+	t.IdToken = IdToken(idToken)
 	return t, nil
 }
 
