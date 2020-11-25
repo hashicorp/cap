@@ -29,22 +29,18 @@ type StateReadWriter interface {
 // in the reader.
 func AuthCodeWithState(ctx context.Context, p *oidc.AuthCodeProvider, rw StateReadWriter, successResponseFunc SuccessResponseFunc, errorResponsefunc ErrorResponseFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		// TODO (jimlambrt 11/2020): add an optional logger so we can log errors
 		const op = "callbacks.AuthCodeState"
 		var response string
 		var responseToken *oidc.Token
 		var state *AuthCodeState
 
 		defer func() {
-			// TODO: log this error when we have a logger
 			_, _ = w.Write([]byte(response))
 
 		}()
 		if rw == nil {
 			responseErr := oidc.NewError(oidc.ErrNilParameter, oidc.WithOp(op), oidc.WithKind(oidc.ErrParameterViolation), oidc.WithMsg("state read/writer is nil"))
 			response = errorResponsefunc(nil, responseErr)
-
-			// TODO: log this error when we have a logger
 			return
 		}
 
@@ -57,8 +53,6 @@ func AuthCodeWithState(ctx context.Context, p *oidc.AuthCodeProvider, rw StateRe
 				Uri:         req.FormValue("error_uri"),
 			}
 			response = errorResponsefunc(reqError, nil)
-
-			// TODO: log this error when we have a logger
 			return
 		}
 
@@ -71,23 +65,17 @@ func AuthCodeWithState(ctx context.Context, p *oidc.AuthCodeProvider, rw StateRe
 		if err != nil {
 			responseErr := oidc.NewError(oidc.ErrCodeUnknown, oidc.WithOp(op), oidc.WithKind(oidc.ErrInternal), oidc.WithMsg("unable to read auth code state"), oidc.WithWrap(err))
 			response = errorResponsefunc(nil, responseErr)
-
-			// TODO: log this error when we have a logger
 			return
 		}
 		if state == nil {
 			// could have expired or it could be invalid... no way to known for sure
 			responseErr := oidc.NewError(oidc.ErrNotFound, oidc.WithOp(op), oidc.WithKind(oidc.ErrParameterViolation), oidc.WithMsg("auth code state not found"))
 			response = errorResponsefunc(nil, responseErr)
-
-			// TODO: log this error when we have a logger
 			return
 		}
 		if state.Oidc.IsExpired() {
 			responseErr := oidc.NewError(oidc.ErrExpiredState, oidc.WithOp(op), oidc.WithKind(oidc.ErrParameterViolation), oidc.WithMsg("authentication state is expired"))
 			response = errorResponsefunc(nil, responseErr)
-
-			// TODO: log this error when we have a logger
 			return
 		}
 
@@ -97,8 +85,6 @@ func AuthCodeWithState(ctx context.Context, p *oidc.AuthCodeProvider, rw StateRe
 			// reader, but given this error, we probably shouldn't update the state
 			responseErr := oidc.NewError(oidc.ErrResponseStateInvalid, oidc.WithOp(op), oidc.WithKind(oidc.ErrIntegrityViolation), oidc.WithMsg("authen state and response state are not equal"))
 			response = errorResponsefunc(nil, responseErr)
-
-			// TODO: log this error when we have a logger
 			return
 		}
 
@@ -106,8 +92,6 @@ func AuthCodeWithState(ctx context.Context, p *oidc.AuthCodeProvider, rw StateRe
 		if err != nil {
 			responseErr := oidc.WrapError(err, oidc.WithOp(op), oidc.WithKind(oidc.ErrInternal), oidc.WithMsg("unable to exchange authorization code"))
 			response = errorResponsefunc(nil, responseErr)
-
-			// TODO: log this error when we have a logger
 			return
 		}
 
@@ -115,8 +99,6 @@ func AuthCodeWithState(ctx context.Context, p *oidc.AuthCodeProvider, rw StateRe
 		if err := rw.Update(ctx, state.Oidc.Id, state); err != nil {
 			responseErr := oidc.NewError(oidc.ErrCodeUnknown, oidc.WithOp(op), oidc.WithKind(oidc.ErrInternal), oidc.WithMsg("unable to read auth code state"), oidc.WithWrap(err))
 			response = errorResponsefunc(nil, responseErr)
-
-			// TODO: log this error when we have a logger
 			return
 		}
 

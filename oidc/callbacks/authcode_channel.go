@@ -28,8 +28,6 @@ func AuthCodeWithChannel(ctx context.Context, p *oidc.AuthCodeProvider, state oi
 		var responseErr error
 
 		defer func() {
-			// TODO (jimlambrt 11/2020): add an optional logger so we can log
-			// these errors
 			_, _ = w.Write([]byte(response))
 			doneCh <- LoginResp{*responseToken, responseErr}
 		}()
