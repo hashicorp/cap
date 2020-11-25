@@ -1,7 +1,6 @@
 package oidc
 
 import (
-	"context"
 	"time"
 
 	"github.com/hashicorp/probo/sdk/id"
@@ -10,24 +9,6 @@ import (
 // DefaultStateExpirySkew defines a default time skew when checking a State's
 // expiration.
 const DefaultStateExpirySkew = 1 * time.Second
-
-// StateReadWriter defines a common interface for reading/writing oidc state
-type StateReadWriter interface {
-
-	// Create a new oidc entry.  If optionalKey is provided it will be used as
-	// the entry's unique key, otherwise a new unique key is created.  The
-	// entry's unique key is returned on success.
-	Create(ctx context.Context, value interface{}, optionalKey string) (key string, e error)
-
-	// Update an existing state entry
-	Update(ctx context.Context, key string, value interface{}) (e error)
-
-	// Read an existing state entry
-	Read(ctx context.Context, key string) (v interface{}, e error)
-
-	// Delete an existing state entry
-	Delete(ctx context.Context, key string) error
-}
 
 // NewId generates a ID with an optional prefix.   The ID generated is suitable
 // for an OIDC State's Id or Nonce
