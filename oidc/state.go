@@ -7,6 +7,10 @@ import (
 	"github.com/hashicorp/probo/sdk/id"
 )
 
+// DefaultStateExpirySkew defines a default time skew when checking a State's
+// expiration.
+const DefaultStateExpirySkew = 1 * time.Second
+
 // StateReadWriter defines a common interface for reading/writing oidc state
 type StateReadWriter interface {
 
@@ -26,7 +30,7 @@ type StateReadWriter interface {
 }
 
 // NewId generates a ID with an optional prefix.   The ID generated is suitable
-// for an OIDC state ID or nonce
+// for an OIDC State's Id or Nonce
 func NewId(optionalPrefix string) (string, error) {
 	id, err := id.New(optionalPrefix)
 	if err != nil {
@@ -38,11 +42,11 @@ func NewId(optionalPrefix string) (string, error) {
 // State represents the oidc state used for oidc flows.  The State.Id is passed
 // throughout the flows to uniquely identify a specific flows state.
 type State struct {
-	Id          string
-	Nonce       string
-	RedirectURL string
-	Expiration  time.Time
-	Payload     interface{}
+	Id          string      // Id is a unique identifier and suitable for use as an oidc state
+	Nonce       string      // Nonce is a unique nonce and suitable for use as an oidc nonce
+	RedirectURL string      // RedirectURL is the URL to redirect users going through the OAuth flow, after the resource owner's URLs.
+	Expiration  time.Time   // Expiration is the expiration time for the State
+	Payload     interface{} // Payload is any additional payload need by the process using the State
 }
 
 // NewState creates a new state in memory
@@ -70,7 +74,30 @@ func NewState(expireIn time.Duration, redirectURL string, payload interface{}) (
 	}, nil
 }
 
-// IsExpired returns true if the state has expired
-func (s *State) IsExpired() bool {
-	return s.Expiration.Before(time.Now())
+// IsExpired returns true if the state has expired. Supports the
+// WithExpirySkew option and if none is provided it will use the
+// DefaultStateExpirySkew.
+func (s *State) IsExpired(opt ...Option) bool {
+	opts := getStateOpts(opt...)
+	return s.Expiration.Before(time.Now().Add(opts.withExpirySkew))
+}
+
+// stateOptions is the set of available options for State functions
+type stateOptions struct {
+	withExpirySkew time.Duration
+}
+
+// stateDefaults is a handy way to get the defaults at runtime and during unit
+// tests.
+func stateDefaults() stateOptions {
+	return stateOptions{
+		withExpirySkew: DefaultStateExpirySkew,
+	}
+}
+
+// getStateOpts gets the state defaults and applies the opt overrides passed in
+func getStateOpts(opt ...Option) stateOptions {
+	opts := stateDefaults()
+	ApplyOpts(&opts, opt...)
+	return opts
 }
