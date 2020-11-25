@@ -11,32 +11,12 @@ import (
 	sdkHttp "github.com/hashicorp/probo/sdk/http"
 )
 
-// ProviderAuthStyle determines the style of authentication used when the
-// relying party makes request to the provider.
-type ProviderAuthStyle int
-
-const (
-	UnknownAuthStyle ProviderAuthStyle = iota
-
-	// AuthStyleInParams sends the "client_id" and "client_secret"
-	// in the POST body as application/x-www-form-urlencoded parameters.
-	AuthStyleInParams
-
-	// AuthStyleInHeader sends the client_id and client_password
-	// using HTTP Basic Authorization. This is an optional style
-	// described in the OAuth2 RFC 6749 section 2.3.1.
-	AuthStyleInHeader
-)
-
 type ProviderConfig struct {
 	// ClientId is the relying party id
 	ClientId string
 
 	// ClientSecret is the relying party secret
 	ClientSecret string
-
-	// AuthenStyle to use when making requests to the provider's server
-	AuthenStyle ProviderAuthStyle
 
 	// Scopes is a list of additional oidc scopes to request of the provider
 	// The required "oidc" scope is requested by default, and should be part of
@@ -59,9 +39,6 @@ type ProviderConfig struct {
 	// ProviderCA is an optional CA cert to use when sending requests to the provider.
 	ProviderCA string
 
-	// State is an optional store for oidc state
-	State StateReadWriter
-
 	// Logger is an optional logger
 	Logger hclog.Logger
 }
@@ -72,18 +49,16 @@ type ProviderConfig struct {
 //  WithStateReadWriter
 //	WithProviderCA
 // 	WithScopes
-func NewProviderConfig(issuer string, clientId, clientSecret string, rp ProviderAuthStyle, opt ...Option) (*ProviderConfig, error) {
+func NewProviderConfig(issuer string, clientId, clientSecret string, opt ...Option) (*ProviderConfig, error) {
 	const op = "NewProviderConfig"
 	opts := getProviderConfigOpts(opt...)
 	c := &ProviderConfig{
 		Issuer:       issuer,
 		ClientId:     clientId,
 		ClientSecret: clientSecret,
-		AuthenStyle:  rp,
 		Logger:       opts.withLogger,
 		Scopes:       opts.withScopes,
 		ProviderCA:   opts.withProviderCA,
-		State:        opts.withStateReadWriter,
 	}
 	if err := c.Validate(); err != nil {
 		return nil, WrapError(err, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg("invalid provider config"))
@@ -151,10 +126,9 @@ func HttpClientContext(ctx context.Context, client *http.Client) context.Context
 
 // providerConfigOptions is the set of available options
 type providerConfigOptions struct {
-	withScopes          []string
-	withProviderCA      string
-	withStateReadWriter StateReadWriter
-	withLogger          hclog.Logger
+	withScopes     []string
+	withProviderCA string
+	withLogger     hclog.Logger
 }
 
 // getProviderConfigDefaults is a handy way to get the defaults at runtime and
