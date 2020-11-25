@@ -31,7 +31,7 @@ type ProviderConfig struct {
 	// SupportedSigningAlgs is a list of supported signing algorithms. List of
 	// currently supported algs: RS256, RS384, RS512, ES256, ES384, ES512,
 	// PS256, PS384, PS512
-	SupportedSigningAlgs []string
+	SupportedSigningAlgs []Alg
 
 	// Audiences is a list optional case-sensitive strings used when verifying an id_token's "aud" claim
 	Audiences []string
@@ -90,11 +90,7 @@ func (c *ProviderConfig) Validate() error {
 		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("supported algorithms is empty"))
 	}
 	for _, a := range c.SupportedSigningAlgs {
-		switch a {
-		case oidc.RS256, oidc.RS384, oidc.RS512,
-			oidc.ES256, oidc.ES384, oidc.ES512,
-			oidc.PS256, oidc.PS384, oidc.PS512:
-		default:
+		if _, ok := SupportedAlgorithms[a]; !ok {
 			return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg(fmt.Sprintf("unsupported algorithm: %s", a)))
 		}
 	}
