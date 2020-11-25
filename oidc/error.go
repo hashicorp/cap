@@ -18,9 +18,12 @@ const (
 	ErrInvalidIssuer
 	ErrIdGeneratorFailed
 	ErrExpiredState
-	ErrRelyPartyAuthenFailed
+	ErrResponseStateInvalid
+	ErrCodeExchangeFailed
 	ErrMissingIdToken
 	ErrIdTokenVerificationFailed
+	ErrNotFound
+	ErrLoginFailed
 )
 
 const (
@@ -28,6 +31,7 @@ const (
 	ErrInternal
 	ErrParameterViolation
 	ErrIntegrityViolation
+	ErrLoginViolation
 )
 
 func (k Kind) String() string {
