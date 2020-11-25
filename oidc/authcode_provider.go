@@ -168,17 +168,3 @@ func (p *AuthCodeProvider) VerifyIdToken(ctx context.Context, idToken, nonce str
 func (p *AuthCodeProvider) UserInfoClaims(ctx context.Context, t *Token) (map[string]interface{}, error) {
 	panic("TODO")
 }
-
-// CallbackHandler will be the callback used by the IdP redirect, when the IdP
-// completes the user's authentication and authorization.  This handler will use
-// it's StateReadWriter to verify request.  if successful, it will store the
-// tokens exchanged with the IdP (id_token and optional access_token) using the
-// stateId included in the inbound request. Options supported: WithNonce,
-// WithChannel
-func (p *AuthCodeProvider) CallbackWithChannel(ch chan<- interface{}, opt ...Option) http.HandlerFunc {
-	opts := getAuthCodeProviderOpts(opt...)
-	if opts.withNonce != nil {
-		panic("TODO")
-	}
-	panic("TODO")
-}
