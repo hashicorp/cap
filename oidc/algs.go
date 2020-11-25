@@ -17,7 +17,7 @@ const (
 	PS512 Alg = "PS512" // RSASSA-PSS using SHA512 and MGF1-SHA512
 )
 
-var SupportedAlgorithms = map[Alg]bool{
+var supportedAlgorithms = map[Alg]bool{
 	RS256: true,
 	RS384: true,
 	RS512: true,

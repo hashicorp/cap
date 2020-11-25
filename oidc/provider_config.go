@@ -90,7 +90,7 @@ func (c *ProviderConfig) Validate() error {
 		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("supported algorithms is empty"))
 	}
 	for _, a := range c.SupportedSigningAlgs {
-		if _, ok := SupportedAlgorithms[a]; !ok {
+		if _, ok := supportedAlgorithms[a]; !ok {
 			return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg(fmt.Sprintf("unsupported algorithm: %s", a)))
 		}
 	}
