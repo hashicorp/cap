@@ -4,7 +4,6 @@ go 1.15
 
 require (
 	github.com/coreos/go-oidc v2.2.1+incompatible
-	github.com/hashicorp/go-hclog v0.15.0
 	github.com/hashicorp/probo/sdk v0.0.0-20201124144932-a04c48195035
 	github.com/stretchr/testify v1.6.1
 	golang.org/x/oauth2 v0.0.0-20201109201403-9fd604954f58
