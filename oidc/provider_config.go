@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/coreos/go-oidc"
 	"github.com/hashicorp/go-hclog"
@@ -54,9 +55,6 @@ type ProviderConfig struct {
 
 	// ProviderCA is an optional CA cert to use when sending requests to the provider.
 	ProviderCA string
-
-	// Logger is an optional logger
-	Logger hclog.Logger
 }
 
 // NewProviderConfig composes a new config for a provider.
@@ -72,7 +70,6 @@ func NewProviderConfig(issuer string, clientId string, clientSecret ClientSecret
 		Issuer:       issuer,
 		ClientId:     clientId,
 		ClientSecret: clientSecret,
-		Logger:       opts.withLogger,
 		Scopes:       opts.withScopes,
 		ProviderCA:   opts.withProviderCA,
 	}
@@ -102,6 +99,13 @@ func (c *ProviderConfig) Validate() error {
 		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("discovery URL is empty"))
 	}
 
+	u, err := url.Parse(c.Issuer)
+	if err != nil {
+		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("issuer url is invalid"), WithWrap(err))
+	}
+	if u.Scheme != "https" {
+		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("issuer url schemes in not https"), WithWrap(err))
+	}
 	if len(c.SupportedSigningAlgs) == 0 {
 		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("supported algorithms is empty"))
 	}
@@ -171,15 +175,6 @@ func WithProviderCA(cert string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*providerConfigOptions); ok {
 			o.withProviderCA = cert
-		}
-	}
-}
-
-// WithLogger provides an optional logger for the provider's config
-func WithLogger(l hclog.Logger) Option {
-	return func(o interface{}) {
-		if o, ok := o.(*providerConfigOptions); ok {
-			o.withLogger = l
 		}
 	}
 }
