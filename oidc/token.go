@@ -60,10 +60,11 @@ func (t IdToken) MarshalJSON() ([]byte, error) {
 // Token represents an Oauth2 access_token and refresh_token (including the the access_token
 // expiry), as well as an OIDC id_token
 type Token struct {
-	RefreshToken RefreshToken
-	AccessToken  AccessToken
-	Expiry       time.Time
-	IdToken      IdToken
+	RefreshToken   RefreshToken
+	AccessToken    AccessToken
+	Expiry         time.Time
+	IdToken        IdToken
+	UserInfoClaims map[string]interface{}
 }
 
 // Expired will return true if the token is expired.  Supports the
