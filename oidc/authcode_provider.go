@@ -104,7 +104,7 @@ func (p *AuthCodeProvider) AuthURL(ctx context.Context, authenState State, opts 
 	// Configure an OpenID Connect aware OAuth2 client
 	oauth2Config := oauth2.Config{
 		ClientID:     p.config.ClientId,
-		ClientSecret: p.config.ClientSecret,
+		ClientSecret: string(p.config.ClientSecret),
 		RedirectURL:  authenState.RedirectURL,
 		Endpoint:     p.provider.Endpoint(),
 		Scopes:       scopes,
@@ -135,7 +135,7 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, authenState State, resp
 
 	var oauth2Config = oauth2.Config{
 		ClientID:     p.config.ClientId,
-		ClientSecret: p.config.ClientSecret,
+		ClientSecret: string(p.config.ClientSecret),
 		RedirectURL:  authenState.RedirectURL,
 		Endpoint:     p.provider.Endpoint(),
 		Scopes:       []string{oidc.ScopeOpenID},

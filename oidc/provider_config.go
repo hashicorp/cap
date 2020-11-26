@@ -2,6 +2,7 @@ package oidc
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,12 +12,27 @@ import (
 	sdkHttp "github.com/hashicorp/probo/sdk/http"
 )
 
+type ClientSecret string
+
+// RedactedClientSecret is the redacted string or json for an oauth client secret
+const RedactedClientSecret = "[REDACTED: client secret]"
+
+// String will redact the client secret
+func (t ClientSecret) String() string {
+	return RedactedClientSecret
+}
+
+// MarshalJSON will redact the client secret
+func (t ClientSecret) MarshalJSON() ([]byte, error) {
+	return json.Marshal(RedactedClientSecret)
+}
+
 type ProviderConfig struct {
 	// ClientId is the relying party id
 	ClientId string
 
 	// ClientSecret is the relying party secret
-	ClientSecret string
+	ClientSecret ClientSecret
 
 	// Scopes is a list of additional oidc scopes to request of the provider
 	// The required "oidc" scope is requested by default, and should be part of
@@ -49,7 +65,7 @@ type ProviderConfig struct {
 //  WithStateReadWriter
 //	WithProviderCA
 // 	WithScopes
-func NewProviderConfig(issuer string, clientId, clientSecret string, opt ...Option) (*ProviderConfig, error) {
+func NewProviderConfig(issuer string, clientId string, clientSecret ClientSecret, opt ...Option) (*ProviderConfig, error) {
 	const op = "NewProviderConfig"
 	opts := getProviderConfigOpts(opt...)
 	c := &ProviderConfig{
