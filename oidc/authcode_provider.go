@@ -30,8 +30,8 @@ type AuthCodeProvider struct {
 // authorization code flow.  Intializing the the provider, includes making an
 // http request to the provider's issuer.
 //
-//	See AuthCodeProvider.Stop()
-//	See NewProviderConfig() to create a ProviderConfig.
+//  See: AuthCodeProvider.Stop() which must be called to release provider resources.
+//	See: NewProviderConfig() to create a ProviderConfig.
 func NewAuthCodeProvider(c *ProviderConfig, opts ...Option) (*AuthCodeProvider, error) {
 	const op = "authcode.NewProvider"
 	if c == nil {
@@ -83,19 +83,19 @@ func (p *AuthCodeProvider) Stop() {
 // AuthURL will generate a URL the caller can use to kick off an OIDC
 // authorization code flow with an IdP.  The redirectURL is the URL the IdP
 // should use as a redirect after the authentication/authorization is completed
-// by the user. The authenState must contain a unique Id and Nonce (they cannot be
+// by the user. The State must contain a unique Id and Nonce (they cannot be
 // equal) which will be used during the OIDC flow to prevent CSRF and replay
-// attacks (see the oidc spec for specifics). The authenState must also contain
+// attacks (see the oidc spec for specifics). The State must also contain
 // a redirectURL that will handle the IdP redirect and has been configured as a
 // valid redirect URL for the IdP.
 //
-// 	See NewState() to create an authentication state with a valid Id and Nonce.
-func (p *AuthCodeProvider) AuthURL(ctx context.Context, authenState State, opts ...Option) (url string, e error) {
+// 	See NewState() to create an oidc flow State with a valid Id and Nonce.
+func (p *AuthCodeProvider) AuthURL(ctx context.Context, s State, opts ...Option) (url string, e error) {
 	const op = "AuthCodeProvider.AuthURL"
-	if authenState.Id == authenState.Nonce {
+	if s.Id == s.Nonce {
 		return "", NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("state id and nonce cannot be equal"))
 	}
-	if authenState.RedirectURL == "" {
+	if s.RedirectURL == "" {
 		return "", NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("redirectURL is empty"))
 	}
 	// Add the "openid" scope, which is a required scope for oidc flows
@@ -105,25 +105,31 @@ func (p *AuthCodeProvider) AuthURL(ctx context.Context, authenState State, opts 
 	oauth2Config := oauth2.Config{
 		ClientID:     p.config.ClientId,
 		ClientSecret: string(p.config.ClientSecret),
-		RedirectURL:  authenState.RedirectURL,
+		RedirectURL:  s.RedirectURL,
 		Endpoint:     p.provider.Endpoint(),
 		Scopes:       scopes,
 	}
 	authCodeOpts := []oauth2.AuthCodeOption{
-		oidc.Nonce(authenState.Nonce),
+		oidc.Nonce(s.Nonce),
 	}
-	return oauth2Config.AuthCodeURL(authenState.Id, authCodeOpts...), nil
+	return oauth2Config.AuthCodeURL(s.Id, authCodeOpts...), nil
 }
 
-func (p *AuthCodeProvider) Exchange(ctx context.Context, authenState State, responseState string, responseCode string) (*Token, error) {
+// Exchange will request a token from the oidc token endpoint, using the
+// authorizationCode and authorizationState it received in an earlier successful oidc
+// authentication response.
+//
+// It will also validate the authorizationState it receives against the
+// existing State for the user's oidc authentication flow.
+func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationState string, authorizationCode string) (*Token, error) {
 	const op = "AuthCodeProvider.Exchange"
 	if p.config == nil {
 		return nil, NewError(ErrNilParameter, WithOp(op), WithKind(ErrInternal), WithMsg("provider config is nil"))
 	}
-	if authenState.Id != responseState {
-		return nil, NewError(ErrResponseStateInvalid, WithOp(op), WithKind(ErrParameterViolation), WithMsg("authen state and response state are not equal"))
+	if s.Id != authorizationState {
+		return nil, NewError(ErrResponseStateInvalid, WithOp(op), WithKind(ErrParameterViolation), WithMsg("authentication state and authorization state are not equal"))
 	}
-	if authenState.IsExpired() {
+	if s.IsExpired() {
 		return nil, NewError(ErrExpiredState, WithOp(op), WithKind(ErrParameterViolation), WithMsg("authentication state is expired"))
 	}
 	client, err := p.config.HttpClient()
@@ -140,12 +146,12 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, authenState State, resp
 	var oauth2Config = oauth2.Config{
 		ClientID:     p.config.ClientId,
 		ClientSecret: string(p.config.ClientSecret),
-		RedirectURL:  authenState.RedirectURL,
+		RedirectURL:  s.RedirectURL,
 		Endpoint:     p.provider.Endpoint(),
 		Scopes:       scopes,
 	}
 
-	oauth2Token, err := oauth2Config.Exchange(exchangeCtx, responseCode)
+	oauth2Token, err := oauth2Config.Exchange(exchangeCtx, authorizationCode)
 	if err != nil {
 		return nil, NewError(ErrCodeExchangeFailed, WithOp(op), WithKind(ErrInternal), WithMsg("unable to exchange auth code with provider"), WithWrap(err))
 	}
@@ -158,7 +164,7 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, authenState State, resp
 	if !ok {
 		return nil, NewError(ErrMissingIdToken, WithOp(op), WithKind(ErrInternal), WithMsg("id_token is missing from auth code exchange"), WithWrap(err))
 	}
-	if err := p.VerifyIdToken(ctx, idToken, authenState.Nonce); err != nil {
+	if err := p.VerifyIdToken(ctx, idToken, s.Nonce); err != nil {
 		return nil, NewError(ErrIdTokenVerificationFailed, WithOp(op), WithKind(ErrInternal), WithMsg("id_token failed verification"), WithWrap(err))
 	}
 
