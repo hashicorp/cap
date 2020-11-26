@@ -133,12 +133,16 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, authenState State, resp
 
 	exchangeCtx := HttpClientContext(ctx, client)
 
+	// Add the "openid" scope, which is a required scope for oidc flows
+	// * TODO (jimlambrt 11/2020): make sure these additional scopes work as intended.
+	scopes := append([]string{oidc.ScopeOpenID}, p.config.Scopes...)
+
 	var oauth2Config = oauth2.Config{
 		ClientID:     p.config.ClientId,
 		ClientSecret: string(p.config.ClientSecret),
 		RedirectURL:  authenState.RedirectURL,
 		Endpoint:     p.provider.Endpoint(),
-		Scopes:       []string{oidc.ScopeOpenID},
+		Scopes:       scopes,
 	}
 
 	oauth2Token, err := oauth2Config.Exchange(exchangeCtx, responseCode)
