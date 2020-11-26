@@ -64,6 +64,7 @@ type Err struct {
 	Wrapped error
 }
 
+// NewError creates a new memory with the given Code and options.
 func NewError(c Code, opt ...Option) error {
 	opts := getErrOpts(opt...)
 	if c == 0 {
