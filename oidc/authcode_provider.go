@@ -3,7 +3,6 @@ package oidc
 import (
 	"context"
 	"errors"
-	"net/http"
 	"sync"
 
 	"github.com/coreos/go-oidc"
@@ -127,7 +126,7 @@ func (p *AuthCodeProvider) AuthURL(ctx context.Context, s State, opts ...Option)
 // On success, the Token returned will include IdToken and AccessToken.  Based
 // on the IdP, it may include a RefreshToken.  Based on the provider config, it
 // may include UserInfoClaims.
-func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationState string, authorizationCode string) (*Token, error) {
+func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationState string, authorizationCode string) (Token, error) {
 	const op = "AuthCodeProvider.Exchange"
 	if p.config == nil {
 		return nil, NewError(ErrNilParameter, WithOp(op), WithKind(ErrInternal), WithMsg("provider config is nil"))
@@ -141,7 +140,7 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationS
 
 	client, err := p.config.HttpClient()
 	if err != nil {
-		return nil, WrapError(http.ErrBodyReadAfterClose, WithOp(op), WithKind(ErrInternal), WithMsg("unable to create http client"))
+		return nil, WrapError(err, WithOp(op), WithKind(ErrInternal), WithMsg("unable to create http client"))
 	}
 	oidcCtx := HttpClientContext(ctx, client)
 
@@ -161,11 +160,7 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationS
 	if err != nil {
 		return nil, NewError(ErrCodeExchangeFailed, WithOp(op), WithKind(ErrInternal), WithMsg("unable to exchange auth code with provider"), WithWrap(err))
 	}
-	t := &Token{
-		RefreshToken: RefreshToken(oauth2Token.RefreshToken),
-		AccessToken:  AccessToken(oauth2Token.AccessToken),
-		Expiry:       oauth2Token.Expiry,
-	}
+
 	idToken, ok := oauth2Token.Extra("id_token").(string)
 	if !ok {
 		return nil, NewError(ErrMissingIdToken, WithOp(op), WithKind(ErrInternal), WithMsg("id_token is missing from auth code exchange"), WithWrap(err))
@@ -174,18 +169,35 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationS
 		return nil, NewError(ErrIdTokenVerificationFailed, WithOp(op), WithKind(ErrInternal), WithMsg("id_token failed verification"), WithWrap(err))
 	}
 
-	if p.config.UserInfoClaims {
-		// Try to get additional claims from the oidc UserInfo endpoint. An error
-		// getting these claims will not be returned, since it's not considered an
-		// oidc authentication error
-		if userinfo, err := p.provider.UserInfo(oidcCtx, oauth2.StaticTokenSource(oauth2Token)); err == nil {
-			// only returns err if there are no claims to set, so safely ignoring this error
-			_ = userinfo.Claims(&t.UserInfoClaims)
-		}
+	t, err := NewToken(IdToken(idToken), oauth2Token)
+	if err != nil {
+		return nil, WrapError(err, WithOp(op), WithKind(ErrInternal), WithMsg("unable to create new id_token"), WithWrap(err))
 	}
 
-	t.IdToken = IdToken(idToken)
 	return t, nil
+}
+
+// UserInfo gets the UserInfo claims from the provider using the token produced
+// by the tokenSource.
+func (p *AuthCodeProvider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource) (map[string]interface{}, error) {
+	const op = "Tk.UserInfo"
+	client, err := p.config.HttpClient()
+	if err != nil {
+		return nil, WrapError(err, WithOp(op), WithKind(ErrInternal), WithMsg("unable to create http client"))
+	}
+	oidcCtx := HttpClientContext(ctx, client)
+
+	userinfo, err := p.provider.UserInfo(oidcCtx, tokenSource)
+	if err != nil {
+		return nil, NewError(ErrUserInfoFailed, WithOp(op), WithKind(ErrInternal), WithMsg("provider UserInfo request failed"), WithWrap(err))
+
+	}
+	claims := map[string]interface{}{}
+	err = userinfo.Claims(&claims)
+	if err != nil {
+		return nil, NewError(ErrUserInfoFailed, WithOp(op), WithKind(ErrInternal), WithMsg("failed to get UserInfo claims"), WithWrap(err))
+	}
+	return claims, nil
 }
 
 // VerifyIdToken will verify the inbound IdToken.
