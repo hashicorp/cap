@@ -54,12 +54,6 @@ type ProviderConfig struct {
 
 	// ProviderCA is an optional CA cert to use when sending requests to the provider.
 	ProviderCA string
-
-	// UserInfoClaims determines whether or not we attempt to get claims from
-	// the oidc UserInfo endpoint during an authentication flow.  Errors
-	// retrieving these optional claims will not be considered a failure of the
-	// authentication flow.
-	UserInfoClaims bool
 }
 
 // NewProviderConfig composes a new config for a provider.
@@ -147,9 +141,8 @@ func HttpClientContext(ctx context.Context, client *http.Client) context.Context
 
 // providerConfigOptions is the set of available options
 type providerConfigOptions struct {
-	withScopes         []string
-	withProviderCA     string
-	withUserInfoClaims bool
+	withScopes     []string
+	withProviderCA string
 }
 
 // getProviderConfigDefaults is a handy way to get the defaults at runtime and
@@ -180,16 +173,6 @@ func WithProviderCA(cert string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*providerConfigOptions); ok {
 			o.withProviderCA = cert
-		}
-	}
-}
-
-// WithUserInfoClaims signals that we'd like to get claims from the oidc
-// UserInfo endpoint during an authentication flow.
-func WithUserInfoClaims(flag bool) Option {
-	return func(o interface{}) {
-		if o, ok := o.(*providerConfigOptions); ok {
-			o.withUserInfoClaims = flag
 		}
 	}
 }
