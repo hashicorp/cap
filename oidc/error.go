@@ -22,6 +22,8 @@ const (
 	ErrCodeExchangeFailed
 	ErrMissingIdToken
 	ErrIdTokenVerificationFailed
+	ErrInvalidSignature
+	ErrInvalidAudience
 	ErrNotFound
 	ErrLoginFailed
 )
