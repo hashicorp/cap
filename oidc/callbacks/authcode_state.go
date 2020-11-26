@@ -36,7 +36,7 @@ func AuthCodeWithState(ctx context.Context, p *oidc.AuthCodeProvider, rw StateRe
 	return func(w http.ResponseWriter, req *http.Request) {
 		const op = "callbacks.AuthCodeState"
 		var response []byte
-		var responseToken *oidc.Token
+		var responseToken oidc.Token
 		var state *AuthCodeState
 
 		defer func() {
@@ -100,6 +100,6 @@ func AuthCodeWithState(ctx context.Context, p *oidc.AuthCodeProvider, rw StateRe
 			response = eFn(reqState, nil, responseErr)
 			return
 		}
-		response = sFn(reqState, *responseToken)
+		response = sFn(reqState, responseToken)
 	}
 }

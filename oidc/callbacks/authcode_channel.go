@@ -30,12 +30,12 @@ func AuthCodeWithChannel(ctx context.Context, p *oidc.AuthCodeProvider, state oi
 	return doneCh, func(w http.ResponseWriter, req *http.Request) {
 		const op = "callbacks.AuthCodeChannel"
 		var response []byte
-		var responseToken *oidc.Token
+		var responseToken oidc.Token
 		var responseErr error
 
 		defer func() {
 			_, _ = w.Write(response)
-			doneCh <- LoginResp{*responseToken, responseErr}
+			doneCh <- LoginResp{responseToken, responseErr}
 			close(doneCh)
 		}()
 
@@ -73,6 +73,6 @@ func AuthCodeWithChannel(ctx context.Context, p *oidc.AuthCodeProvider, state oi
 			response = eFn(reqState, nil, err)
 			return
 		}
-		response = sFn(reqState, *responseToken)
+		response = sFn(reqState, responseToken)
 	}
 }
