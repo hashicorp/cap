@@ -26,6 +26,7 @@ const (
 	ErrInvalidAudience
 	ErrNotFound
 	ErrLoginFailed
+	ErrUserInfoFailed
 )
 
 const (
