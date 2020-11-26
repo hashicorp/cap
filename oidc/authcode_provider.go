@@ -2,10 +2,12 @@ package oidc
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"sync"
 
 	"github.com/coreos/go-oidc"
+	strutil "github.com/hashicorp/probo/sdk/strutils"
 	"golang.org/x/oauth2"
 )
 
@@ -121,6 +123,10 @@ func (p *AuthCodeProvider) AuthURL(ctx context.Context, s State, opts ...Option)
 //
 // It will also validate the authorizationState it receives against the
 // existing State for the user's oidc authentication flow.
+//
+// On success, the Token returned will include IdToken and AccessToken.  Based
+// on the IdP, it may include a RefreshToken.  Based on the provider config, it
+// may include UserInfoClaims.
 func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationState string, authorizationCode string) (*Token, error) {
 	const op = "AuthCodeProvider.Exchange"
 	if p.config == nil {
@@ -132,12 +138,12 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationS
 	if s.IsExpired() {
 		return nil, NewError(ErrExpiredState, WithOp(op), WithKind(ErrParameterViolation), WithMsg("authentication state is expired"))
 	}
+
 	client, err := p.config.HttpClient()
 	if err != nil {
 		return nil, WrapError(http.ErrBodyReadAfterClose, WithOp(op), WithKind(ErrInternal), WithMsg("unable to create http client"))
 	}
-
-	exchangeCtx := HttpClientContext(ctx, client)
+	oidcCtx := HttpClientContext(ctx, client)
 
 	// Add the "openid" scope, which is a required scope for oidc flows
 	// * TODO (jimlambrt 11/2020): make sure these additional scopes work as intended.
@@ -151,7 +157,7 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationS
 		Scopes:       scopes,
 	}
 
-	oauth2Token, err := oauth2Config.Exchange(exchangeCtx, authorizationCode)
+	oauth2Token, err := oauth2Config.Exchange(oidcCtx, authorizationCode)
 	if err != nil {
 		return nil, NewError(ErrCodeExchangeFailed, WithOp(op), WithKind(ErrInternal), WithMsg("unable to exchange auth code with provider"), WithWrap(err))
 	}
@@ -168,14 +174,56 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationS
 		return nil, NewError(ErrIdTokenVerificationFailed, WithOp(op), WithKind(ErrInternal), WithMsg("id_token failed verification"), WithWrap(err))
 	}
 
+	if p.config.UserInfoClaims {
+		// Try to get additional claims from the oidc UserInfo endpoint. An error
+		// getting these claims will not be returned, since it's not considered an
+		// oidc authentication error
+		if userinfo, err := p.provider.UserInfo(oidcCtx, oauth2.StaticTokenSource(oauth2Token)); err == nil {
+			// only returns err if there are no claims to set, so safely ignoring this error
+			_ = userinfo.Claims(&t.UserInfoClaims)
+		}
+	}
+
 	t.IdToken = IdToken(idToken)
 	return t, nil
 }
 
+// VerifyIdToken will verify the inbound IdToken.
 func (p *AuthCodeProvider) VerifyIdToken(ctx context.Context, idToken, nonce string) error {
-	panic("TODO")
-}
+	const op = "AuthCodeProvider.VerifyIdToken"
+	if idToken == "" {
+		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("id_token is empty"))
+	}
+	if nonce == "" {
+		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("nonce is empty"))
+	}
+	algs := []string{}
+	for _, a := range p.config.SupportedSigningAlgs {
+		algs = append(algs, string(a))
+	}
+	oidcConfig := &oidc.Config{
+		SupportedSigningAlgs: algs,
+		ClientID:             p.config.ClientId,
+	}
+	verifier := p.provider.Verifier(oidcConfig)
 
-func (p *AuthCodeProvider) UserInfoClaims(ctx context.Context, t *Token) (map[string]interface{}, error) {
-	panic("TODO")
+	oidcIdToken, err := verifier.Verify(ctx, idToken)
+	if err != nil {
+		return NewError(ErrInvalidSignature, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg("error verifying id_token signature"), WithWrap(err))
+	}
+
+	if err := func() error {
+		if len(p.config.Audiences) > 0 {
+			for _, v := range p.config.Audiences {
+				if strutil.StrListContains(oidcIdToken.Audience, v) {
+					return nil
+				}
+			}
+			return errors.New("aud claim does not match configured audiences")
+		}
+		return nil
+	}(); err != nil {
+		return NewError(ErrInvalidAudience, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg("error validating id_token audiences"), WithWrap(err))
+	}
+	return nil
 }
