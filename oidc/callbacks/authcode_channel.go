@@ -62,7 +62,7 @@ func AuthCodeWithChannel(ctx context.Context, p *oidc.AuthCodeProvider, state oi
 		// FormValue prioritizes body values, if found.
 		reqCode := req.FormValue("code")
 
-		if reqState != state.Id {
+		if reqState != state.Id() {
 			responseErr = oidc.NewError(oidc.ErrResponseStateInvalid, oidc.WithOp(op), oidc.WithKind(oidc.ErrParameterViolation), oidc.WithMsg("authen state and response state are not equal"))
 			response = eFn(reqState, nil, responseErr)
 			return

@@ -7,26 +7,18 @@ import (
 	"github.com/hashicorp/probo/oidc"
 )
 
-// AuthCodeState defines a state which is used by the AuthCodeWithState to
-// communicate the callbacks results
-type AuthCodeState struct {
-	Oidc          oidc.State // Oidc is the auth code flow's oidc state.  The State.Id is the key for the entry
-	ResponseToken oidc.Token // ResponseToken is the oidc.Token that's the result of a successful authorization code exchange
-}
-
-// StateReader defines an interface for finding and reading an AuthCodeState.
-// Implementions must be concurrently safe, since the reader will likley be used
+// StateReader defines an interface for finding and reading an oidc.State
+// Implementions must be concurrently safe, since the reader will likely be used
 // within a concurrent http.Handler
 type StateReader interface {
-	// Read an existing AuthCodeState entry.  The returned AuthCodeState.Oidc.Id
-	// must match the oidcStateId used to look it up. Implementions must be
-	// concurrently safe, which likely means returning a deep copy as the
-	// *AuthCodeState
-	Read(ctx context.Context, oidcStateId string) (*AuthCodeState, error)
+	// Read an existing AuthCodeState entry.  The returned state's Id()
+	// must match the stateId used to look it up. Implementions must be
+	// concurrently safe, which likely means returning a deep copy
+	Read(ctx context.Context, stateId string) (oidc.State, error)
 }
 
 // AuthCodeWithState creates an oidc authorization code callback handler which
-// uses a StateReader to read existing AuthCodeStates via the request's
+// uses a StateReader to read existing oidc.State(s) via the request's
 // oidc "state" parameter as a key for the lookup.
 //
 // The SuccessResponseFunc is used to create a response when callback is
@@ -37,7 +29,7 @@ func AuthCodeWithState(ctx context.Context, p *oidc.AuthCodeProvider, rw StateRe
 		const op = "callbacks.AuthCodeState"
 		var response []byte
 		var responseToken oidc.Token
-		var state *AuthCodeState
+		var state oidc.State
 
 		defer func() {
 			_, _ = w.Write(response)
@@ -79,22 +71,22 @@ func AuthCodeWithState(ctx context.Context, p *oidc.AuthCodeProvider, rw StateRe
 			response = eFn(reqState, nil, responseErr)
 			return
 		}
-		if state.Oidc.IsExpired() {
+		if state.IsExpired() {
 			responseErr := oidc.NewError(oidc.ErrExpiredState, oidc.WithOp(op), oidc.WithKind(oidc.ErrParameterViolation), oidc.WithMsg("authentication state is expired"))
 			response = eFn(reqState, nil, responseErr)
 			return
 		}
 
-		if reqState != state.Oidc.Id {
+		if reqState != state.Id() {
 			// the stateReadWriter didn't return the correct state for the key
-			// giving... this is an internal sort of error on the part of the
+			// given... this is an internal sort of error on the part of the
 			// reader, but given this error, we probably shouldn't update the state
 			responseErr := oidc.NewError(oidc.ErrResponseStateInvalid, oidc.WithOp(op), oidc.WithKind(oidc.ErrIntegrityViolation), oidc.WithMsg("authen state and response state are not equal"))
 			response = eFn(reqState, nil, responseErr)
 			return
 		}
 
-		responseToken, err = p.Exchange(ctx, state.Oidc, reqState, reqCode)
+		responseToken, err = p.Exchange(ctx, state, reqState, reqCode)
 		if err != nil {
 			responseErr := oidc.WrapError(err, oidc.WithOp(op), oidc.WithKind(oidc.ErrInternal), oidc.WithMsg("unable to exchange authorization code"))
 			response = eFn(reqState, nil, responseErr)

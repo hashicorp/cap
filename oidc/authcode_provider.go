@@ -93,10 +93,10 @@ func (p *AuthCodeProvider) Stop() {
 // 	See NewState() to create an oidc flow State with a valid Id and Nonce.
 func (p *AuthCodeProvider) AuthURL(ctx context.Context, s State, opts ...Option) (url string, e error) {
 	const op = "AuthCodeProvider.AuthURL"
-	if s.Id == s.Nonce {
+	if s.Id() == s.Nonce() {
 		return "", NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("state id and nonce cannot be equal"))
 	}
-	if s.RedirectURL == "" {
+	if s.RedirectURL() == "" {
 		return "", NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("redirectURL is empty"))
 	}
 	// Add the "openid" scope, which is a required scope for oidc flows
@@ -106,14 +106,14 @@ func (p *AuthCodeProvider) AuthURL(ctx context.Context, s State, opts ...Option)
 	oauth2Config := oauth2.Config{
 		ClientID:     p.config.ClientId,
 		ClientSecret: string(p.config.ClientSecret),
-		RedirectURL:  s.RedirectURL,
+		RedirectURL:  s.RedirectURL(),
 		Endpoint:     p.provider.Endpoint(),
 		Scopes:       scopes,
 	}
 	authCodeOpts := []oauth2.AuthCodeOption{
-		oidc.Nonce(s.Nonce),
+		oidc.Nonce(s.Nonce()),
 	}
-	return oauth2Config.AuthCodeURL(s.Id, authCodeOpts...), nil
+	return oauth2Config.AuthCodeURL(s.Id(), authCodeOpts...), nil
 }
 
 // Exchange will request a token from the oidc token endpoint, using the
@@ -131,7 +131,7 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationS
 	if p.config == nil {
 		return nil, NewError(ErrNilParameter, WithOp(op), WithKind(ErrInternal), WithMsg("provider config is nil"))
 	}
-	if s.Id != authorizationState {
+	if s.Id() != authorizationState {
 		return nil, NewError(ErrResponseStateInvalid, WithOp(op), WithKind(ErrParameterViolation), WithMsg("authentication state and authorization state are not equal"))
 	}
 	if s.IsExpired() {
@@ -151,7 +151,7 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationS
 	var oauth2Config = oauth2.Config{
 		ClientID:     p.config.ClientId,
 		ClientSecret: string(p.config.ClientSecret),
-		RedirectURL:  s.RedirectURL,
+		RedirectURL:  s.RedirectURL(),
 		Endpoint:     p.provider.Endpoint(),
 		Scopes:       scopes,
 	}
@@ -165,7 +165,7 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationS
 	if !ok {
 		return nil, NewError(ErrMissingIdToken, WithOp(op), WithKind(ErrInternal), WithMsg("id_token is missing from auth code exchange"), WithWrap(err))
 	}
-	if err := p.VerifyIdToken(ctx, idToken, s.Nonce); err != nil {
+	if err := p.VerifyIdToken(ctx, idToken, s.Nonce()); err != nil {
 		return nil, NewError(ErrIdTokenVerificationFailed, WithOp(op), WithKind(ErrInternal), WithMsg("id_token failed verification"), WithWrap(err))
 	}
 
