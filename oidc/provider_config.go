@@ -9,7 +9,6 @@ import (
 	"net/url"
 
 	"github.com/coreos/go-oidc"
-	"github.com/hashicorp/go-hclog"
 	sdkHttp "github.com/hashicorp/probo/sdk/http"
 )
 
@@ -144,7 +143,6 @@ func HttpClientContext(ctx context.Context, client *http.Client) context.Context
 type providerConfigOptions struct {
 	withScopes     []string
 	withProviderCA string
-	withLogger     hclog.Logger
 }
 
 // getProviderConfigDefaults is a handy way to get the defaults at runtime and
