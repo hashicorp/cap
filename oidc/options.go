@@ -19,7 +19,7 @@ func WithExpirySkew(d time.Duration) Option {
 		switch v := o.(type) {
 		case *tokenOptions:
 			v.withExpirySkew = d
-		case *stateOptions:
+		case *stOptions:
 			v.withExpirySkew = d
 		}
 	}
