@@ -11,54 +11,6 @@ import (
 // expiration.
 const DefaultTokenExpirySkew = 10 * time.Second
 
-// AccessToken is an oauth access_token
-type AccessToken string
-
-// RedactedAccessToken is the redacted string or json for an oauth access_token
-const RedactedAccessToken = "[REDACTED: access_token]"
-
-// String will redact the token
-func (t AccessToken) String() string {
-	return RedactedAccessToken
-}
-
-// MarshalJSON will redact the token
-func (t AccessToken) MarshalJSON() ([]byte, error) {
-	return json.Marshal(RedactedAccessToken)
-}
-
-// RefreshToken is an oauth refresh_token
-type RefreshToken string
-
-// RedactedRefreshToken is the redacted string or json for an oauth refresh_token
-const RedactedRefreshToken = "[REDACTED: refresh_token]"
-
-// String will redact the token
-func (t RefreshToken) String() string {
-	return RedactedRefreshToken
-}
-
-// MarshalJSON will redact the token
-func (t RefreshToken) MarshalJSON() ([]byte, error) {
-	return json.Marshal(RedactedRefreshToken)
-}
-
-// IdToken is an oidc id_token
-type IdToken string
-
-// RedactedIdToken is the redacted string or json for an oidc id_token
-const RedactedIdToken = "[REDACTED: id_token]"
-
-// String will redact the token
-func (t IdToken) String() string {
-	return RedactedIdToken
-}
-
-// MarshalJSON will redact the token
-func (t IdToken) MarshalJSON() ([]byte, error) {
-	return json.Marshal(RedactedIdToken)
-}
-
 // Token interface and represents an Oauth2 access_token and refresh_token
 // (including the the access_token expiry), as well as an OIDC id_token
 type Token interface {
@@ -89,6 +41,9 @@ type Tk struct {
 	underlying *oauth2.Token
 }
 
+// ensure that Tk implements the Token interface
+var _ Token = (*Tk)(nil)
+
 // NewToken creates a new Token.
 func NewToken(i IdToken, t *oauth2.Token) (Token, error) {
 	// since oauth2 is part of stdlib we're not going to worry about it leaking
@@ -106,10 +61,10 @@ func NewToken(i IdToken, t *oauth2.Token) (Token, error) {
 	}, nil
 }
 
-func (t *Tk) AccessToken() AccessToken   { return AccessToken(t.underlying.AccessToken) }
-func (t *Tk) RefreshToken() RefreshToken { return RefreshToken(t.underlying.RefreshToken) }
-func (t *Tk) IdToken() IdToken           { return IdToken(t.idToken) }
-func (t *Tk) Expiry() time.Time          { return t.underlying.Expiry }
+func (t *Tk) AccessToken() AccessToken   { return AccessToken(t.underlying.AccessToken) }   // AccessToken implements the Token.AccessToken() interface function
+func (t *Tk) RefreshToken() RefreshToken { return RefreshToken(t.underlying.RefreshToken) } // RefreshToken implements the Token.RefreshToken() interface function
+func (t *Tk) IdToken() IdToken           { return IdToken(t.idToken) }                      // IdToken implements the IdToken.IdToken() interface function
+func (t *Tk) Expiry() time.Time          { return t.underlying.Expiry }                     // Expiry implements the Token.Expiry() interface function
 
 // StaticTokenSource returns a TokenSource that always returns the same token.
 // Because the provided token t is never refreshed.
@@ -158,4 +113,52 @@ func getTokenOpts(opt ...Option) tokenOptions {
 	opts := tokenDefaults()
 	ApplyOpts(&opts, opt...)
 	return opts
+}
+
+// AccessToken is an oauth access_token
+type AccessToken string
+
+// RedactedAccessToken is the redacted string or json for an oauth access_token
+const RedactedAccessToken = "[REDACTED: access_token]"
+
+// String will redact the token
+func (t AccessToken) String() string {
+	return RedactedAccessToken
+}
+
+// MarshalJSON will redact the token
+func (t AccessToken) MarshalJSON() ([]byte, error) {
+	return json.Marshal(RedactedAccessToken)
+}
+
+// RefreshToken is an oauth refresh_token
+type RefreshToken string
+
+// RedactedRefreshToken is the redacted string or json for an oauth refresh_token
+const RedactedRefreshToken = "[REDACTED: refresh_token]"
+
+// String will redact the token
+func (t RefreshToken) String() string {
+	return RedactedRefreshToken
+}
+
+// MarshalJSON will redact the token
+func (t RefreshToken) MarshalJSON() ([]byte, error) {
+	return json.Marshal(RedactedRefreshToken)
+}
+
+// IdToken is an oidc id_token
+type IdToken string
+
+// RedactedIdToken is the redacted string or json for an oidc id_token
+const RedactedIdToken = "[REDACTED: id_token]"
+
+// String will redact the token
+func (t IdToken) String() string {
+	return RedactedIdToken
+}
+
+// MarshalJSON will redact the token
+func (t IdToken) MarshalJSON() ([]byte, error) {
+	return json.Marshal(RedactedIdToken)
 }
