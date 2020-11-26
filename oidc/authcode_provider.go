@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/coreos/go-oidc"
-	strutil "github.com/hashicorp/probo/sdk/strutils"
+	strutil "github.com/hashicorp/cap/sdk/strutils"
 	"golang.org/x/oauth2"
 )
 

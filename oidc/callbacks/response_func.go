@@ -1,6 +1,6 @@
 package callbacks
 
-import "github.com/hashicorp/probo/oidc"
+import "github.com/hashicorp/cap/oidc"
 
 // AuthenErrorResponse represents Oauth2 error responses.  See:
 // https://openid.net/specs/openid-connect-core-1_0.html#AuthError

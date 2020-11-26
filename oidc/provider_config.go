@@ -9,7 +9,7 @@ import (
 	"net/url"
 
 	"github.com/coreos/go-oidc"
-	sdkHttp "github.com/hashicorp/probo/sdk/http"
+	sdkHttp "github.com/hashicorp/cap/sdk/http"
 )
 
 type ClientSecret string

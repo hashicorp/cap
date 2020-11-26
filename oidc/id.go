@@ -1,6 +1,6 @@
 package oidc
 
-import "github.com/hashicorp/probo/sdk/id"
+import "github.com/hashicorp/cap/sdk/id"
 
 // NewId generates a ID with an optional prefix.   The ID generated is suitable
 // for an State Id or Nonce

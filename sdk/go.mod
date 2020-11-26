@@ -1,4 +1,4 @@
-module github.com/hashicorp/probo/sdk
+module github.com/hashicorp/cap/sdk
 
 go 1.15
 

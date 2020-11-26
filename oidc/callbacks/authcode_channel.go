@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/hashicorp/probo/oidc"
+	"github.com/hashicorp/cap/oidc"
 )
 
 // LoginResp is used by AuthCodeWithChannel.  The callback writes its response

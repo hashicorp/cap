@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/hashicorp/probo/oidc"
+	"github.com/hashicorp/cap/oidc"
 )
 
 // StateReader defines an interface for finding and reading an oidc.State
