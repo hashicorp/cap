@@ -54,13 +54,13 @@ func NewAuthCodeProvider(c *ProviderConfig, opts ...Option) (*AuthCodeProvider, 
 
 	client, err := c.HttpClient()
 	if err != nil {
-		p.Stop() // release the backgroundCtxCancel resources
+		p.Done() // release the backgroundCtxCancel resources
 		return nil, WrapError(err, WithOp(op), WithKind(ErrInternal), WithMsg("unable create http client"))
 	}
 
 	provider, err := oidc.NewProvider(HttpClientContext(p.backgroundCtx, client), c.Issuer) // makes http req to issuer for discovery
 	if err != nil {
-		p.Stop() // release the backgroundCtxCancel resources
+		p.Done() // release the backgroundCtxCancel resources
 		// we don't know what's causing the problem, so we won't classify the
 		// error with a Kind
 		return nil, NewError(ErrInvalidIssuer, WithOp(op), WithMsg("unable to create provider"), WithWrap(err))
@@ -70,9 +70,9 @@ func NewAuthCodeProvider(c *ProviderConfig, opts ...Option) (*AuthCodeProvider, 
 	return p, nil
 }
 
-// Stop the provider's background resources and must be called for every
+// Done with the provider's background resources and must be called for every
 // AuthCodeProvider created
-func (p *AuthCodeProvider) Stop() {
+func (p *AuthCodeProvider) Done() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.backgroundCtxCancel != nil {
