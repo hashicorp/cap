@@ -42,16 +42,13 @@ type St struct {
 
 	// Expiration is the expiration time for the State
 	expiration time.Time
-
-	// Payload is any additional payload need by the process using the State
-	Payload interface{}
 }
 
 // ensure that St implements the State interface
 var _ State = (*St)(nil)
 
 // NewState creates a new state in memory
-func NewState(expireIn time.Duration, redirectURL string, payload interface{}) (State, error) {
+func NewState(expireIn time.Duration, redirectURL string) (State, error) {
 	const op = "oidc.NewState"
 	if redirectURL == "" {
 		return nil, NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("redirectURL is empty"))
@@ -71,7 +68,6 @@ func NewState(expireIn time.Duration, redirectURL string, payload interface{}) (
 		nonce:       nonce,
 		redirectURL: redirectURL,
 		expiration:  time.Now().Add(expireIn),
-		Payload:     payload,
 	}, nil
 }
 
