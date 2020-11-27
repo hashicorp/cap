@@ -10,6 +10,7 @@ import (
 
 	"github.com/coreos/go-oidc"
 	sdkHttp "github.com/hashicorp/cap/sdk/http"
+	strutil "github.com/hashicorp/cap/sdk/strutils"
 )
 
 type ClientSecret string
@@ -62,15 +63,16 @@ type ProviderConfig struct {
 //  WithStateReadWriter
 //	WithProviderCA
 // 	WithScopes
-func NewProviderConfig(issuer string, clientId string, clientSecret ClientSecret, opt ...Option) (*ProviderConfig, error) {
+func NewProviderConfig(issuer string, clientId string, clientSecret ClientSecret, supported []Alg, opt ...Option) (*ProviderConfig, error) {
 	const op = "NewProviderConfig"
 	opts := getProviderConfigOpts(opt...)
 	c := &ProviderConfig{
-		Issuer:       issuer,
-		ClientId:     clientId,
-		ClientSecret: clientSecret,
-		Scopes:       opts.withScopes,
-		ProviderCA:   opts.withProviderCA,
+		Issuer:               issuer,
+		ClientId:             clientId,
+		ClientSecret:         clientSecret,
+		SupportedSigningAlgs: supported,
+		Scopes:               opts.withScopes,
+		ProviderCA:           opts.withProviderCA,
 	}
 	if err := c.Validate(); err != nil {
 		return nil, WrapError(err, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg("invalid provider config"))
@@ -100,10 +102,10 @@ func (c *ProviderConfig) Validate() error {
 
 	u, err := url.Parse(c.Issuer)
 	if err != nil {
-		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("issuer url is invalid"), WithWrap(err))
+		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg(fmt.Sprintf("issuer url %s is invalid", c.Issuer)), WithWrap(err))
 	}
-	if u.Scheme != "https" {
-		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("issuer url schemes in not https"), WithWrap(err))
+	if !strutil.StrListContains([]string{"https", "http"}, u.Scheme) {
+		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg(fmt.Sprintf("issuer url %s scheme %s is not http or https", c.Issuer, u.Scheme)), WithWrap(err))
 	}
 	if len(c.SupportedSigningAlgs) == 0 {
 		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("supported algorithms is empty"))
@@ -142,6 +144,7 @@ func HttpClientContext(ctx context.Context, client *http.Client) context.Context
 // providerConfigOptions is the set of available options
 type providerConfigOptions struct {
 	withScopes     []string
+	withAudiences  []string
 	withProviderCA string
 }
 
@@ -164,6 +167,15 @@ func WithScopes(scopes []string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*providerConfigOptions); ok {
 			o.withScopes = scopes
+		}
+	}
+}
+
+// WithAudiences provides an optional list of audiences for the provider's config
+func WithAudiences(auds []string) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*providerConfigOptions); ok {
+			o.withAudiences = auds
 		}
 	}
 }
