@@ -39,7 +39,8 @@ type Token interface {
 
 // StaticTokenSource is a single function interface that defines a method to
 // create a oauth2.TokenSource that always returns the same token. Because the
-// token is never refreshed.
+// token is never refreshed.  A TokenSource can be used to when calling a
+// provider's UserInfo(), among other things
 type StaticTokenSource interface {
 	StaticTokenSource() oauth2.TokenSource
 }
