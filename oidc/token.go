@@ -173,8 +173,12 @@ func (t IdToken) MarshalJSON() ([]byte, error) {
 	return json.Marshal(RedactedIdToken)
 }
 
+// Claims retrieves the IdToken claims.
 func (t IdToken) Claims(c *map[string]interface{}) error {
 	const op = "IdToken.Claims"
+	if len(t) == 0 {
+		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg("the id_token is empty"))
+	}
 	parts := strings.Split(string(t), ".")
 	if len(parts) < 2 {
 		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg(fmt.Sprintf("malformed id_token, expected 3 parts got %d", len(parts))))
