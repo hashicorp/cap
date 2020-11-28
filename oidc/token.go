@@ -1,7 +1,10 @@
 package oidc
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -168,4 +171,20 @@ func (t IdToken) String() string {
 // MarshalJSON will redact the token
 func (t IdToken) MarshalJSON() ([]byte, error) {
 	return json.Marshal(RedactedIdToken)
+}
+
+func (t IdToken) Claims(c *map[string]interface{}) error {
+	const op = "IdToken.Claims"
+	parts := strings.Split(string(t), ".")
+	if len(parts) < 2 {
+		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg(fmt.Sprintf("malformed id_token, expected 3 parts got %d", len(parts))))
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg("malformed id_token claims"), WithWrap(err))
+	}
+	if err := json.Unmarshal(raw, c); err != nil {
+		return NewError(ErrCodeUnknown, WithOp(op), WithKind(ErrInternal), WithMsg("unable to marshal id_token JSON"), WithWrap(err))
+	}
+	return nil
 }
