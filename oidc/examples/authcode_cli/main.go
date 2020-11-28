@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/cap/oidc"
-	"github.com/hashicorp/cap/oidc/callbacks"
+	"github.com/hashicorp/cap/oidc/callback"
 )
 
 // List of configuration environment variables
@@ -107,7 +107,7 @@ func main() {
 		}
 	}
 
-	errorFn := func(stateId string, r *callbacks.AuthenErrorResponse, e error, w http.ResponseWriter) {
+	errorFn := func(stateId string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter) {
 		var responseToken oidc.Token
 		var responseErr error
 		defer func() {
@@ -127,7 +127,7 @@ func main() {
 			return
 		}
 	}
-	callback := callbacks.AuthCodeWithState(context.Background(), p, &callbacks.SingleStateReader{State: s}, successFn, errorFn)
+	callback := callback.AuthCodeWithState(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
 
 	// Set up callback handler
 	http.HandleFunc("/callback", callback)
