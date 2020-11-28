@@ -64,10 +64,6 @@ func main() {
 		fmt.Fprint(os.Stderr, err)
 		return
 	}
-	fmt.Fprintf(os.Stderr, "Env: OIDC_PORT\t\t%s\n", env[port])
-	fmt.Fprintf(os.Stderr, "Env: OIDC_CLIENT_ID\t%s\n", env[clientId])
-	fmt.Fprintf(os.Stderr, "Env: OIDC_CLIENT_SECRET\t%s\n", env[clientSecret])
-	fmt.Fprintf(os.Stderr, "Env: OIDC_ISSUER\t%s\n", env[issuer])
 
 	// handle ctrl-c while waiting for the callback
 	sigintCh := make(chan os.Signal, 1)
@@ -105,16 +101,8 @@ func main() {
 		defer func() {
 			doneCh <- loginResp{t, responseErr}
 		}()
-
-		respToken := convertToken(t)
-		data, err := json.MarshalIndent(respToken, "", "    ")
-		if err != nil {
-			responseErr = err
-			fmt.Fprint(os.Stderr, err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
 		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write(data); err != nil {
+		if _, err := w.Write([]byte(successHTML)); err != nil {
 			fmt.Fprintf(os.Stderr, "error writing successful response: %s", err)
 		}
 	}
@@ -152,9 +140,6 @@ func main() {
 	defer listener.Close()
 
 	// Open the default browser to the callback URL.
-	fmt.Fprintf(os.Stderr, "Env: callback\t\thttp://localhost:%s/callback\n\n", env[port])
-
-	// Open the default browser to the callback URL.
 	fmt.Fprintf(os.Stderr, "Complete the login via your OIDC provider. Launching browser to:\n\n    %s\n\n\n", authUrl)
 	if err := openURL(authUrl); err != nil {
 		fmt.Fprintf(os.Stderr, "Error attempting to automatically open browser: '%s'.\nPlease visit the authorization URL manually.", err)
@@ -178,7 +163,7 @@ func main() {
 		if resp.Error != nil {
 			fmt.Fprintf(os.Stderr, "channel received error: %s", resp.Error)
 		}
-		data, err := json.MarshalIndent(convertToken(resp.Token), "", "    ")
+		data, err := json.MarshalIndent(printableToken(resp.Token), "", "    ")
 		if err != nil {
 			fmt.Fprint(os.Stderr, err)
 		}
@@ -234,7 +219,9 @@ type respToken struct {
 	Expiry       time.Time
 }
 
-func convertToken(t oidc.Token) respToken {
+// printableToken is needed because the oidc.Token redacts the IdToken,
+// AccessToken and RefreshToken
+func printableToken(t oidc.Token) respToken {
 	return respToken{
 		IdToken:      string(t.IdToken()),
 		AccessToken:  string(t.AccessToken()),
