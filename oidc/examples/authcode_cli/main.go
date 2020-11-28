@@ -94,7 +94,7 @@ func main() {
 
 	successFn, successCh := success()
 	errorFn, failedCh := failed()
-	callback := callback.AuthCodeWithState(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
+	callback := callback.AuthCode(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
 
 	// Set up callback handler
 	http.HandleFunc("/callback", callback)
