@@ -6,14 +6,6 @@ import (
 	"github.com/hashicorp/cap/oidc"
 )
 
-// AuthenErrorResponse represents Oauth2 error responses.  See:
-// https://openid.net/specs/openid-connect-core-1_0.html#AuthError
-type AuthenErrorResponse struct {
-	Error       string
-	Description string
-	Uri         string
-}
-
 // SuccessResponseFunc is used by Callbacks to create a http response when the
 // authorization code callback is successful.
 //
@@ -41,3 +33,11 @@ type SuccessResponseFunc func(stateId string, t oidc.Token, w http.ResponseWrite
 // update the oidc.State for the request or log info about the request, if the
 // implementation requires it.
 type ErrorResponseFunc func(stateId string, r *AuthenErrorResponse, e error, w http.ResponseWriter)
+
+// AuthenErrorResponse represents Oauth2 error responses.  See:
+// https://openid.net/specs/openid-connect-core-1_0.html#AuthError
+type AuthenErrorResponse struct {
+	Error       string
+	Description string
+	Uri         string
+}
