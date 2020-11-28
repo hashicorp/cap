@@ -18,12 +18,13 @@ type StateReader interface {
 
 // SingleStateReader implements the StateReader interface for a single state.
 // When it's Read() receiver function is called it will always return the same
-// state.
+// state.  It is concurrent safe.
 type SingleStateReader struct {
 	State oidc.State
 }
 
-// Read() will always return the same state and satisfies the StateReader interface
+// Read() will always return the same state and satisfies the StateReader
+// interface.  Read() is concurrent safe.
 func (s *SingleStateReader) Read(ctx context.Context, stateId string) (oidc.State, error) {
 	return s.State, nil
 }
