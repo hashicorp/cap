@@ -190,7 +190,6 @@ func (p *AuthCodeProvider) UserInfo(ctx context.Context, tokenSource oauth2.Toke
 	userinfo, err := p.provider.UserInfo(oidcCtx, tokenSource)
 	if err != nil {
 		return nil, NewError(ErrUserInfoFailed, WithOp(op), WithKind(ErrInternal), WithMsg("provider UserInfo request failed"), WithWrap(err))
-
 	}
 	claims := map[string]interface{}{}
 	err = userinfo.Claims(&claims)
