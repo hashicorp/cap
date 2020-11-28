@@ -11,7 +11,7 @@ import (
 // expiration.
 const DefaultTokenExpirySkew = 10 * time.Second
 
-// Token interface and represents an Oauth2 access_token and refresh_token
+// Token interface represents an Oauth2 access_token and refresh_token
 // (including the the access_token expiry), as well as an OIDC id_token
 type Token interface {
 	// RefreshToken returns the Token's refresh_token
@@ -32,6 +32,13 @@ type Token interface {
 	// Expired will return true if the token is expired.  Implementations may
 	// want to support the WithExpirySkew option.
 	Expired(opt ...Option) bool
+}
+
+// StaticTokenSource is a single function interface that defines a method to
+// create a oauth2.TokenSource that always returns the same token. Because the
+// token is never refreshed.
+type StaticTokenSource interface {
+	StaticTokenSource() oauth2.TokenSource
 }
 
 // Tk satisfies the Token interface and represents an Oauth2 access_token and
