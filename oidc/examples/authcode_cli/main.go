@@ -141,7 +141,8 @@ func main() {
 		if t, ok := resp.Token.(interface {
 			StaticTokenSource() oauth2.TokenSource
 		}); ok {
-			infoClaims, err := p.UserInfo(context.Background(), t.StaticTokenSource())
+			var infoClaims map[string]interface{}
+			err := p.UserInfo(context.Background(), t.StaticTokenSource(), &infoClaims)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "channel received success, but error getting UserInfo claims: %s", resp.Error)
 				return

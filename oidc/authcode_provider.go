@@ -179,24 +179,29 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationS
 
 // UserInfo gets the UserInfo claims from the provider using the token produced
 // by the tokenSource.
-func (p *AuthCodeProvider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource) (map[string]interface{}, error) {
+func (p *AuthCodeProvider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource, claims *map[string]interface{}) error {
 	const op = "Tk.UserInfo"
+	if tokenSource == nil {
+		return NewError(ErrNilParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("token source is nil"))
+	}
+	if claims == nil {
+		return NewError(ErrNilParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("claims are nil"))
+	}
 	client, err := p.config.HttpClient()
 	if err != nil {
-		return nil, WrapError(err, WithOp(op), WithKind(ErrInternal), WithMsg("unable to create http client"))
+		return WrapError(err, WithOp(op), WithKind(ErrInternal), WithMsg("unable to create http client"))
 	}
 	oidcCtx := HttpClientContext(ctx, client)
 
 	userinfo, err := p.provider.UserInfo(oidcCtx, tokenSource)
 	if err != nil {
-		return nil, NewError(ErrUserInfoFailed, WithOp(op), WithKind(ErrInternal), WithMsg("provider UserInfo request failed"), WithWrap(err))
+		return NewError(ErrUserInfoFailed, WithOp(op), WithKind(ErrInternal), WithMsg("provider UserInfo request failed"), WithWrap(err))
 	}
-	claims := map[string]interface{}{}
 	err = userinfo.Claims(&claims)
 	if err != nil {
-		return nil, NewError(ErrUserInfoFailed, WithOp(op), WithKind(ErrInternal), WithMsg("failed to get UserInfo claims"), WithWrap(err))
+		return NewError(ErrUserInfoFailed, WithOp(op), WithKind(ErrInternal), WithMsg("failed to get UserInfo claims"), WithWrap(err))
 	}
-	return claims, nil
+	return nil
 }
 
 // VerifyIdToken will verify the inbound IdToken.
