@@ -7,36 +7,14 @@ import (
 	"github.com/hashicorp/cap/oidc"
 )
 
-// StateReader defines an interface for finding and reading an oidc.State
-// Implementions must be concurrently safe, since the reader will likely be used
-// within a concurrent http.Handler
-type StateReader interface {
-	// Read an existing AuthCodeState entry.  The returned state's Id()
-	// must match the stateId used to look it up. Implementions must be
-	// concurrently safe, which likely means returning a deep copy
-	Read(ctx context.Context, stateId string) (oidc.State, error)
-}
-
-// SingleStateReader implements the StateReader interface for a single state.
-// When it's Read() receiver function is called it will always return the same
-// state.
-type SingleStateReader struct {
-	State oidc.State
-}
-
-// Read() will always return the same state and satisfies the StateReader interface
-func (s *SingleStateReader) Read(ctx context.Context, stateId string) (oidc.State, error) {
-	return s.State, nil
-}
-
-// AuthCodeWithState creates an oidc authorization code callback handler which
+// AuthCode creates an oidc authorization code callback handler which
 // uses a StateReader to read existing oidc.State(s) via the request's
 // oidc "state" parameter as a key for the lookup.
 //
 // The SuccessResponseFunc is used to create a response when callback is
 // successful. The ErrorResponseFunc is to create a response when the callback
 // fails.
-func AuthCodeWithState(ctx context.Context, p *oidc.AuthCodeProvider, rw StateReader, sFn SuccessResponseFunc, eFn ErrorResponseFunc) http.HandlerFunc {
+func AuthCode(ctx context.Context, p *oidc.AuthCodeProvider, rw StateReader, sFn SuccessResponseFunc, eFn ErrorResponseFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		const op = "callbacks.AuthCodeState"
 
