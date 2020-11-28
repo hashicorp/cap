@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -53,11 +54,6 @@ func envConfig() (map[string]interface{}, error) {
 	return env, nil
 }
 
-type loginResp struct {
-	Token oidc.Token // Token is populated when the callback successfully exchanges the auth code.
-	Error error      // Error is populated when there's an error during the callback
-}
-
 func main() {
 	env, err := envConfig()
 	if err != nil {
@@ -95,38 +91,8 @@ func main() {
 		return
 	}
 
-	doneCh := make(chan loginResp)
-	successFn := func(stateId string, t oidc.Token, w http.ResponseWriter) {
-		var responseErr error
-		defer func() {
-			doneCh <- loginResp{t, responseErr}
-		}()
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(successHTML)); err != nil {
-			fmt.Fprintf(os.Stderr, "error writing successful response: %s", err)
-		}
-	}
-
-	errorFn := func(stateId string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter) {
-		var responseToken oidc.Token
-		var responseErr error
-		defer func() {
-			doneCh <- loginResp{responseToken, responseErr}
-		}()
-
-		if e != nil {
-			fmt.Fprintf(os.Stderr, "callback error: %s", e.Error())
-			responseErr = e
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		if r != nil {
-			fmt.Fprintf(os.Stderr, "callback error from oidc provider: %s", r)
-			responseErr = fmt.Errorf("callback error from oidc provider: %s", r)
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-	}
+	successFn, successCh := success()
+	errorFn, failedCh := failed()
 	callback := callback.AuthCodeWithState(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
 
 	// Set up callback handler
@@ -159,7 +125,7 @@ func main() {
 	case err := <-srvCh:
 		fmt.Fprintf(os.Stderr, "server closed with error: %s", err.Error())
 		return
-	case resp := <-doneCh:
+	case resp := <-successCh:
 		if resp.Error != nil {
 			fmt.Fprintf(os.Stderr, "channel received error: %s", resp.Error)
 		}
@@ -169,6 +135,13 @@ func main() {
 		}
 		fmt.Fprintf(os.Stderr, "channel received success:\n%s", data)
 		return
+	case err := <-failedCh:
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "channel received error: %s", err)
+			return
+		}
+		fmt.Fprint(os.Stderr, "missing error from error channel.  try again?\n")
+		return
 	case <-sigintCh:
 		fmt.Fprintf(os.Stderr, "Interrupted")
 		return
@@ -176,6 +149,52 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Timed out waiting for response from provider")
 		return
 	}
+}
+
+type successResp struct {
+	Token oidc.Token // Token is populated when the callback successfully exchanges the auth code.
+	Error error      // Error is populated when there's an error during the callback
+}
+
+func success() (callback.SuccessResponseFunc, <-chan successResp) {
+	doneCh := make(chan successResp)
+	return func(stateId string, t oidc.Token, w http.ResponseWriter) {
+		var responseErr error
+		defer func() {
+			doneCh <- successResp{t, responseErr}
+			close(doneCh)
+		}()
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte(successHTML)); err != nil {
+			responseErr = err
+			fmt.Fprintf(os.Stderr, "error writing successful response: %s", err)
+		}
+	}, doneCh
+}
+
+func failed() (callback.ErrorResponseFunc, <-chan error) {
+	doneCh := make(chan error)
+	return func(stateId string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter) {
+		var responseErr error
+		defer func() {
+			doneCh <- responseErr
+			close(doneCh)
+		}()
+
+		if e != nil {
+			fmt.Fprintf(os.Stderr, "callback error: %s", e.Error())
+			responseErr = e
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if r != nil {
+			fmt.Fprintf(os.Stderr, "callback error from oidc provider: %s", r)
+			responseErr = fmt.Errorf("callback error from oidc provider: %s", r)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		responseErr = errors.New("Unknown error from callback")
+	}, doneCh
 }
 
 // openURL opens the specified URL in the default browser of the user.
