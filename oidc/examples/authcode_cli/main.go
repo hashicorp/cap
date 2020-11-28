@@ -17,6 +17,7 @@ import (
 
 	"github.com/hashicorp/cap/oidc"
 	"github.com/hashicorp/cap/oidc/callback"
+	"golang.org/x/oauth2"
 )
 
 // List of configuration environment variables
@@ -127,13 +128,32 @@ func main() {
 		return
 	case resp := <-successCh:
 		if resp.Error != nil {
-			fmt.Fprintf(os.Stderr, "channel received error: %s", resp.Error)
+			fmt.Fprintf(os.Stderr, "channel received success with error: %s", resp.Error)
+			return
 		}
-		data, err := json.MarshalIndent(printableToken(resp.Token), "", "    ")
+		tokenData, err := json.MarshalIndent(printableToken(resp.Token), "", "    ")
 		if err != nil {
 			fmt.Fprint(os.Stderr, err)
+			return
 		}
-		fmt.Fprintf(os.Stderr, "channel received success:\n%s", data)
+		fmt.Fprintf(os.Stderr, "channel received success.\nToken:%s\n", tokenData)
+
+		if t, ok := resp.Token.(interface {
+			StaticTokenSource() oauth2.TokenSource
+		}); ok {
+			infoClaims, err := p.UserInfo(context.Background(), t.StaticTokenSource())
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "channel received success, but error getting UserInfo claims: %s", resp.Error)
+				return
+			}
+			infoData, err := json.MarshalIndent(infoClaims, "", "    ")
+			if err != nil {
+				fmt.Fprint(os.Stderr, err)
+				return
+			}
+			fmt.Fprintf(os.Stderr, "UserInfo claims:%s\n", infoData)
+			return
+		}
 		return
 	case err := <-failedCh:
 		if err != nil {
