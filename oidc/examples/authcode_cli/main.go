@@ -138,6 +138,18 @@ func main() {
 		}
 		fmt.Fprintf(os.Stderr, "channel received success.\nToken:%s\n", tokenData)
 
+		var tokenClaims map[string]interface{}
+		if err := resp.Token.IdToken().Claims(&tokenClaims); err != nil {
+			fmt.Fprintf(os.Stderr, "IdToken claims: error parsing: %s", err)
+		} else {
+			idData, err := json.MarshalIndent(tokenClaims, "", "    ")
+			if err != nil {
+				fmt.Fprint(os.Stderr, err)
+			} else {
+				fmt.Fprintf(os.Stderr, "IdToken claims:%s\n", idData)
+			}
+		}
+
 		if t, ok := resp.Token.(interface {
 			StaticTokenSource() oauth2.TokenSource
 		}); ok {
