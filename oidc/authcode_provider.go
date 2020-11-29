@@ -179,13 +179,13 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationS
 
 // UserInfo gets the UserInfo claims from the provider using the token produced
 // by the tokenSource.
-func (p *AuthCodeProvider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource, claims *map[string]interface{}) error {
+func (p *AuthCodeProvider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource, claims interface{}) error {
 	const op = "Tk.UserInfo"
 	if tokenSource == nil {
 		return NewError(ErrNilParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("token source is nil"))
 	}
 	if claims == nil {
-		return NewError(ErrNilParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("claims are nil"))
+		return NewError(ErrNilParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("claims interface is nil"))
 	}
 	client, err := p.config.HttpClient()
 	if err != nil {

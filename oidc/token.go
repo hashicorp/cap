@@ -175,10 +175,13 @@ func (t IdToken) MarshalJSON() ([]byte, error) {
 }
 
 // Claims retrieves the IdToken claims.
-func (t IdToken) Claims(c *map[string]interface{}) error {
+func (t IdToken) Claims(claims interface{}) error {
 	const op = "IdToken.Claims"
 	if len(t) == 0 {
-		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg("the id_token is empty"))
+		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("the id_token is empty"))
+	}
+	if claims == nil {
+		return NewError(ErrNilParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("claims interface is nil"))
 	}
 	parts := strings.Split(string(t), ".")
 	if len(parts) < 2 {
@@ -188,7 +191,7 @@ func (t IdToken) Claims(c *map[string]interface{}) error {
 	if err != nil {
 		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg("malformed id_token claims"), WithWrap(err))
 	}
-	if err := json.Unmarshal(raw, c); err != nil {
+	if err := json.Unmarshal(raw, claims); err != nil {
 		return NewError(ErrCodeUnknown, WithOp(op), WithKind(ErrInternal), WithMsg("unable to marshal id_token JSON"), WithWrap(err))
 	}
 	return nil
