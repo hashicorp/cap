@@ -20,7 +20,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// List of configuration environment variables
+// List of required configuration environment variables
 const (
 	clientId     = "OIDC_CLIENT_ID"
 	clientSecret = "OIDC_CLIENT_SECRET"
