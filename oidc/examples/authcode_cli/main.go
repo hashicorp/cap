@@ -131,42 +131,9 @@ func main() {
 			fmt.Fprintf(os.Stderr, "channel received success with error: %s", resp.Error)
 			return
 		}
-		tokenData, err := json.MarshalIndent(printableToken(resp.Token), "", "    ")
-		if err != nil {
-			fmt.Fprint(os.Stderr, err)
-			return
-		}
-		fmt.Fprintf(os.Stderr, "channel received success.\nToken:%s\n", tokenData)
-
-		var tokenClaims map[string]interface{}
-		if err := resp.Token.IdToken().Claims(&tokenClaims); err != nil {
-			fmt.Fprintf(os.Stderr, "IdToken claims: error parsing: %s", err)
-		} else {
-			idData, err := json.MarshalIndent(tokenClaims, "", "    ")
-			if err != nil {
-				fmt.Fprint(os.Stderr, err)
-			} else {
-				fmt.Fprintf(os.Stderr, "IdToken claims:%s\n", idData)
-			}
-		}
-
-		if t, ok := resp.Token.(interface {
-			StaticTokenSource() oauth2.TokenSource
-		}); ok {
-			var infoClaims map[string]interface{}
-			err := p.UserInfo(context.Background(), t.StaticTokenSource(), &infoClaims)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "channel received success, but error getting UserInfo claims: %s", resp.Error)
-				return
-			}
-			infoData, err := json.MarshalIndent(infoClaims, "", "    ")
-			if err != nil {
-				fmt.Fprint(os.Stderr, err)
-				return
-			}
-			fmt.Fprintf(os.Stderr, "UserInfo claims:%s\n", infoData)
-			return
-		}
+		printToken(resp.Token)
+		printClaims(resp.Token.IdToken())
+		printUserInfo(p, resp.Token)
 		return
 	case err := <-failedCh:
 		if err != nil {
@@ -269,6 +236,48 @@ type respToken struct {
 	AccessToken  string
 	RefreshToken string
 	Expiry       time.Time
+}
+
+func printClaims(t oidc.IdToken) {
+	var tokenClaims map[string]interface{}
+	if err := t.Claims(&tokenClaims); err != nil {
+		fmt.Fprintf(os.Stderr, "IdToken claims: error parsing: %s", err)
+	} else {
+		if idData, err := json.MarshalIndent(tokenClaims, "", "    "); err != nil {
+			fmt.Fprint(os.Stderr, err)
+		} else {
+			fmt.Fprintf(os.Stderr, "IdToken claims:%s\n", idData)
+		}
+	}
+}
+
+func printUserInfo(p *oidc.AuthCodeProvider, t oidc.Token) {
+	if t, ok := t.(interface {
+		StaticTokenSource() oauth2.TokenSource
+	}); ok {
+		var infoClaims map[string]interface{}
+		err := p.UserInfo(context.Background(), t.StaticTokenSource(), &infoClaims)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "channel received success, but error getting UserInfo claims: %s", err)
+			return
+		}
+		infoData, err := json.MarshalIndent(infoClaims, "", "    ")
+		if err != nil {
+			fmt.Fprint(os.Stderr, err)
+			return
+		}
+		fmt.Fprintf(os.Stderr, "UserInfo claims:%s\n", infoData)
+		return
+	}
+}
+
+func printToken(t oidc.Token) {
+	tokenData, err := json.MarshalIndent(printableToken(t), "", "    ")
+	if err != nil {
+		fmt.Fprint(os.Stderr, err)
+		return
+	}
+	fmt.Fprintf(os.Stderr, "channel received success.\nToken:%s\n", tokenData)
 }
 
 // printableToken is needed because the oidc.Token redacts the IdToken,
