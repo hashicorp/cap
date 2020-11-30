@@ -18,7 +18,7 @@ import (
 // Just a reminder that the function parameters could also be used to
 // update the oidc.State for the request or log info about the request, if the
 // implementation requires it.
-type SuccessResponseFunc func(stateId string, t oidc.Token, w http.ResponseWriter)
+type SuccessResponseFunc func(stateId string, t oidc.Token, w http.ResponseWriter, req *http.Request)
 
 // ErrorResponseFunc is used by Callbacks to create a response when the
 // authorization code callback fails.
@@ -32,7 +32,7 @@ type SuccessResponseFunc func(stateId string, t oidc.Token, w http.ResponseWrite
 // Just a reminder that the function parameters could also be used to
 // update the oidc.State for the request or log info about the request, if the
 // implementation requires it.
-type ErrorResponseFunc func(stateId string, r *AuthenErrorResponse, e error, w http.ResponseWriter)
+type ErrorResponseFunc func(stateId string, respErr *AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request)
 
 // AuthenErrorResponse represents Oauth2 error responses.  See:
 // https://openid.net/specs/openid-connect-core-1_0.html#AuthError

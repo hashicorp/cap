@@ -22,7 +22,7 @@ func AuthCode(ctx context.Context, p *oidc.AuthCodeProvider, rw StateReader, sFn
 
 		if rw == nil {
 			responseErr := oidc.NewError(oidc.ErrNilParameter, oidc.WithOp(op), oidc.WithKind(oidc.ErrParameterViolation), oidc.WithMsg("state read/writer is nil"))
-			eFn(reqState, nil, responseErr, w)
+			eFn(reqState, nil, responseErr, w, req)
 			return
 		}
 
@@ -34,7 +34,7 @@ func AuthCode(ctx context.Context, p *oidc.AuthCodeProvider, rw StateReader, sFn
 				Description: req.FormValue("error_description"),
 				Uri:         req.FormValue("error_uri"),
 			}
-			eFn(reqState, reqError, nil, w)
+			eFn(reqState, reqError, nil, w, req)
 			return
 		}
 
@@ -45,18 +45,18 @@ func AuthCode(ctx context.Context, p *oidc.AuthCodeProvider, rw StateReader, sFn
 		state, err := rw.Read(ctx, reqState)
 		if err != nil {
 			responseErr := oidc.NewError(oidc.ErrCodeUnknown, oidc.WithOp(op), oidc.WithKind(oidc.ErrInternal), oidc.WithMsg("unable to read auth code state"), oidc.WithWrap(err))
-			eFn(reqState, nil, responseErr, w)
+			eFn(reqState, nil, responseErr, w, req)
 			return
 		}
 		if state == nil {
 			// could have expired or it could be invalid... no way to known for sure
 			responseErr := oidc.NewError(oidc.ErrNotFound, oidc.WithOp(op), oidc.WithKind(oidc.ErrParameterViolation), oidc.WithMsg("auth code state not found"))
-			eFn(reqState, nil, responseErr, w)
+			eFn(reqState, nil, responseErr, w, req)
 			return
 		}
 		if state.IsExpired() {
 			responseErr := oidc.NewError(oidc.ErrExpiredState, oidc.WithOp(op), oidc.WithKind(oidc.ErrParameterViolation), oidc.WithMsg("authentication state is expired"))
-			eFn(reqState, nil, responseErr, w)
+			eFn(reqState, nil, responseErr, w, req)
 			return
 		}
 
@@ -65,16 +65,16 @@ func AuthCode(ctx context.Context, p *oidc.AuthCodeProvider, rw StateReader, sFn
 			// given... this is an internal sort of error on the part of the
 			// reader, but given this error, we probably shouldn't update the state
 			responseErr := oidc.NewError(oidc.ErrResponseStateInvalid, oidc.WithOp(op), oidc.WithKind(oidc.ErrIntegrityViolation), oidc.WithMsg("authen state and response state are not equal"))
-			eFn(reqState, nil, responseErr, w)
+			eFn(reqState, nil, responseErr, w, req)
 			return
 		}
 
 		responseToken, err := p.Exchange(ctx, state, reqState, reqCode)
 		if err != nil {
 			responseErr := oidc.WrapError(err, oidc.WithOp(op), oidc.WithKind(oidc.ErrInternal), oidc.WithMsg("unable to exchange authorization code"))
-			eFn(reqState, nil, responseErr, w)
+			eFn(reqState, nil, responseErr, w, req)
 			return
 		}
-		sFn(reqState, responseToken, w)
+		sFn(reqState, responseToken, w, req)
 	}
 }

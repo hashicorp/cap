@@ -162,7 +162,7 @@ type successResp struct {
 
 func success() (callback.SuccessResponseFunc, <-chan successResp) {
 	doneCh := make(chan successResp)
-	return func(stateId string, t oidc.Token, w http.ResponseWriter) {
+	return func(stateId string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
 		var responseErr error
 		defer func() {
 			doneCh <- successResp{t, responseErr}
@@ -178,7 +178,7 @@ func success() (callback.SuccessResponseFunc, <-chan successResp) {
 
 func failed() (callback.ErrorResponseFunc, <-chan error) {
 	doneCh := make(chan error)
-	return func(stateId string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter) {
+	return func(stateId string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
 		var responseErr error
 		defer func() {
 			if _, err := w.Write([]byte(responseErr.Error())); err != nil {
