@@ -55,8 +55,8 @@ type Tk struct {
 // ensure that Tk implements the Token interface
 var _ Token = (*Tk)(nil)
 
-// NewToken creates a new Token.
-func NewToken(i IdToken, t *oauth2.Token) (Token, error) {
+// NewToken creates a new Token (*Tk)
+func NewToken(i IdToken, t *oauth2.Token) (*Tk, error) {
 	// since oauth2 is part of stdlib we're not going to worry about it leaking
 	// into our abstraction in this factory
 	const op = "oidc.NewToken"

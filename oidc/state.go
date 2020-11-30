@@ -14,7 +14,10 @@ type State interface {
 
 	// RedirectURL is the redirection URL that the authentication response will
 	// be sent. This URL must exactly match one of the redirection URL values
-	// for the Client pre-registered at the OpenID Provider,
+	// for the Client pre-registered at the OpenID Provider.  RedirectURL is
+	// used for several steps in an OIDC flow.  For instance, the same
+	// RedirectURL must be used when generating an authorization code URL and
+	// exchange the code for a token.
 	RedirectURL() string
 
 	//	Nonce is a unique nonce and a string value used to associate a Client
@@ -47,8 +50,8 @@ type St struct {
 // ensure that St implements the State interface
 var _ State = (*St)(nil)
 
-// NewState creates a new state in memory
-func NewState(expireIn time.Duration, redirectURL string) (State, error) {
+// NewState creates a new State (*St)
+func NewState(expireIn time.Duration, redirectURL string) (*St, error) {
 	const op = "oidc.NewState"
 	if redirectURL == "" {
 		return nil, NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("redirectURL is empty"))
