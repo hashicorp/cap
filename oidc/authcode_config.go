@@ -28,7 +28,8 @@ func (t ClientSecret) MarshalJSON() ([]byte, error) {
 	return json.Marshal(RedactedClientSecret)
 }
 
-// AuthCodeConfig describes a typical 3-legged OIDC authorization code flow.
+// AuthCodeConfig represents the configuration for a typical 3-legged OIDC
+// authorization code flow.
 type AuthCodeConfig struct {
 	// ClientId is the relying party id
 	ClientId string
