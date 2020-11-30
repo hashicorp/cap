@@ -13,7 +13,7 @@ import (
 // AuthCodeProvider provides integration with a provider using the authorization
 // code flow.
 type AuthCodeProvider struct {
-	config   *ProviderConfig
+	config   *AuthCodeConfig
 	provider *oidc.Provider
 
 	mu sync.Mutex
@@ -33,7 +33,7 @@ type AuthCodeProvider struct {
 //
 //  See: AuthCodeProvider.Stop() which must be called to release provider resources.
 //	See: NewProviderConfig() to create a ProviderConfig.
-func NewAuthCodeProvider(c *ProviderConfig, opts ...Option) (*AuthCodeProvider, error) {
+func NewAuthCodeProvider(c *AuthCodeConfig, opts ...Option) (*AuthCodeProvider, error) {
 	const op = "authcode.NewProvider"
 	if c == nil {
 		return nil, NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("provider config is nil"))

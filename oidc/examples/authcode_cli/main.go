@@ -67,7 +67,7 @@ func main() {
 	signal.Notify(sigintCh, os.Interrupt)
 	defer signal.Stop(sigintCh)
 
-	pc, err := oidc.NewProviderConfig(env[issuer].(string), env[clientId].(string), oidc.ClientSecret(env[clientSecret].(string)), []oidc.Alg{oidc.RS256})
+	pc, err := oidc.NewAuthCodeConfig(env[issuer].(string), env[clientId].(string), oidc.ClientSecret(env[clientSecret].(string)), []oidc.Alg{oidc.RS256})
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return

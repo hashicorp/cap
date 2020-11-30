@@ -28,7 +28,8 @@ func (t ClientSecret) MarshalJSON() ([]byte, error) {
 	return json.Marshal(RedactedClientSecret)
 }
 
-type ProviderConfig struct {
+// AuthCodeConfig describes a typical 3-legged OIDC authorization code flow.
+type AuthCodeConfig struct {
 	// ClientId is the relying party id
 	ClientId string
 
@@ -57,16 +58,16 @@ type ProviderConfig struct {
 	ProviderCA string
 }
 
-// NewProviderConfig composes a new config for a provider.
+// NewAuthCodeConfig composes a new config for a provider.
 // Supported options:
 // 	WithLogger
 //  WithStateReadWriter
 //	WithProviderCA
 // 	WithScopes
-func NewProviderConfig(issuer string, clientId string, clientSecret ClientSecret, supported []Alg, opt ...Option) (*ProviderConfig, error) {
+func NewAuthCodeConfig(issuer string, clientId string, clientSecret ClientSecret, supported []Alg, opt ...Option) (*AuthCodeConfig, error) {
 	const op = "NewProviderConfig"
 	opts := getProviderConfigOpts(opt...)
-	c := &ProviderConfig{
+	c := &AuthCodeConfig{
 		Issuer:               issuer,
 		ClientId:             clientId,
 		ClientSecret:         clientSecret,
@@ -85,7 +86,7 @@ func NewProviderConfig(issuer string, clientId string, clientSecret ClientSecret
 // an http request.  SupportedSigningAlgs is validated against the list of
 // currently supported algs: RS256, RS384, RS512, ES256, ES384, ES512, PS256,
 // PS384, PS512
-func (c *ProviderConfig) Validate() error {
+func (c *AuthCodeConfig) Validate() error {
 	const op = "oidc.Validate"
 	if c == nil {
 		return NewError(ErrNilParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("provider config is nil"))
@@ -120,7 +121,7 @@ func (c *ProviderConfig) Validate() error {
 
 // HttpClient is a helper function that creates a new http client for the
 // provider configured
-func (c *ProviderConfig) HttpClient() (*http.Client, error) {
+func (c *AuthCodeConfig) HttpClient() (*http.Client, error) {
 	const op = "ProviderConfig.NewHTTPClient"
 	client, err := sdkHttp.NewClient(c.ProviderCA)
 	if err != nil {
