@@ -10,8 +10,8 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// AuthCodeProvider provides integration with a provider using the authorization
-// code flow.
+// AuthCodeProvider provides integration with a provider using the typical
+// 3-legged OIDC authorization code flow.
 type AuthCodeProvider struct {
 	config   *AuthCodeConfig
 	provider *oidc.Provider

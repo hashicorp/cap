@@ -14,8 +14,8 @@ import (
 // expiration.
 const DefaultTokenExpirySkew = 10 * time.Second
 
-// Token interface represents an Oauth2 access_token and refresh_token
-// (including the the access_token expiry), as well as an OIDC id_token
+// Token interface represents an OIDC id_token, as well as an Oauth2
+// access_token and refresh_token (including the the access_token expiry)
 type Token interface {
 	// RefreshToken returns the Token's refresh_token
 	RefreshToken() RefreshToken
