@@ -202,8 +202,11 @@ func (p *AuthCodeProvider) UserInfo(ctx context.Context, tokenSource oauth2.Toke
 	return nil
 }
 
-// VerifyIdToken will verify the inbound IdToken, including a check of the
-// provider's allowed audiences (if they are not empty).
+// VerifyIdToken will verify the inbound IdToken.  It verifies it's been signed
+// by the provider, it validates the nonce, and performs checks any additional
+// checks depending on the provider's config (audiences, etc).
+//
+// See: https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
 func (p *AuthCodeProvider) VerifyIdToken(ctx context.Context, t IdToken, nonce string) error {
 	const op = "AuthCodeProvider.VerifyIdToken"
 	if t == "" {
@@ -224,7 +227,11 @@ func (p *AuthCodeProvider) VerifyIdToken(ctx context.Context, t IdToken, nonce s
 
 	oidcIdToken, err := verifier.Verify(ctx, string(t))
 	if err != nil {
-		return NewError(ErrInvalidSignature, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg("error verifying id_token signature"), WithWrap(err))
+		return NewError(ErrInvalidSignature, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg("invalid id_token signature"), WithWrap(err))
+	}
+
+	if oidcIdToken.Nonce != nonce {
+		return NewError(ErrInvalidNonce, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg("invalid id_token nonce"), WithWrap(err))
 	}
 
 	if err := func() error {
@@ -238,7 +245,7 @@ func (p *AuthCodeProvider) VerifyIdToken(ctx context.Context, t IdToken, nonce s
 		}
 		return nil
 	}(); err != nil {
-		return NewError(ErrInvalidAudience, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg("error validating id_token audiences"), WithWrap(err))
+		return NewError(ErrInvalidAudience, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg("invalid id_token audiences"), WithWrap(err))
 	}
 	return nil
 }
