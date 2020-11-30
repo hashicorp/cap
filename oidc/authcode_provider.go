@@ -202,7 +202,8 @@ func (p *AuthCodeProvider) UserInfo(ctx context.Context, tokenSource oauth2.Toke
 	return nil
 }
 
-// VerifyIdToken will verify the inbound IdToken.
+// VerifyIdToken will verify the inbound IdToken, including a check of the
+// provider's allowed audiences (if they are not empty).
 func (p *AuthCodeProvider) VerifyIdToken(ctx context.Context, t IdToken, nonce string) error {
 	const op = "AuthCodeProvider.VerifyIdToken"
 	if t == "" {
