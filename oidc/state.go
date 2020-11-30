@@ -8,22 +8,17 @@ import (
 // contains the data needed to uniquely represent that one-time flow across the
 // multiple interactions needed to complete the OIDC flow the user is
 // attempting.  Id() is passed throughout the OIDC interactions to uniquely
-// identify the flow's state.
+// identify the flow's state. The Id() and Nonce() cannot cannot be equal, and
+// will be used during the OIDC flow to prevent CSRF and replay attacks (see the
+// oidc spec for specifics).
 type State interface {
 	//	Id is a unique identifier and an opaque value used to maintain state
-	//	between the oidc request and the callback
+	//	between the oidc request and the callback. Id cannot equal the Nonce.
 	Id() string
 
-	// RedirectURL is the redirection URL that the authentication response will
-	// be sent. This URL must exactly match one of the redirection URL values
-	// for the Client pre-registered at the OpenID Provider.  RedirectURL is
-	// used for several steps in an OIDC flow.  For instance, the same
-	// RedirectURL must be used when generating an authorization code URL and
-	// exchange the code for a token.
-	RedirectURL() string
-
 	//	Nonce is a unique nonce and a string value used to associate a Client
-	//	session with an ID Token, and to mitigate replay attacks.
+	//	session with an ID Token, and to mitigate replay attacks. Nonce cannot
+	//	equal the Id
 	Nonce() string
 
 	// IsExpired returns true if the state has expired. Implementations should
@@ -42,9 +37,6 @@ type St struct {
 	// nonce is a unique nonce and suitable for use as an oidc nonce
 	nonce string
 
-	// redirectURL is the authentication response URL
-	redirectURL string
-
 	// Expiration is the expiration time for the State
 	expiration time.Time
 }
@@ -53,11 +45,8 @@ type St struct {
 var _ State = (*St)(nil)
 
 // NewState creates a new State (*St)
-func NewState(expireIn time.Duration, redirectURL string) (*St, error) {
+func NewState(expireIn time.Duration) (*St, error) {
 	const op = "oidc.NewState"
-	if redirectURL == "" {
-		return nil, NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("redirectURL is empty"))
-	}
 	nonce, err := NewId("n")
 	if err != nil {
 		return nil, WrapError(err, WithOp(op), WithKind(ErrInternal), WithMsg("unable to generate a state's nonce"))
@@ -69,16 +58,14 @@ func NewState(expireIn time.Duration, redirectURL string) (*St, error) {
 	}
 
 	return &St{
-		id:          id,
-		nonce:       nonce,
-		redirectURL: redirectURL,
-		expiration:  time.Now().Add(expireIn),
+		id:         id,
+		nonce:      nonce,
+		expiration: time.Now().Add(expireIn),
 	}, nil
 }
 
-func (s *St) Id() string          { return s.id }          // Id implements the State.Id() interface function
-func (s *St) RedirectURL() string { return s.redirectURL } // RedirectURL implements the State.RedirectURL() interface function
-func (s *St) Nonce() string       { return s.nonce }       // Nonce implements the Nonce.Id() interface function
+func (s *St) Id() string    { return s.id }    // Id implements the State.Id() interface function
+func (s *St) Nonce() string { return s.nonce } // Nonce implements the Nonce.Id() interface function
 
 // DefaultStateExpirySkew defines a default time skew when checking a State's
 // expiration.

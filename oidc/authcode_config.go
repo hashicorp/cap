@@ -51,6 +51,8 @@ type AuthCodeConfig struct {
 	// PS256, PS384, PS512
 	SupportedSigningAlgs []Alg
 
+	RedirectUrl string
+
 	// Audiences is a list optional case-sensitive strings used when verifying an id_token's "aud" claim
 	Audiences []string
 
@@ -60,11 +62,10 @@ type AuthCodeConfig struct {
 
 // NewAuthCodeConfig composes a new config for a provider.
 // Supported options:
-// 	WithLogger
 //  WithStateReadWriter
 //	WithProviderCA
 // 	WithScopes
-func NewAuthCodeConfig(issuer string, clientId string, clientSecret ClientSecret, supported []Alg, opt ...Option) (*AuthCodeConfig, error) {
+func NewAuthCodeConfig(issuer string, clientId string, clientSecret ClientSecret, supported []Alg, redirectUrl string, opt ...Option) (*AuthCodeConfig, error) {
 	const op = "NewProviderConfig"
 	opts := getProviderConfigOpts(opt...)
 	c := &AuthCodeConfig{
@@ -72,6 +73,7 @@ func NewAuthCodeConfig(issuer string, clientId string, clientSecret ClientSecret
 		ClientId:             clientId,
 		ClientSecret:         clientSecret,
 		SupportedSigningAlgs: supported,
+		RedirectUrl:          redirectUrl,
 		Scopes:               opts.withScopes,
 		ProviderCA:           opts.withProviderCA,
 	}
@@ -100,7 +102,9 @@ func (c *AuthCodeConfig) Validate() error {
 	if c.Issuer == "" {
 		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("discovery URL is empty"))
 	}
-
+	if c.RedirectUrl == "" {
+		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("redirect URL is empty"))
+	}
 	u, err := url.Parse(c.Issuer)
 	if err != nil {
 		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg(fmt.Sprintf("issuer url %s is invalid", c.Issuer)), WithWrap(err))

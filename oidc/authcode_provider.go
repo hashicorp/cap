@@ -84,20 +84,14 @@ func (p *AuthCodeProvider) Done() {
 // AuthURL will generate a URL the caller can use to kick off an OIDC
 // authorization code flow with an IdP.  The redirectURL is the URL the IdP
 // should use as a redirect after the authentication/authorization is completed
-// by the user. The State must contain a unique Id and Nonce (they cannot be
-// equal) which will be used during the OIDC flow to prevent CSRF and replay
-// attacks (see the oidc spec for specifics). The State must also contain
-// a redirectURL that will handle the IdP redirect and has been configured as a
-// valid redirect URL for the IdP.
+// by the user.
 //
-// 	See NewState() to create an oidc flow State with a valid Id and Nonce.
+//  See NewState() to create an oidc flow State with a valid Id and Nonce that
+// will uniquely identify the user's authentication attempt through out the flow.
 func (p *AuthCodeProvider) AuthURL(ctx context.Context, s State, opts ...Option) (url string, e error) {
 	const op = "AuthCodeProvider.AuthURL"
 	if s.Id() == s.Nonce() {
 		return "", NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("state id and nonce cannot be equal"))
-	}
-	if s.RedirectURL() == "" {
-		return "", NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("redirectURL is empty"))
 	}
 	// Add the "openid" scope, which is a required scope for oidc flows
 	scopes := append([]string{oidc.ScopeOpenID}, p.config.Scopes...)
@@ -106,7 +100,7 @@ func (p *AuthCodeProvider) AuthURL(ctx context.Context, s State, opts ...Option)
 	oauth2Config := oauth2.Config{
 		ClientID:     p.config.ClientId,
 		ClientSecret: string(p.config.ClientSecret),
-		RedirectURL:  s.RedirectURL(),
+		RedirectURL:  p.config.RedirectUrl,
 		Endpoint:     p.provider.Endpoint(),
 		Scopes:       scopes,
 	}
@@ -151,7 +145,7 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationS
 	var oauth2Config = oauth2.Config{
 		ClientID:     p.config.ClientId,
 		ClientSecret: string(p.config.ClientSecret),
-		RedirectURL:  s.RedirectURL(),
+		RedirectURL:  p.config.RedirectUrl,
 		Endpoint:     p.provider.Endpoint(),
 		Scopes:       scopes,
 	}

@@ -67,7 +67,11 @@ func main() {
 	signal.Notify(sigintCh, os.Interrupt)
 	defer signal.Stop(sigintCh)
 
-	pc, err := oidc.NewAuthCodeConfig(env[issuer].(string), env[clientId].(string), oidc.ClientSecret(env[clientSecret].(string)), []oidc.Alg{oidc.RS256})
+	issuer := env[issuer].(string)
+	clientId := env[clientId].(string)
+	clientSecret := oidc.ClientSecret(env[clientSecret].(string))
+	redirectUrl := fmt.Sprintf("http://localhost:%s/callback", env[port].(string))
+	pc, err := oidc.NewAuthCodeConfig(issuer, clientId, clientSecret, []oidc.Alg{oidc.RS256}, redirectUrl)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return
@@ -80,7 +84,7 @@ func main() {
 	}
 	defer p.Done()
 
-	s, err := oidc.NewState(env[attemptExp].(time.Duration), fmt.Sprintf("http://localhost:%s/callback", env[port].(string)))
+	s, err := oidc.NewState(env[attemptExp].(time.Duration))
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return
