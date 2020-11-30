@@ -1,19 +1,18 @@
-# authcode_cli
+# authcode_spa
 
 
-An example OIDC user authentication CLI. 
+An example OIDC SPA (single page application). 
 
 The example uses the `oidc` and `callback` packages to compose a solution. Among
 other things, it demonstrates how to configure and use an
 `oidc.AuthCodeProvider` to implement a solution. 
 
-It combines `oidc.State`, `callback.SingleStateReader`, and
-the `callback.AuthCodeWithState()` function to compose a "one-time use" oidc
-authentication response callback that's tied to the CLI's authentication attempt.  
+It extends `oidc.State` and `oidc.Token` in combination with a State cache to
+compose a solution.
 
 It also shows example closures that meet the `callback.SuccessResponseFn` and
-`callback.ErrorResponseFn` interfaces and uses channels to communicate if the
-CLI user successfully authenticated with the OIDC provider. 
+`callback.ErrorResponseFn` interfaces and uses the State cache to communicate if
+the user successfully authenticated with the OIDC provider.  
 
 <hr>
 
