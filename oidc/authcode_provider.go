@@ -126,7 +126,7 @@ func (p *AuthCodeProvider) AuthURL(ctx context.Context, s State, opts ...Option)
 // On success, the Token returned will include IdToken and AccessToken.  Based
 // on the IdP, it may include a RefreshToken.  Based on the provider config, it
 // may include UserInfoClaims.
-func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationState string, authorizationCode string) (Token, error) {
+func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationState string, authorizationCode string) (*Tk, error) {
 	const op = "AuthCodeProvider.Exchange"
 	if p.config == nil {
 		return nil, NewError(ErrNilParameter, WithOp(op), WithKind(ErrInternal), WithMsg("provider config is nil"))
@@ -165,15 +165,13 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationS
 	if !ok {
 		return nil, NewError(ErrMissingIdToken, WithOp(op), WithKind(ErrInternal), WithMsg("id_token is missing from auth code exchange"), WithWrap(err))
 	}
-	if err := p.VerifyIdToken(ctx, idToken, s.Nonce()); err != nil {
-		return nil, NewError(ErrIdTokenVerificationFailed, WithOp(op), WithKind(ErrInternal), WithMsg("id_token failed verification"), WithWrap(err))
-	}
-
 	t, err := NewToken(IdToken(idToken), oauth2Token)
 	if err != nil {
 		return nil, WrapError(err, WithOp(op), WithKind(ErrInternal), WithMsg("unable to create new id_token"), WithWrap(err))
 	}
-
+	if err := p.VerifyIdToken(ctx, t.IdToken(), s.Nonce()); err != nil {
+		return nil, NewError(ErrIdTokenVerificationFailed, WithOp(op), WithKind(ErrInternal), WithMsg("id_token failed verification"), WithWrap(err))
+	}
 	return t, nil
 }
 
@@ -205,9 +203,9 @@ func (p *AuthCodeProvider) UserInfo(ctx context.Context, tokenSource oauth2.Toke
 }
 
 // VerifyIdToken will verify the inbound IdToken.
-func (p *AuthCodeProvider) VerifyIdToken(ctx context.Context, idToken, nonce string) error {
+func (p *AuthCodeProvider) VerifyIdToken(ctx context.Context, t IdToken, nonce string) error {
 	const op = "AuthCodeProvider.VerifyIdToken"
-	if idToken == "" {
+	if t == "" {
 		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("id_token is empty"))
 	}
 	if nonce == "" {
@@ -223,7 +221,7 @@ func (p *AuthCodeProvider) VerifyIdToken(ctx context.Context, idToken, nonce str
 	}
 	verifier := p.provider.Verifier(oidcConfig)
 
-	oidcIdToken, err := verifier.Verify(ctx, idToken)
+	oidcIdToken, err := verifier.Verify(ctx, string(t))
 	if err != nil {
 		return NewError(ErrInvalidSignature, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg("error verifying id_token signature"), WithWrap(err))
 	}
