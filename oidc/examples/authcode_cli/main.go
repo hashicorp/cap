@@ -177,6 +177,9 @@ func failed() (callback.ErrorResponseFunc, <-chan error) {
 	return func(stateId string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter) {
 		var responseErr error
 		defer func() {
+			if _, err := w.Write([]byte(responseErr.Error())); err != nil {
+				fmt.Fprintf(os.Stderr, "error writing failed response: %s", err)
+			}
 			doneCh <- responseErr
 			close(doneCh)
 		}()
