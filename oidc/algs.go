@@ -1,5 +1,6 @@
 package oidc
 
+// Alg represents asymmetric signing algorithms
 type Alg string
 
 const (
