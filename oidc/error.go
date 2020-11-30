@@ -24,6 +24,7 @@ const (
 	ErrIdTokenVerificationFailed
 	ErrInvalidSignature
 	ErrInvalidAudience
+	ErrInvalidNonce
 	ErrNotFound
 	ErrLoginFailed
 	ErrUserInfoFailed
