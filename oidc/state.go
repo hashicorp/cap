@@ -4,9 +4,11 @@ import (
 	"time"
 )
 
-// State defines an interface for the representation an oidc state used for
-// oidc flows.  Id() is passed throughout the flows to uniquely identify a
-// specific flow's state.
+// State basically represents one OIDC authentication flow for a user. It
+// contains the data needed to uniquely represent that one-time flow across the
+// multiple interactions needed to complete the OIDC flow the user is
+// attempting.  Id() is passed throughout the OIDC interactions to uniquely
+// identify the flow's state.
 type State interface {
 	//	Id is a unique identifier and an opaque value used to maintain state
 	//	between the oidc request and the callback
