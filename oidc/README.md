@@ -34,7 +34,7 @@ tokens.
 
 <hr>
 
-### Examples:
+### Examples apps:
 
 * [CLI example](examples/authcode_cli/) which implements an OIDC
   user authentication CLI.  
@@ -42,3 +42,56 @@ tokens.
 * [SPA example](examples/authcode_spa) which implements an OIDC user
   authentication SPA (single page app). 
 
+### Example snippets...
+
+```go
+// Create a new Config
+pc, _ := oidc.NewConfig(
+"http://YOUR_ISSUER/",
+"YOUR_CLIENT_ID",
+"YOUR_CLIENT_SECRET",
+[]oidc.Alg{oidc.RS256},
+"http://YOUR_REDIRECT_URL",
+)
+
+// Create a provider
+p, _ := oidc.NewProvider(pc)
+defer p.Done()
+
+// Create a State for a user's authentication attempt
+ttl := 2 * time.Minute
+s, _ := oidc.NewState(ttl)
+
+// Create an auth URL from the provider using the user's auth attempt state
+authUrl, _ := p.AuthURL(context.Background(), s)
+fmt.Println("open url to kick-off authentication: ", authUrl)
+
+// Exchange an authorizationCode and authorizationState received via a
+// callback from successful oidc authentication response for a verified
+// Token.
+t, _ := p.Exchange(context.Background(), s, "RECEIVED_STATE", "RECEIVED_CODE")
+fmt.Printf("id_token: %v\n", string(t.IdToken()))
+
+// Create an auth code callback
+successFn := func(stateId string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
+w.WriteHeader(http.StatusOK)
+printableToken := fmt.Sprintf("id_token: %s", string(t.IdToken()))
+_, _ = w.Write([]byte(printableToken))
+}
+errorFn := func(stateId string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
+if e != nil {
+	w.WriteHeader(http.StatusInternalServerError)
+	_, _ = w.Write([]byte(e.Error()))
+	return
+}
+w.WriteHeader(http.StatusUnauthorized)
+}
+callback := callback.AuthCode(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
+http.HandleFunc("/callback", callback)
+
+// Get the user's claims via the UserInfo endpoint
+var infoClaims map[string]interface{}
+_ = p.UserInfo(context.Background(), t.StaticTokenSource(), &infoClaims)
+fmt.Println("UserInfo claims: ", infoClaims)
+
+```
