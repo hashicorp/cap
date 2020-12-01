@@ -154,10 +154,19 @@ func ExampleProvider_UserInfo() {
 		[]oidc.Alg{oidc.RS256},
 		"http://YOUR_REDIRECT_URL",
 	)
-	
+
 	// Create a provider
 	p, _ := oidc.NewProvider(pc)
 	defer p.Done()
+
+	// Create a State for a user's authentication attempt
+	ttl := 2 * time.Minute
+	s, _ := oidc.NewState(ttl)
+
+	// Exchange an authorizationCode and authorizationState received via a
+	// callback from successful oidc authentication response for a verified
+	// Token.
+	t, _ := p.Exchange(context.Background(), s, "RECEIVED_STATE", "RECEIVED_CODE")
 
 	var infoClaims map[string]interface{}
 	_ = p.UserInfo(context.Background(), t.StaticTokenSource(), &infoClaims)
