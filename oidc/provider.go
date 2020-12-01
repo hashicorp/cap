@@ -10,10 +10,10 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// AuthCodeProvider provides integration with a provider using the typical
+// Provider provides integration with a provider using the typical
 // 3-legged OIDC authorization code flow.
-type AuthCodeProvider struct {
-	config   *AuthCodeConfig
+type Provider struct {
+	config   *Config
 	provider *oidc.Provider
 
 	mu sync.Mutex
@@ -27,13 +27,13 @@ type AuthCodeProvider struct {
 	backgroundCtxCancel context.CancelFunc
 }
 
-// NewAuthCodeProvider creates and initializes a Provider for the OIDC
+// NewProvider creates and initializes a Provider for the OIDC
 // authorization code flow.  Intializing the the provider, includes making an
 // http request to the provider's issuer.
 //
-//  See: AuthCodeProvider.Stop() which must be called to release provider resources.
+//  See: Provider.Stop() which must be called to release provider resources.
 //	See: NewProviderConfig() to create a ProviderConfig.
-func NewAuthCodeProvider(c *AuthCodeConfig) (*AuthCodeProvider, error) {
+func NewProvider(c *Config) (*Provider, error) {
 	const op = "authcode.NewProvider"
 	if c == nil {
 		return nil, fmt.Errorf("provider config is nil: %w", ErrNilParameter)
@@ -43,10 +43,10 @@ func NewAuthCodeProvider(c *AuthCodeConfig) (*AuthCodeProvider, error) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	// initializing the AuthCodeProvider with it's background ctx/cancel will
+	// initializing the Provider with it's background ctx/cancel will
 	// allow us to use p.Stop() to release any resources when returning errors
 	// from this function.
-	p := &AuthCodeProvider{
+	p := &Provider{
 		config:              c,
 		backgroundCtx:       ctx,
 		backgroundCtxCancel: cancel,
@@ -71,8 +71,8 @@ func NewAuthCodeProvider(c *AuthCodeConfig) (*AuthCodeProvider, error) {
 }
 
 // Done with the provider's background resources and must be called for every
-// AuthCodeProvider created
-func (p *AuthCodeProvider) Done() {
+// Provider created
+func (p *Provider) Done() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.backgroundCtxCancel != nil {
@@ -88,8 +88,8 @@ func (p *AuthCodeProvider) Done() {
 //
 //  See NewState() to create an oidc flow State with a valid Id and Nonce that
 // will uniquely identify the user's authentication attempt through out the flow.
-func (p *AuthCodeProvider) AuthURL(ctx context.Context, s State) (url string, e error) {
-	const op = "AuthCodeProvider.AuthURL"
+func (p *Provider) AuthURL(ctx context.Context, s State) (url string, e error) {
+	const op = "Provider.AuthURL"
 	if s.Id() == s.Nonce() {
 		return "", fmt.Errorf("state id and nonce cannot be equal: %w", ErrInvalidParameter)
 	}
@@ -120,8 +120,8 @@ func (p *AuthCodeProvider) AuthURL(ctx context.Context, s State) (url string, e 
 // On success, the Token returned will include IdToken and AccessToken.  Based
 // on the IdP, it may include a RefreshToken.  Based on the provider config, it
 // may include UserInfoClaims.
-func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationState string, authorizationCode string) (*Tk, error) {
-	const op = "AuthCodeProvider.Exchange"
+func (p *Provider) Exchange(ctx context.Context, s State, authorizationState string, authorizationCode string) (*Tk, error) {
+	const op = "Provider.Exchange"
 	if p.config == nil {
 		return nil, fmt.Errorf("provider config is nil: %w", ErrNilParameter)
 	}
@@ -171,7 +171,7 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationS
 
 // UserInfo gets the UserInfo claims from the provider using the token produced
 // by the tokenSource.
-func (p *AuthCodeProvider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource, claims interface{}) error {
+func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource, claims interface{}) error {
 	const op = "Tk.UserInfo"
 	if tokenSource == nil {
 		return fmt.Errorf("token source is nil: %w", ErrInvalidParameter)
@@ -201,8 +201,8 @@ func (p *AuthCodeProvider) UserInfo(ctx context.Context, tokenSource oauth2.Toke
 // checks depending on the provider's config (audiences, etc).
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
-func (p *AuthCodeProvider) VerifyIdToken(ctx context.Context, t IdToken, nonce string) error {
-	const op = "AuthCodeProvider.VerifyIdToken"
+func (p *Provider) VerifyIdToken(ctx context.Context, t IdToken, nonce string) error {
+	const op = "Provider.VerifyIdToken"
 	if t == "" {
 		return fmt.Errorf("id_token is empty: %w", ErrInvalidParameter)
 	}

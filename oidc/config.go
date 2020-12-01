@@ -28,9 +28,9 @@ func (t ClientSecret) MarshalJSON() ([]byte, error) {
 	return json.Marshal(RedactedClientSecret)
 }
 
-// AuthCodeConfig represents the configuration for a typical 3-legged OIDC
+// Config represents the configuration for a typical 3-legged OIDC
 // authorization code flow.
-type AuthCodeConfig struct {
+type Config struct {
 	// ClientId is the relying party id
 	ClientId string
 
@@ -61,15 +61,15 @@ type AuthCodeConfig struct {
 	ProviderCA string
 }
 
-// NewAuthCodeConfig composes a new config for a provider.
+// NewConfig composes a new config for a provider.
 // Supported options:
 //  WithStateReadWriter
 //	WithProviderCA
 // 	WithScopes
-func NewAuthCodeConfig(issuer string, clientId string, clientSecret ClientSecret, supported []Alg, redirectUrl string, opt ...Option) (*AuthCodeConfig, error) {
+func NewConfig(issuer string, clientId string, clientSecret ClientSecret, supported []Alg, redirectUrl string, opt ...Option) (*Config, error) {
 	const op = "NewProviderConfig"
 	opts := getProviderConfigOpts(opt...)
-	c := &AuthCodeConfig{
+	c := &Config{
 		Issuer:               issuer,
 		ClientId:             clientId,
 		ClientSecret:         clientSecret,
@@ -89,7 +89,7 @@ func NewAuthCodeConfig(issuer string, clientId string, clientSecret ClientSecret
 // an http request.  SupportedSigningAlgs is validated against the list of
 // currently supported algs: RS256, RS384, RS512, ES256, ES384, ES512, PS256,
 // PS384, PS512
-func (c *AuthCodeConfig) Validate() error {
+func (c *Config) Validate() error {
 	const op = "oidc.Validate"
 	if c == nil {
 		return fmt.Errorf("provider config is nil: %w", ErrNilParameter)
@@ -126,7 +126,7 @@ func (c *AuthCodeConfig) Validate() error {
 
 // HttpClient is a helper function that creates a new http client for the
 // provider configured
-func (c *AuthCodeConfig) HttpClient() (*http.Client, error) {
+func (c *Config) HttpClient() (*http.Client, error) {
 	const op = "ProviderConfig.NewHTTPClient"
 	client, err := sdkHttp.NewClient(c.ProviderCA)
 	if err != nil {

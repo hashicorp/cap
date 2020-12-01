@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/cap/oidc"
 )
 
-func LoginHandler(ctx context.Context, p *oidc.AuthCodeProvider, sc *stateCache, timeout time.Duration) http.HandlerFunc {
+func LoginHandler(ctx context.Context, p *oidc.Provider, sc *stateCache, timeout time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s, err := oidc.NewState(timeout)
 		if err != nil {

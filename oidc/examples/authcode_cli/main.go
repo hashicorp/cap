@@ -71,13 +71,13 @@ func main() {
 	clientId := env[clientId].(string)
 	clientSecret := oidc.ClientSecret(env[clientSecret].(string))
 	redirectUrl := fmt.Sprintf("http://localhost:%s/callback", env[port].(string))
-	pc, err := oidc.NewAuthCodeConfig(issuer, clientId, clientSecret, []oidc.Alg{oidc.RS256}, redirectUrl)
+	pc, err := oidc.NewConfig(issuer, clientId, clientSecret, []oidc.Alg{oidc.RS256}, redirectUrl)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return
 	}
 
-	p, err := oidc.NewAuthCodeProvider(pc)
+	p, err := oidc.NewProvider(pc)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return
@@ -258,7 +258,7 @@ func printClaims(t oidc.IdToken) {
 	}
 }
 
-func printUserInfo(p *oidc.AuthCodeProvider, t oidc.Token) {
+func printUserInfo(p *oidc.Provider, t oidc.Token) {
 	if t, ok := t.(interface {
 		StaticTokenSource() oauth2.TokenSource
 	}); ok {

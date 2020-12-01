@@ -15,7 +15,7 @@ import (
 // The SuccessResponseFunc is used to create a response when callback is
 // successful. The ErrorResponseFunc is to create a response when the callback
 // fails.
-func AuthCode(ctx context.Context, p *oidc.AuthCodeProvider, rw StateReader, sFn SuccessResponseFunc, eFn ErrorResponseFunc) http.HandlerFunc {
+func AuthCode(ctx context.Context, p *oidc.Provider, rw StateReader, sFn SuccessResponseFunc, eFn ErrorResponseFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		const op = "callbacks.AuthCodeState"
 

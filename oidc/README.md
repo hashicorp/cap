@@ -13,11 +13,11 @@ Primary types provided by the package:
 * `Token`: represents an OIDC id_token, as well as an Oauth2 access_token and
   refresh_token (including the the access_token expiry)
 
-* `AuthCodeConfig`: provides the configuration for a typical 3-legged OIDC
+* `Config`: provides the configuration for a typical 3-legged OIDC
   authorization code flow (for example: client Id/Secret, redirectUrl, supported
   signing algorithms, additional scopes requested, etc)
 
-* `AuthCodeProvider`: provides integration with a provider using the typical
+* `Provider`: provides integration with a provider using the typical
   3-legged OIDC authorization code flow. The provider provides capabilities
   like: generating an auth URL, exchanging codes for tokens, verifying tokens,
   making user info requests, etc.

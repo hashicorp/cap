@@ -5,7 +5,7 @@ An example OIDC SPA (single page application).
 
 The example uses the `oidc` and `callback` packages to compose a solution. Among
 other things, it demonstrates how to configure and use an
-`oidc.AuthCodeProvider` to implement a solution. 
+`oidc.Provider` to implement a solution. 
 
 It extends `oidc.State` and `oidc.Token` in combination with a State cache to
 compose a solution.

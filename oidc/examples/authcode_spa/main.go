@@ -67,13 +67,13 @@ func main() {
 
 	sc := newStateCache(env[attemptExp].(time.Duration), timeout)
 
-	pc, err := oidc.NewAuthCodeConfig(issuer, clientId, clientSecret, []oidc.Alg{oidc.RS256}, redirectUrl)
+	pc, err := oidc.NewConfig(issuer, clientId, clientSecret, []oidc.Alg{oidc.RS256}, redirectUrl)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return
 	}
 
-	p, err := oidc.NewAuthCodeProvider(pc)
+	p, err := oidc.NewProvider(pc)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return
