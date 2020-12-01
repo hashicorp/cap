@@ -31,8 +31,7 @@ type Provider struct {
 // authorization code flow.  Intializing the the provider, includes making an
 // http request to the provider's issuer.
 //
-//  See: Provider.Stop() which must be called to release provider resources.
-//	See: NewProviderConfig() to create a ProviderConfig.
+// See Provider.Stop() which must be called to release provider resources.
 func NewProvider(c *Config) (*Provider, error) {
 	const op = "authcode.NewProvider"
 	if c == nil {
@@ -73,6 +72,9 @@ func NewProvider(c *Config) (*Provider, error) {
 // Done with the provider's background resources and must be called for every
 // Provider created
 func (p *Provider) Done() {
+	if p == nil {
+		return
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.backgroundCtxCancel != nil {
