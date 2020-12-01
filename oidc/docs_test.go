@@ -144,3 +144,22 @@ func ExampleProvider_Exchange() {
 	t, _ := p.Exchange(context.Background(), s, "RECEIVED_STATE", "RECEIVED_CODE")
 	fmt.Printf("id_token: %v\n", string(t.IdToken()))
 }
+
+func ExampleProvider_UserInfo() {
+	// Create a new Config
+	pc, _ := oidc.NewConfig(
+		"http://YOUR_ISSUER/",
+		"YOUR_CLIENT_ID",
+		"YOUR_CLIENT_SECRET",
+		[]oidc.Alg{oidc.RS256},
+		"http://YOUR_REDIRECT_URL",
+	)
+	
+	// Create a provider
+	p, _ := oidc.NewProvider(pc)
+	defer p.Done()
+
+	var infoClaims map[string]interface{}
+	_ = p.UserInfo(context.Background(), t.StaticTokenSource(), &infoClaims)
+	fmt.Println("UserInfo claims: ", infoClaims)
+}

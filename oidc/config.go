@@ -61,11 +61,8 @@ type Config struct {
 	ProviderCA string
 }
 
-// NewConfig composes a new config for a provider.
-// Supported options:
-//  WithStateReadWriter
-//	WithProviderCA
-// 	WithScopes
+// NewConfig composes a new config for a provider. Supported options:
+// WithStateReadWriter, WithProviderCA, WithScopes
 func NewConfig(issuer string, clientId string, clientSecret ClientSecret, supported []Alg, redirectUrl string, opt ...Option) (*Config, error) {
 	const op = "NewProviderConfig"
 	opts := getProviderConfigOpts(opt...)
@@ -86,7 +83,7 @@ func NewConfig(issuer string, clientId string, clientSecret ClientSecret, suppor
 
 // Validate the provider configuration.  Among other validations, it verifies
 // the issuer is not empty, but it doesn't verify the Issuer is discoverable via
-// an http request.  SupportedSigningAlgs is validated against the list of
+// an http request.  SupportedSigningAlgs are validated against the list of
 // currently supported algs: RS256, RS384, RS512, ES256, ES384, ES512, PS256,
 // PS384, PS512
 func (c *Config) Validate() error {
