@@ -33,7 +33,7 @@ type AuthCodeProvider struct {
 //
 //  See: AuthCodeProvider.Stop() which must be called to release provider resources.
 //	See: NewProviderConfig() to create a ProviderConfig.
-func NewAuthCodeProvider(c *AuthCodeConfig, opts ...Option) (*AuthCodeProvider, error) {
+func NewAuthCodeProvider(c *AuthCodeConfig) (*AuthCodeProvider, error) {
 	const op = "authcode.NewProvider"
 	if c == nil {
 		return nil, fmt.Errorf("provider config is nil: %w", ErrNilParameter)
@@ -88,7 +88,7 @@ func (p *AuthCodeProvider) Done() {
 //
 //  See NewState() to create an oidc flow State with a valid Id and Nonce that
 // will uniquely identify the user's authentication attempt through out the flow.
-func (p *AuthCodeProvider) AuthURL(ctx context.Context, s State, opts ...Option) (url string, e error) {
+func (p *AuthCodeProvider) AuthURL(ctx context.Context, s State) (url string, e error) {
 	const op = "AuthCodeProvider.AuthURL"
 	if s.Id() == s.Nonce() {
 		return "", fmt.Errorf("state id and nonce cannot be equal: %w", ErrInvalidParameter)
