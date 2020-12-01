@@ -37,6 +37,8 @@ tokens.
 ### Examples:
 
 * [CLI example](examples/authcode_cli/) which implements an OIDC
-  user authentication CLI.  The example  uses the `oidc` and `callback` packages
-  to compose a solution.  
+  user authentication CLI.  
+
+* [SPA example](examples/authcode_spa) which implements an OIDC user
+  authentication SPA (single page app). 
 
