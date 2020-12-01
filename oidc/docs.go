@@ -28,15 +28,20 @@ The callback package includes the ability to create a http.HandlerFunc which can
 for the 3rd leg of the OIDC flow where the authorization code is exchanged for
 tokens.
 
-Examples
+Example apps
+
+Complete concise example solutions:
 
 * OIDC authentication CLI:
 https://github.com/hashicorp/cap/tree/jimlambrt-initial/oidc/examples/authcode_cli/
 
-
-
 * OIDC authentication SPA:
 https://github.com/hashicorp/cap/tree/jimlambrt-initial/oidc/examples/authcode_cli/
+
+
+Package examples
+
+Concise snippets with error handling omitted:
 
 
 */
