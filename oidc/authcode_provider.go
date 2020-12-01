@@ -2,7 +2,7 @@ package oidc
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/coreos/go-oidc"
@@ -36,10 +36,10 @@ type AuthCodeProvider struct {
 func NewAuthCodeProvider(c *AuthCodeConfig, opts ...Option) (*AuthCodeProvider, error) {
 	const op = "authcode.NewProvider"
 	if c == nil {
-		return nil, NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("provider config is nil"))
+		return nil, fmt.Errorf("provider config is nil: %w", ErrNilParameter)
 	}
 	if err := c.Validate(); err != nil {
-		return nil, WrapError(err, WithOp(op), WithKind(ErrParameterViolation), WithMsg("provider config is invalid"), WithWrap(err))
+		return nil, fmt.Errorf("provider config is invalid: %w", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -55,7 +55,7 @@ func NewAuthCodeProvider(c *AuthCodeConfig, opts ...Option) (*AuthCodeProvider, 
 	client, err := c.HttpClient()
 	if err != nil {
 		p.Done() // release the backgroundCtxCancel resources
-		return nil, WrapError(err, WithOp(op), WithKind(ErrInternal), WithMsg("unable create http client"))
+		return nil, fmt.Errorf("unable to create http client: %w", err)
 	}
 
 	provider, err := oidc.NewProvider(HttpClientContext(p.backgroundCtx, client), c.Issuer) // makes http req to issuer for discovery
@@ -63,7 +63,7 @@ func NewAuthCodeProvider(c *AuthCodeConfig, opts ...Option) (*AuthCodeProvider, 
 		p.Done() // release the backgroundCtxCancel resources
 		// we don't know what's causing the problem, so we won't classify the
 		// error with a Kind
-		return nil, NewError(ErrInvalidIssuer, WithOp(op), WithMsg("unable to create provider"), WithWrap(err))
+		return nil, fmt.Errorf("unable to create provider: %w", err)
 	}
 	p.provider = provider
 
@@ -91,7 +91,7 @@ func (p *AuthCodeProvider) Done() {
 func (p *AuthCodeProvider) AuthURL(ctx context.Context, s State, opts ...Option) (url string, e error) {
 	const op = "AuthCodeProvider.AuthURL"
 	if s.Id() == s.Nonce() {
-		return "", NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("state id and nonce cannot be equal"))
+		return "", fmt.Errorf("state id and nonce cannot be equal: %w", ErrInvalidParameter)
 	}
 	// Add the "openid" scope, which is a required scope for oidc flows
 	scopes := append([]string{oidc.ScopeOpenID}, p.config.Scopes...)
@@ -123,18 +123,18 @@ func (p *AuthCodeProvider) AuthURL(ctx context.Context, s State, opts ...Option)
 func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationState string, authorizationCode string) (*Tk, error) {
 	const op = "AuthCodeProvider.Exchange"
 	if p.config == nil {
-		return nil, NewError(ErrNilParameter, WithOp(op), WithKind(ErrInternal), WithMsg("provider config is nil"))
+		return nil, fmt.Errorf("provider config is nil: %w", ErrNilParameter)
 	}
 	if s.Id() != authorizationState {
-		return nil, NewError(ErrResponseStateInvalid, WithOp(op), WithKind(ErrParameterViolation), WithMsg("authentication state and authorization state are not equal"))
+		return nil, fmt.Errorf("authentication state and authorization state are not equal: %w", ErrInvalidParameter)
 	}
 	if s.IsExpired() {
-		return nil, NewError(ErrExpiredState, WithOp(op), WithKind(ErrParameterViolation), WithMsg("authentication state is expired"))
+		return nil, fmt.Errorf("authentication state is expired", ErrInvalidParameter)
 	}
 
 	client, err := p.config.HttpClient()
 	if err != nil {
-		return nil, WrapError(err, WithOp(op), WithKind(ErrInternal), WithMsg("unable to create http client"))
+		return nil, fmt.Errorf("unable to create http client: %w", err)
 	}
 	oidcCtx := HttpClientContext(ctx, client)
 
@@ -152,19 +152,19 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationS
 
 	oauth2Token, err := oauth2Config.Exchange(oidcCtx, authorizationCode)
 	if err != nil {
-		return nil, NewError(ErrCodeExchangeFailed, WithOp(op), WithKind(ErrInternal), WithMsg("unable to exchange auth code with provider"), WithWrap(err))
+		return nil, fmt.Errorf("unable to exchange auth code with provider: %w", err)
 	}
 
 	idToken, ok := oauth2Token.Extra("id_token").(string)
 	if !ok {
-		return nil, NewError(ErrMissingIdToken, WithOp(op), WithKind(ErrInternal), WithMsg("id_token is missing from auth code exchange"), WithWrap(err))
+		return nil, fmt.Errorf("id_token is missing from auth code exchange: %w", ErrMissingIdToken)
 	}
 	t, err := NewToken(IdToken(idToken), oauth2Token)
 	if err != nil {
-		return nil, WrapError(err, WithOp(op), WithKind(ErrInternal), WithMsg("unable to create new id_token"), WithWrap(err))
+		return nil, fmt.Errorf("unable to create new id_token: %w", err)
 	}
 	if err := p.VerifyIdToken(ctx, t.IdToken(), s.Nonce()); err != nil {
-		return nil, NewError(ErrIdTokenVerificationFailed, WithOp(op), WithKind(ErrInternal), WithMsg("id_token failed verification"), WithWrap(err))
+		return nil, fmt.Errorf("id_token failed verification: %w", err)
 	}
 	return t, nil
 }
@@ -174,24 +174,24 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationS
 func (p *AuthCodeProvider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource, claims interface{}) error {
 	const op = "Tk.UserInfo"
 	if tokenSource == nil {
-		return NewError(ErrNilParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("token source is nil"))
+		return fmt.Errorf("token source is nil: %w", ErrInvalidParameter)
 	}
 	if claims == nil {
-		return NewError(ErrNilParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("claims interface is nil"))
+		return fmt.Errorf("claims interface is nil", ErrNilParameter)
 	}
 	client, err := p.config.HttpClient()
 	if err != nil {
-		return WrapError(err, WithOp(op), WithKind(ErrInternal), WithMsg("unable to create http client"))
+		return fmt.Errorf("unable to create http client: %w", err)
 	}
 	oidcCtx := HttpClientContext(ctx, client)
 
 	userinfo, err := p.provider.UserInfo(oidcCtx, tokenSource)
 	if err != nil {
-		return NewError(ErrUserInfoFailed, WithOp(op), WithKind(ErrInternal), WithMsg("provider UserInfo request failed"), WithWrap(err))
+		return fmt.Errorf("provider UserInfo request failed: %w", err)
 	}
 	err = userinfo.Claims(&claims)
 	if err != nil {
-		return NewError(ErrUserInfoFailed, WithOp(op), WithKind(ErrInternal), WithMsg("failed to get UserInfo claims"), WithWrap(err))
+		return fmt.Errorf("failed to get UserInfo claims: %w", err)
 	}
 	return nil
 }
@@ -204,10 +204,10 @@ func (p *AuthCodeProvider) UserInfo(ctx context.Context, tokenSource oauth2.Toke
 func (p *AuthCodeProvider) VerifyIdToken(ctx context.Context, t IdToken, nonce string) error {
 	const op = "AuthCodeProvider.VerifyIdToken"
 	if t == "" {
-		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("id_token is empty"))
+		return fmt.Errorf("id_token is empty: %w", ErrInvalidParameter)
 	}
 	if nonce == "" {
-		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("nonce is empty"))
+		return fmt.Errorf("nonce is empty: %w", ErrInvalidParameter)
 	}
 	algs := []string{}
 	for _, a := range p.config.SupportedSigningAlgs {
@@ -221,11 +221,11 @@ func (p *AuthCodeProvider) VerifyIdToken(ctx context.Context, t IdToken, nonce s
 
 	oidcIdToken, err := verifier.Verify(ctx, string(t))
 	if err != nil {
-		return NewError(ErrInvalidSignature, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg("invalid id_token signature"), WithWrap(err))
+		return fmt.Errorf("invalid id_token signature: %w", err)
 	}
 
 	if oidcIdToken.Nonce != nonce {
-		return NewError(ErrInvalidNonce, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg("invalid id_token nonce"), WithWrap(err))
+		return fmt.Errorf("invalid id_token nonce: %w", ErrInvalidNonce)
 	}
 
 	if err := func() error {
@@ -235,11 +235,11 @@ func (p *AuthCodeProvider) VerifyIdToken(ctx context.Context, t IdToken, nonce s
 					return nil
 				}
 			}
-			return errors.New("aud claim does not match configured audiences")
+			return ErrInvalidAudience
 		}
 		return nil
 	}(); err != nil {
-		return NewError(ErrInvalidAudience, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg("invalid id_token audiences"), WithWrap(err))
+		return fmt.Errorf("invalid id_token audiences: %w", err)
 	}
 	return nil
 }

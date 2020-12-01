@@ -2,6 +2,7 @@ package callback
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/hashicorp/cap/oidc"
@@ -21,7 +22,7 @@ func AuthCode(ctx context.Context, p *oidc.AuthCodeProvider, rw StateReader, sFn
 		reqState := req.FormValue("state")
 
 		if rw == nil {
-			responseErr := oidc.NewError(oidc.ErrNilParameter, oidc.WithOp(op), oidc.WithKind(oidc.ErrParameterViolation), oidc.WithMsg("state read/writer is nil"))
+			responseErr := fmt.Errorf("state read/writer is nil: %w", oidc.ErrNilParameter)
 			eFn(reqState, nil, responseErr, w, req)
 			return
 		}
@@ -44,18 +45,19 @@ func AuthCode(ctx context.Context, p *oidc.AuthCodeProvider, rw StateReader, sFn
 
 		state, err := rw.Read(ctx, reqState)
 		if err != nil {
-			responseErr := oidc.NewError(oidc.ErrCodeUnknown, oidc.WithOp(op), oidc.WithKind(oidc.ErrInternal), oidc.WithMsg("unable to read auth code state"), oidc.WithWrap(err))
+			responseErr := fmt.Errorf("unable to read auth code state: %w", err)
 			eFn(reqState, nil, responseErr, w, req)
 			return
 		}
 		if state == nil {
-			// could have expired or it could be invalid... no way to known for sure
-			responseErr := oidc.NewError(oidc.ErrNotFound, oidc.WithOp(op), oidc.WithKind(oidc.ErrParameterViolation), oidc.WithMsg("auth code state not found"))
+			// could have expired or it could be invalid... no way to known for
+			// sure
+			responseErr := fmt.Errorf("auth code state not found: %w", oidc.ErrNotFound)
 			eFn(reqState, nil, responseErr, w, req)
 			return
 		}
 		if state.IsExpired() {
-			responseErr := oidc.NewError(oidc.ErrExpiredState, oidc.WithOp(op), oidc.WithKind(oidc.ErrParameterViolation), oidc.WithMsg("authentication state is expired"))
+			responseErr := fmt.Errorf("authentication state is expired: %w", oidc.ErrExpiredState)
 			eFn(reqState, nil, responseErr, w, req)
 			return
 		}
@@ -63,15 +65,16 @@ func AuthCode(ctx context.Context, p *oidc.AuthCodeProvider, rw StateReader, sFn
 		if reqState != state.Id() {
 			// the stateReadWriter didn't return the correct state for the key
 			// given... this is an internal sort of error on the part of the
-			// reader, but given this error, we probably shouldn't update the state
-			responseErr := oidc.NewError(oidc.ErrResponseStateInvalid, oidc.WithOp(op), oidc.WithKind(oidc.ErrIntegrityViolation), oidc.WithMsg("authen state and response state are not equal"))
+			// reader, but given this error, we probably shouldn't update the
+			// state
+			responseErr := fmt.Errorf("authen state and response state are not equal: %w", oidc.ErrResponseStateInvalid)
 			eFn(reqState, nil, responseErr, w, req)
 			return
 		}
 
 		responseToken, err := p.Exchange(ctx, state, reqState, reqCode)
 		if err != nil {
-			responseErr := oidc.WrapError(err, oidc.WithOp(op), oidc.WithKind(oidc.ErrInternal), oidc.WithMsg("unable to exchange authorization code"))
+			responseErr := fmt.Errorf("unable to exchange authorization code: %w", oidc.ErrExchangeFailed)
 			eFn(reqState, nil, responseErr, w, req)
 			return
 		}

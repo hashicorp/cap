@@ -1,6 +1,7 @@
 package oidc
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -49,12 +50,12 @@ func NewState(expireIn time.Duration) (*St, error) {
 	const op = "oidc.NewState"
 	nonce, err := NewId("n")
 	if err != nil {
-		return nil, WrapError(err, WithOp(op), WithKind(ErrInternal), WithMsg("unable to generate a state's nonce"))
+		return nil, fmt.Errorf("unable to generate a state's nonce: %w", err)
 	}
 
 	id, err := NewId("st")
 	if err != nil {
-		return nil, WrapError(err, WithOp(op), WithKind(ErrInternal), WithMsg("unable to generate a state's id"))
+		return nil, fmt.Errorf("unable to generate a state's id: %w", err)
 	}
 
 	return &St{

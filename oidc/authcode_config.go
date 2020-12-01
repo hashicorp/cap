@@ -79,7 +79,7 @@ func NewAuthCodeConfig(issuer string, clientId string, clientSecret ClientSecret
 		ProviderCA:           opts.withProviderCA,
 	}
 	if err := c.Validate(); err != nil {
-		return nil, WrapError(err, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg("invalid provider config"))
+		return nil, fmt.Errorf("invalid provider config: %w", err)
 	}
 	return c, nil
 }
@@ -92,33 +92,33 @@ func NewAuthCodeConfig(issuer string, clientId string, clientSecret ClientSecret
 func (c *AuthCodeConfig) Validate() error {
 	const op = "oidc.Validate"
 	if c == nil {
-		return NewError(ErrNilParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("provider config is nil"))
+		return fmt.Errorf("provider config is nil: %w", ErrNilParameter)
 	}
 	if c.ClientId == "" {
-		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("client id is empty"))
+		return fmt.Errorf("client id is empty: %w", ErrInvalidParameter)
 	}
 	if c.ClientSecret == "" {
-		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("client secret is empty"))
+		return fmt.Errorf("client secret is empty: %w", ErrInvalidParameter)
 	}
 	if c.Issuer == "" {
-		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("discovery URL is empty"))
+		return fmt.Errorf("discovery URL is empty: %w", ErrInvalidParameter)
 	}
 	if c.RedirectUrl == "" {
-		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("redirect URL is empty"))
+		return fmt.Errorf("redirect URL is empty: %w", ErrInvalidParameter)
 	}
 	u, err := url.Parse(c.Issuer)
 	if err != nil {
-		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg(fmt.Sprintf("issuer url %s is invalid", c.Issuer)), WithWrap(err))
+		return fmt.Errorf("issuer %s is invalid: %w", err)
 	}
 	if !strutil.StrListContains([]string{"https", "http"}, u.Scheme) {
-		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg(fmt.Sprintf("issuer url %s scheme %s is not http or https", c.Issuer, u.Scheme)), WithWrap(err))
+		return fmt.Errorf("issuer %s schema is not http or https: %w", err)
 	}
 	if len(c.SupportedSigningAlgs) == 0 {
-		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("supported algorithms is empty"))
+		return fmt.Errorf("supported algorithms is empty: %w", ErrInvalidParameter)
 	}
 	for _, a := range c.SupportedSigningAlgs {
 		if _, ok := supportedAlgorithms[a]; !ok {
-			return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg(fmt.Sprintf("unsupported algorithm: %s", a)))
+			return fmt.Errorf("unsupported algorithm %s: %w", ErrInvalidParameter)
 		}
 	}
 	return nil
@@ -131,9 +131,9 @@ func (c *AuthCodeConfig) HttpClient() (*http.Client, error) {
 	client, err := sdkHttp.NewClient(c.ProviderCA)
 	if err != nil {
 		if errors.Is(err, sdkHttp.ErrInvalidCertificatePem) {
-			return nil, NewError(ErrInvalidCACert, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg("could not parse CA PEM value successfully"))
+			return nil, fmt.Errorf("could not parse CA PEM value: %w", ErrInvalidCACert)
 		}
-		return nil, NewError(ErrCodeUnknown, WithOp(op), WithKind(ErrInternal), WithMsg("could not get an http client"), WithWrap(err))
+		return nil, fmt.Errorf("could not get an http client: %w", err)
 	}
 	return client, nil
 }

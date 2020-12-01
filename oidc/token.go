@@ -61,10 +61,11 @@ func NewToken(i IdToken, t *oauth2.Token) (*Tk, error) {
 	// into our abstraction in this factory
 	const op = "oidc.NewToken"
 	if t == nil {
-		return nil, NewError(ErrNilParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("token is nil"))
+		return nil, fmt.Errorf("token is nil: %w", ErrNilParameter)
 	}
 	if i == "" {
-		return nil, NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("id_token is empty"))
+		return nil, fmt.Errorf("id_token is empty: %w", ErrInvalidParameter)
+
 	}
 	return &Tk{
 		idToken:    i,
@@ -178,21 +179,21 @@ func (t IdToken) MarshalJSON() ([]byte, error) {
 func (t IdToken) Claims(claims interface{}) error {
 	const op = "IdToken.Claims"
 	if len(t) == 0 {
-		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("the id_token is empty"))
+		return fmt.Errorf("id_token is empty: %w", ErrInvalidParameter)
 	}
 	if claims == nil {
-		return NewError(ErrNilParameter, WithOp(op), WithKind(ErrParameterViolation), WithMsg("claims interface is nil"))
+		return fmt.Errorf("claims interface is nil: %w", ErrNilParameter)
 	}
 	parts := strings.Split(string(t), ".")
 	if len(parts) < 2 {
-		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg(fmt.Sprintf("malformed id_token, expected 3 parts got %d", len(parts))))
+		return fmt.Errorf("malformed id_token, expected 3 parts got %d: %w", len(parts), ErrInvalidParameter)
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return NewError(ErrInvalidParameter, WithOp(op), WithKind(ErrIntegrityViolation), WithMsg("malformed id_token claims"), WithWrap(err))
+		return fmt.Errorf("malformed id_token claims: %w", err)
 	}
 	if err := json.Unmarshal(raw, claims); err != nil {
-		return NewError(ErrCodeUnknown, WithOp(op), WithKind(ErrInternal), WithMsg("unable to marshal id_token JSON"), WithWrap(err))
+		return fmt.Errorf("unable to marshal id_token JSON: %w", err)
 	}
 	return nil
 }
