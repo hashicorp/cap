@@ -108,17 +108,17 @@ func (c *AuthCodeConfig) Validate() error {
 	}
 	u, err := url.Parse(c.Issuer)
 	if err != nil {
-		return fmt.Errorf("issuer %s is invalid: %w", err)
+		return fmt.Errorf("issuer %s is invalid: %w", c.Issuer, err)
 	}
 	if !strutil.StrListContains([]string{"https", "http"}, u.Scheme) {
-		return fmt.Errorf("issuer %s schema is not http or https: %w", err)
+		return fmt.Errorf("issuer %s schema is not http or https: %w", c.Issuer, err)
 	}
 	if len(c.SupportedSigningAlgs) == 0 {
 		return fmt.Errorf("supported algorithms is empty: %w", ErrInvalidParameter)
 	}
 	for _, a := range c.SupportedSigningAlgs {
 		if _, ok := supportedAlgorithms[a]; !ok {
-			return fmt.Errorf("unsupported algorithm %s: %w", ErrInvalidParameter)
+			return fmt.Errorf("unsupported algorithm %s: %w", a, ErrInvalidParameter)
 		}
 	}
 	return nil

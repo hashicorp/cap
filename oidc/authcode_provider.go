@@ -129,7 +129,7 @@ func (p *AuthCodeProvider) Exchange(ctx context.Context, s State, authorizationS
 		return nil, fmt.Errorf("authentication state and authorization state are not equal: %w", ErrInvalidParameter)
 	}
 	if s.IsExpired() {
-		return nil, fmt.Errorf("authentication state is expired", ErrInvalidParameter)
+		return nil, fmt.Errorf("authentication state is expired: %w", ErrInvalidParameter)
 	}
 
 	client, err := p.config.HttpClient()
@@ -177,7 +177,7 @@ func (p *AuthCodeProvider) UserInfo(ctx context.Context, tokenSource oauth2.Toke
 		return fmt.Errorf("token source is nil: %w", ErrInvalidParameter)
 	}
 	if claims == nil {
-		return fmt.Errorf("claims interface is nil", ErrNilParameter)
+		return fmt.Errorf("claims interface is nil: %w", ErrNilParameter)
 	}
 	client, err := p.config.HttpClient()
 	if err != nil {
