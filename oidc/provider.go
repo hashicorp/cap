@@ -3,6 +3,7 @@ package oidc
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/coreos/go-oidc"
@@ -84,14 +85,17 @@ func (p *Provider) Done() {
 }
 
 // AuthURL will generate a URL the caller can use to kick off an OIDC
-// authorization code flow with an IdP.  The redirectURL is the URL the IdP
-// should use as a redirect after the authentication/authorization is completed
-// by the user.
+// authorization code (or an implicit flow) with an IdP.  The redirectURL is the
+// URL the IdP should use as a redirect after the authentication/authorization
+// is completed by the user.  Providing a WithImplicitFlow() option overrides
+// the default authorization code default flow.
 //
 //  See NewState() to create an oidc flow State with a valid Id and Nonce that
 // will uniquely identify the user's authentication attempt through out the flow.
-func (p *Provider) AuthURL(ctx context.Context, s State) (url string, e error) {
+func (p *Provider) AuthURL(ctx context.Context, s State, opt ...Option) (url string, e error) {
 	const op = "Provider.AuthURL"
+	opts := getProviderOpts(opt...)
+
 	if s.Id() == s.Nonce() {
 		return "", fmt.Errorf("%s: state id and nonce cannot be equal: %w", op, ErrInvalidParameter)
 	}
@@ -108,6 +112,13 @@ func (p *Provider) AuthURL(ctx context.Context, s State) (url string, e error) {
 	}
 	authCodeOpts := []oauth2.AuthCodeOption{
 		oidc.Nonce(s.Nonce()),
+	}
+	if opts.withImplicitFlow != nil {
+		reqTokens := []string{"id_token"}
+		if !opts.withImplicitFlow.WithoutAccessToken {
+			reqTokens = append(reqTokens, "token")
+		}
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("response_mode", "form_post"), oauth2.SetAuthURLParam("response_type", strings.Join(reqTokens, " ")))
 	}
 	return oauth2Config.AuthCodeURL(s.Id(), authCodeOpts...), nil
 }
@@ -244,4 +255,50 @@ func (p *Provider) VerifyIdToken(ctx context.Context, t IdToken, nonce string) e
 		return fmt.Errorf("%s: invalid id_token audiences: %w", op, err)
 	}
 	return nil
+}
+
+type implicitFlow struct {
+	WithoutAccessToken bool
+}
+
+// providerOptions is the set of available options
+type providerOptions struct {
+	withImplicitFlow *implicitFlow
+}
+
+// getProviderDefaults is a handy way to get the defaults at runtime and
+// during unit tests.
+func providerDefaults() providerOptions {
+	return providerOptions{}
+}
+
+// getProviderOpts gets the defaults and applies the opt overrides passed
+// in.
+func getProviderOpts(opt ...Option) providerOptions {
+	opts := providerDefaults()
+	ApplyOpts(&opts, opt...)
+	return opts
+}
+
+// WithImplicitFlow provides an option to use an implicit flow for the auth URL
+// being requested. Getting an id_token and access_token is the default, and
+// optionally passing a true bool that will prevent an access_token from being
+// requested during the flow
+func WithImplicitFlow(args ...interface{}) Option {
+	withoutAccessToken := false
+	for _, arg := range args {
+		switch arg := arg.(type) {
+		case bool:
+			if arg {
+				withoutAccessToken = true
+			}
+		}
+	}
+	return func(o interface{}) {
+		if o, ok := o.(*providerOptions); ok {
+			o.withImplicitFlow = &implicitFlow{
+				WithoutAccessToken: withoutAccessToken,
+			}
+		}
+	}
 }
