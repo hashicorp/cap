@@ -46,7 +46,8 @@ type StaticTokenSource interface {
 }
 
 // Tk satisfies the Token interface and represents an Oauth2 access_token and
-// refresh_token (including the the access_token expiry), as well as an OIDC id_token
+// refresh_token (including the the access_token expiry), as well as an OIDC
+// id_token.  The access_token and refresh_token may be empty.
 type Tk struct {
 	idToken    IdToken
 	underlying *oauth2.Token
@@ -55,14 +56,13 @@ type Tk struct {
 // ensure that Tk implements the Token interface
 var _ Token = (*Tk)(nil)
 
-// NewToken creates a new Token (*Tk)
+// NewToken creates a new Token (*Tk).  The IdToken is required and the
+// *oauth2.Token may be nil.
 func NewToken(i IdToken, t *oauth2.Token) (*Tk, error) {
 	// since oauth2 is part of stdlib we're not going to worry about it leaking
 	// into our abstraction in this factory
 	const op = "NewToken"
-	if t == nil {
-		return nil, fmt.Errorf("%s: token is nil: %w", op, ErrNilParameter)
-	}
+
 	if i == "" {
 		return nil, fmt.Errorf("%s: id_token is empty: %w", op, ErrInvalidParameter)
 
@@ -73,21 +73,53 @@ func NewToken(i IdToken, t *oauth2.Token) (*Tk, error) {
 	}, nil
 }
 
-func (t *Tk) AccessToken() AccessToken   { return AccessToken(t.underlying.AccessToken) }   // AccessToken implements the Token.AccessToken() interface function
-func (t *Tk) RefreshToken() RefreshToken { return RefreshToken(t.underlying.RefreshToken) } // RefreshToken implements the Token.RefreshToken() interface function
-func (t *Tk) IdToken() IdToken           { return IdToken(t.idToken) }                      // IdToken implements the IdToken.IdToken() interface function
-func (t *Tk) Expiry() time.Time          { return t.underlying.Expiry }                     // Expiry implements the Token.Expiry() interface function
+// AccessToken implements the Token.AccessToken() interface function and may
+// return an empty AccessToken.
+func (t *Tk) AccessToken() AccessToken {
+	if t.underlying == nil {
+		return ""
+	}
+	return AccessToken(t.underlying.AccessToken)
+}
+
+// RefreshToken implements the Token.RefreshToken() interface function and may
+// return an empty RefreshToken
+func (t *Tk) RefreshToken() RefreshToken {
+	if t.underlying == nil {
+		return ""
+	}
+	return RefreshToken(t.underlying.RefreshToken)
+}
+
+// IdToken implements the IdToken.IdToken() interface function
+func (t *Tk) IdToken() IdToken { return IdToken(t.idToken) }
+
+// Expiry implements the Token.Expiry() interface function and may return a
+// "zero" time if the token's AccessToken is empty
+func (t *Tk) Expiry() time.Time {
+	if t.underlying == nil {
+		return time.Time{}
+	}
+	return t.underlying.Expiry
+}
 
 // StaticTokenSource returns a TokenSource that always returns the same token.
-// Because the provided token t is never refreshed.
+// Because the provided token t is never refreshed.  It will return nil, if the
+// t.AccessToken() is empty.
 func (t *Tk) StaticTokenSource() oauth2.TokenSource {
+	if t.underlying == nil {
+		return nil
+	}
 	return oauth2.StaticTokenSource(t.underlying)
 }
 
 // Expired will return true if the token is expired.  Supports the
 // WithExpirySkew option and if none is provided it will use the
-// DefaultTokenExpirySkew.
+// DefaultTokenExpirySkew.  It returns false if t.AccessToken() is empty.
 func (t *Tk) Expired(opt ...Option) bool {
+	if t.underlying == nil {
+		return true
+	}
 	if t.underlying.Expiry.IsZero() {
 		return false
 	}
@@ -95,7 +127,8 @@ func (t *Tk) Expired(opt ...Option) bool {
 	return t.underlying.Expiry.Round(0).Before(time.Now().Add(opts.withExpirySkew))
 }
 
-// Valid will ensure that the access_token is not empty or expired.
+// Valid will ensure that the access_token is not empty or expired. It will
+// return false if t.AccessToken() is empty
 func (t *Tk) Valid() bool {
 	if t == nil {
 		return false
@@ -184,16 +217,22 @@ func (t IdToken) Claims(claims interface{}) error {
 	if claims == nil {
 		return fmt.Errorf("%s: claims interface is nil: %w", op, ErrNilParameter)
 	}
-	parts := strings.Split(string(t), ".")
+	return UnmarshalClaims(string(t), claims)
+}
+
+// UnmarshalClaims will retrieve the claims from the provided raw JWT token.
+func UnmarshalClaims(rawToken string, claims interface{}) error {
+	const op = "JwtClaims"
+	parts := strings.Split(string(rawToken), ".")
 	if len(parts) < 2 {
-		return fmt.Errorf("%s: malformed id_token, expected 3 parts got %d: %w", op, len(parts), ErrInvalidParameter)
+		return fmt.Errorf("%s: malformed jwt, expected 3 parts got %d: %w", op, len(parts), ErrInvalidParameter)
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return fmt.Errorf("%s: malformed id_token claims: %w", op, err)
+		return fmt.Errorf("%s: malformed jwt claims: %w", op, err)
 	}
 	if err := json.Unmarshal(raw, claims); err != nil {
-		return fmt.Errorf("%s: unable to marshal id_token JSON: %w", op, err)
+		return fmt.Errorf("%s: unable to marshal jwt JSON: %w", op, err)
 	}
 	return nil
 }
