@@ -1,7 +1,8 @@
-# authcode_cli
+# cli
 
 
-An example OIDC user authentication CLI. 
+An example OIDC user authentication CLI that supports both the authorization
+code and implicit OIDC flows.
 
 The example uses the `oidc` and `callback` packages to compose a solution. Among
 other things, it demonstrates how to configure and use an
