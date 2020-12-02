@@ -10,7 +10,11 @@ import (
 	"github.com/hashicorp/cap/oidc"
 )
 
-func LoginHandler(ctx context.Context, p *oidc.Provider, sc *stateCache, timeout time.Duration) http.HandlerFunc {
+func LoginHandler(ctx context.Context, p *oidc.Provider, sc *stateCache, timeout time.Duration, withImplicit bool) http.HandlerFunc {
+	var urlOption oidc.Option
+	if withImplicit {
+		urlOption = oidc.WithImplicitFlow()
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		s, err := oidc.NewState(timeout)
 		if err != nil {
@@ -19,7 +23,7 @@ func LoginHandler(ctx context.Context, p *oidc.Provider, sc *stateCache, timeout
 		}
 		sc.Add(s)
 
-		authUrl, err := p.AuthURL(context.Background(), s)
+		authUrl, err := p.AuthURL(context.Background(), s, urlOption)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error getting auth url: %s", err)
 			return

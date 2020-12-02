@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"net"
 	"net/http"
@@ -49,6 +50,9 @@ func envConfig() (map[string]interface{}, error) {
 }
 
 func main() {
+	useImplicit := flag.Bool("implicit", false, "use the implicit flow")
+	flag.Parse()
+
 	env, err := envConfig()
 	if err != nil {
 		fmt.Fprint(os.Stderr, err)
@@ -87,8 +91,8 @@ func main() {
 	}
 
 	// Set up callback handler
-	http.HandleFunc("/callback", CallbackHandler(context.Background(), p, sc))
-	http.HandleFunc("/login", LoginHandler(context.Background(), p, sc, timeout))
+	http.HandleFunc("/callback", CallbackHandler(context.Background(), p, sc, *useImplicit))
+	http.HandleFunc("/login", LoginHandler(context.Background(), p, sc, timeout, *useImplicit))
 	http.HandleFunc("/success", SuccessHandler(context.Background(), sc))
 
 	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", env[port]))

@@ -11,7 +11,10 @@ import (
 	"github.com/hashicorp/cap/oidc/callback"
 )
 
-func CallbackHandler(ctx context.Context, p *oidc.Provider, sc *stateCache) http.HandlerFunc {
+func CallbackHandler(ctx context.Context, p *oidc.Provider, sc *stateCache, withImplicit bool) http.HandlerFunc {
+	if withImplicit {
+		return callback.Implicit(ctx, p, sc, successFn(ctx, sc), failedFn(ctx, sc))
+	}
 	return callback.AuthCode(ctx, p, sc, successFn(ctx, sc), failedFn(ctx, sc))
 }
 

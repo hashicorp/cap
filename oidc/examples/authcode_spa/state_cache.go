@@ -48,7 +48,7 @@ func (sc *stateCache) SetToken(id string, t oidc.Token) error {
 	const op = "stateCache.SetToken"
 	s, exp, ok := sc.c.GetWithExpiration(id)
 	if !ok {
-		return fmt.Errorf("%s not found", op, id)
+		return fmt.Errorf("%s: %s not found", op, id)
 	}
 	extended, ok := s.(*extendedState)
 	if !ok {
