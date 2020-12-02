@@ -75,7 +75,6 @@ func Implicit(ctx context.Context, p *oidc.Provider, rw StateReader, sFn Success
 			oath2Token = &oauth2.Token{
 				AccessToken: reqAccessToken,
 			}
-			fmt.Println("access token: ", reqAccessToken)
 		}
 
 		reqIdToken := req.FormValue("id_token")
