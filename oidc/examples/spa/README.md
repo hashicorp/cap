@@ -1,4 +1,4 @@
-# authcode_spa
+# spa
 
 
 An example OIDC SPA (single page application). 

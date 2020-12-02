@@ -36,7 +36,7 @@ Complete concise example solutions:
 https://github.com/hashicorp/cap/tree/jimlambrt-initial/oidc/examples/cli/
 
 * OIDC authentication SPA:
-https://github.com/hashicorp/cap/tree/jimlambrt-initial/oidc/examples/authcode_cli/
+https://github.com/hashicorp/cap/tree/jimlambrt-initial/oidc/examples/spa/
 
 
 Package examples

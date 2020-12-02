@@ -39,7 +39,7 @@ tokens.
 * [CLI example](examples/cli/) which implements an OIDC
   user authentication CLI.  
 
-* [SPA example](examples/authcode_spa) which implements an OIDC user
+* [SPA example](examples/spa) which implements an OIDC user
   authentication SPA (single page app). 
 
 ### Example snippets...
