@@ -10,6 +10,9 @@ type Option func(interface{})
 // and applies the slice of opts as overrides.
 func ApplyOpts(opts interface{}, opt ...Option) {
 	for _, o := range opt {
+		if o == nil { // ignore any nil Options
+			continue
+		}
 		o(opts)
 	}
 }
