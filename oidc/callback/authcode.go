@@ -74,7 +74,7 @@ func AuthCode(ctx context.Context, p *oidc.Provider, rw StateReader, sFn Success
 
 		responseToken, err := p.Exchange(ctx, state, reqState, reqCode)
 		if err != nil {
-			responseErr := fmt.Errorf("%s: unable to exchange authorization code: %w", op, oidc.ErrExchangeFailed)
+			responseErr := fmt.Errorf("%s: unable to exchange authorization code: %w", op, err)
 			eFn(reqState, nil, responseErr, w, req)
 			return
 		}
