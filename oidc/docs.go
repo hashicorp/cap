@@ -33,7 +33,7 @@ Example apps
 Complete concise example solutions:
 
 * OIDC authentication CLI:
-https://github.com/hashicorp/cap/tree/jimlambrt-initial/oidc/examples/authcode_cli/
+https://github.com/hashicorp/cap/tree/jimlambrt-initial/oidc/examples/cli/
 
 * OIDC authentication SPA:
 https://github.com/hashicorp/cap/tree/jimlambrt-initial/oidc/examples/authcode_cli/

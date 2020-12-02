@@ -36,7 +36,7 @@ tokens.
 
 ### Examples apps:
 
-* [CLI example](examples/authcode_cli/) which implements an OIDC
+* [CLI example](examples/cli/) which implements an OIDC
   user authentication CLI.  
 
 * [SPA example](examples/authcode_spa) which implements an OIDC user
