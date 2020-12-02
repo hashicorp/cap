@@ -65,7 +65,7 @@ type Config struct {
 // WithStateReadWriter, WithProviderCA, WithScopes
 func NewConfig(issuer string, clientId string, clientSecret ClientSecret, supported []Alg, redirectUrl string, opt ...Option) (*Config, error) {
 	const op = "NewConfig"
-	opts := getProviderConfigOpts(opt...)
+	opts := getConfigOpts(opt...)
 	c := &Config{
 		Issuer:               issuer,
 		ClientId:             clientId,
@@ -105,7 +105,7 @@ func (c *Config) Validate() error {
 	}
 	u, err := url.Parse(c.Issuer)
 	if err != nil {
-		return fmt.Errorf("%s: issuer %s is invalid: %w", c.Issuer, err)
+		return fmt.Errorf("%s: issuer %s is invalid: %w", op, c.Issuer, err)
 	}
 	if !strutil.StrListContains([]string{"https", "http"}, u.Scheme) {
 		return fmt.Errorf("%s: issuer %s schema is not http or https: %w", op, c.Issuer, err)
@@ -144,8 +144,8 @@ func HttpClientContext(ctx context.Context, client *http.Client) context.Context
 	return oidc.ClientContext(ctx, client)
 }
 
-// providerConfigOptions is the set of available options
-type providerConfigOptions struct {
+// configOptions is the set of available options
+type configOptions struct {
 	withScopes     []string
 	withAudiences  []string
 	withProviderCA string
@@ -153,14 +153,14 @@ type providerConfigOptions struct {
 
 // getProviderConfigDefaults is a handy way to get the defaults at runtime and
 // during unit tests.
-func providerConfigDefaults() providerConfigOptions {
-	return providerConfigOptions{}
+func configDefaults() configOptions {
+	return configOptions{}
 }
 
-// getProviderConfigOpts gets the defaults and applies the opt overrides passed
+// getConfigOpts gets the defaults and applies the opt overrides passed
 // in.
-func getProviderConfigOpts(opt ...Option) providerConfigOptions {
-	opts := providerConfigDefaults()
+func getConfigOpts(opt ...Option) configOptions {
+	opts := configDefaults()
 	ApplyOpts(&opts, opt...)
 	return opts
 }
@@ -168,7 +168,7 @@ func getProviderConfigOpts(opt ...Option) providerConfigOptions {
 // WithScopes provides an optional list of scopes for the provider's config
 func WithScopes(scopes []string) Option {
 	return func(o interface{}) {
-		if o, ok := o.(*providerConfigOptions); ok {
+		if o, ok := o.(*configOptions); ok {
 			o.withScopes = scopes
 		}
 	}
@@ -177,7 +177,7 @@ func WithScopes(scopes []string) Option {
 // WithAudiences provides an optional list of audiences for the provider's config
 func WithAudiences(auds []string) Option {
 	return func(o interface{}) {
-		if o, ok := o.(*providerConfigOptions); ok {
+		if o, ok := o.(*configOptions); ok {
 			o.withAudiences = auds
 		}
 	}
@@ -186,7 +186,7 @@ func WithAudiences(auds []string) Option {
 // WithProviderCA provides an optional CA cert for the provider's config
 func WithProviderCA(cert string) Option {
 	return func(o interface{}) {
-		if o, ok := o.(*providerConfigOptions); ok {
+		if o, ok := o.(*configOptions); ok {
 			o.withProviderCA = cert
 		}
 	}
