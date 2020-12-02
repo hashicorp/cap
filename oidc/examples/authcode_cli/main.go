@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -56,6 +57,9 @@ func envConfig() (map[string]interface{}, error) {
 }
 
 func main() {
+	useImplicit := flag.Bool("implicit", false, "use the implicit flow")
+	flag.Parse()
+
 	env, err := envConfig()
 	if err != nil {
 		fmt.Fprint(os.Stderr, err)
@@ -90,18 +94,26 @@ func main() {
 		return
 	}
 
-	authUrl, err := p.AuthURL(context.Background(), s)
+	successFn, successCh := success()
+	errorFn, failedCh := failed()
+
+	var handler http.HandlerFunc
+	var urlOption oidc.Option
+	if *useImplicit {
+		urlOption = oidc.WithImplicitFlow()
+		handler = callback.Implicit(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
+	} else {
+		handler = callback.AuthCode(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
+	}
+
+	authUrl, err := p.AuthURL(context.Background(), s, urlOption)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error getting auth url: %s", err)
 		return
 	}
 
-	successFn, successCh := success()
-	errorFn, failedCh := failed()
-	callback := callback.AuthCode(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
-
 	// Set up callback handler
-	http.HandleFunc("/callback", callback)
+	http.HandleFunc("/callback", handler)
 
 	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", env[port]))
 	if err != nil {
@@ -267,6 +279,10 @@ func printUserInfo(p *oidc.Provider, t oidc.Token) {
 	if t, ok := t.(interface {
 		StaticTokenSource() oauth2.TokenSource
 	}); ok {
+		if t.StaticTokenSource() == nil {
+			fmt.Fprintf(os.Stderr, "%s: no access_token received, so we're unable to get UserInfo claims", op)
+			return
+		}
 		var infoClaims map[string]interface{}
 		err := p.UserInfo(context.Background(), t.StaticTokenSource(), &infoClaims)
 		if err != nil {
