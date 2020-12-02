@@ -64,7 +64,7 @@ type Config struct {
 // NewConfig composes a new config for a provider. Supported options:
 // WithStateReadWriter, WithProviderCA, WithScopes
 func NewConfig(issuer string, clientId string, clientSecret ClientSecret, supported []Alg, redirectUrl string, opt ...Option) (*Config, error) {
-	const op = "NewProviderConfig"
+	const op = "NewConfig"
 	opts := getProviderConfigOpts(opt...)
 	c := &Config{
 		Issuer:               issuer,
@@ -76,7 +76,7 @@ func NewConfig(issuer string, clientId string, clientSecret ClientSecret, suppor
 		ProviderCA:           opts.withProviderCA,
 	}
 	if err := c.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid provider config: %w", err)
+		return nil, fmt.Errorf("%s: invalid provider config: %w", op, err)
 	}
 	return c, nil
 }
@@ -87,35 +87,35 @@ func NewConfig(issuer string, clientId string, clientSecret ClientSecret, suppor
 // currently supported algs: RS256, RS384, RS512, ES256, ES384, ES512, PS256,
 // PS384, PS512
 func (c *Config) Validate() error {
-	const op = "oidc.Validate"
+	const op = "Config.Validate"
 	if c == nil {
-		return fmt.Errorf("provider config is nil: %w", ErrNilParameter)
+		return fmt.Errorf("%s: provider config is nil: %w", op, ErrNilParameter)
 	}
 	if c.ClientId == "" {
-		return fmt.Errorf("client id is empty: %w", ErrInvalidParameter)
+		return fmt.Errorf("%s: client id is empty: %w", op, ErrInvalidParameter)
 	}
 	if c.ClientSecret == "" {
-		return fmt.Errorf("client secret is empty: %w", ErrInvalidParameter)
+		return fmt.Errorf("%s: client secret is empty: %w", op, ErrInvalidParameter)
 	}
 	if c.Issuer == "" {
-		return fmt.Errorf("discovery URL is empty: %w", ErrInvalidParameter)
+		return fmt.Errorf("%s: discovery URL is empty: %w", op, ErrInvalidParameter)
 	}
 	if c.RedirectUrl == "" {
-		return fmt.Errorf("redirect URL is empty: %w", ErrInvalidParameter)
+		return fmt.Errorf("%s: redirect URL is empty: %w", op, ErrInvalidParameter)
 	}
 	u, err := url.Parse(c.Issuer)
 	if err != nil {
-		return fmt.Errorf("issuer %s is invalid: %w", c.Issuer, err)
+		return fmt.Errorf("%s: issuer %s is invalid: %w", c.Issuer, err)
 	}
 	if !strutil.StrListContains([]string{"https", "http"}, u.Scheme) {
-		return fmt.Errorf("issuer %s schema is not http or https: %w", c.Issuer, err)
+		return fmt.Errorf("%s: issuer %s schema is not http or https: %w", op, c.Issuer, err)
 	}
 	if len(c.SupportedSigningAlgs) == 0 {
-		return fmt.Errorf("supported algorithms is empty: %w", ErrInvalidParameter)
+		return fmt.Errorf("%s: supported algorithms is empty: %w", op, ErrInvalidParameter)
 	}
 	for _, a := range c.SupportedSigningAlgs {
 		if _, ok := supportedAlgorithms[a]; !ok {
-			return fmt.Errorf("unsupported algorithm %s: %w", a, ErrInvalidParameter)
+			return fmt.Errorf("%s: unsupported algorithm %s: %w", op, a, ErrInvalidParameter)
 		}
 	}
 	return nil
@@ -124,13 +124,13 @@ func (c *Config) Validate() error {
 // HttpClient is a helper function that creates a new http client for the
 // provider configured
 func (c *Config) HttpClient() (*http.Client, error) {
-	const op = "ProviderConfig.NewHTTPClient"
+	const op = "Config.NewHTTPClient"
 	client, err := sdkHttp.NewClient(c.ProviderCA)
 	if err != nil {
 		if errors.Is(err, sdkHttp.ErrInvalidCertificatePem) {
-			return nil, fmt.Errorf("could not parse CA PEM value: %w", ErrInvalidCACert)
+			return nil, fmt.Errorf("%s: could not parse CA PEM value: %w", op, ErrInvalidCACert)
 		}
-		return nil, fmt.Errorf("could not get an http client: %w", err)
+		return nil, fmt.Errorf("%s: could not get an http client: %w", op, err)
 	}
 	return client, nil
 }

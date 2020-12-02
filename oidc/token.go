@@ -59,12 +59,12 @@ var _ Token = (*Tk)(nil)
 func NewToken(i IdToken, t *oauth2.Token) (*Tk, error) {
 	// since oauth2 is part of stdlib we're not going to worry about it leaking
 	// into our abstraction in this factory
-	const op = "oidc.NewToken"
+	const op = "NewToken"
 	if t == nil {
-		return nil, fmt.Errorf("token is nil: %w", ErrNilParameter)
+		return nil, fmt.Errorf("%s: token is nil: %w", op, ErrNilParameter)
 	}
 	if i == "" {
-		return nil, fmt.Errorf("id_token is empty: %w", ErrInvalidParameter)
+		return nil, fmt.Errorf("%s: id_token is empty: %w", op, ErrInvalidParameter)
 
 	}
 	return &Tk{
@@ -179,21 +179,21 @@ func (t IdToken) MarshalJSON() ([]byte, error) {
 func (t IdToken) Claims(claims interface{}) error {
 	const op = "IdToken.Claims"
 	if len(t) == 0 {
-		return fmt.Errorf("id_token is empty: %w", ErrInvalidParameter)
+		return fmt.Errorf("%s: id_token is empty: %w", op, ErrInvalidParameter)
 	}
 	if claims == nil {
-		return fmt.Errorf("claims interface is nil: %w", ErrNilParameter)
+		return fmt.Errorf("%s: claims interface is nil: %w", op, ErrNilParameter)
 	}
 	parts := strings.Split(string(t), ".")
 	if len(parts) < 2 {
-		return fmt.Errorf("malformed id_token, expected 3 parts got %d: %w", len(parts), ErrInvalidParameter)
+		return fmt.Errorf("%s: malformed id_token, expected 3 parts got %d: %w", op, len(parts), ErrInvalidParameter)
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return fmt.Errorf("malformed id_token claims: %w", err)
+		return fmt.Errorf("%s: malformed id_token claims: %w", op, err)
 	}
 	if err := json.Unmarshal(raw, claims); err != nil {
-		return fmt.Errorf("unable to marshal id_token JSON: %w", err)
+		return fmt.Errorf("%s: unable to marshal id_token JSON: %w", op, err)
 	}
 	return nil
 }

@@ -33,12 +33,12 @@ type Provider struct {
 //
 // See Provider.Stop() which must be called to release provider resources.
 func NewProvider(c *Config) (*Provider, error) {
-	const op = "authcode.NewProvider"
+	const op = "NewProvider"
 	if c == nil {
-		return nil, fmt.Errorf("provider config is nil: %w", ErrNilParameter)
+		return nil, fmt.Errorf("%s: provider config is nil: %w", op, ErrNilParameter)
 	}
 	if err := c.Validate(); err != nil {
-		return nil, fmt.Errorf("provider config is invalid: %w", err)
+		return nil, fmt.Errorf("%s: provider config is invalid: %w", op, err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -54,7 +54,7 @@ func NewProvider(c *Config) (*Provider, error) {
 	client, err := c.HttpClient()
 	if err != nil {
 		p.Done() // release the backgroundCtxCancel resources
-		return nil, fmt.Errorf("unable to create http client: %w", err)
+		return nil, fmt.Errorf("%s: unable to create http client: %w", op, err)
 	}
 
 	provider, err := oidc.NewProvider(HttpClientContext(p.backgroundCtx, client), c.Issuer) // makes http req to issuer for discovery
@@ -62,7 +62,7 @@ func NewProvider(c *Config) (*Provider, error) {
 		p.Done() // release the backgroundCtxCancel resources
 		// we don't know what's causing the problem, so we won't classify the
 		// error with a Kind
-		return nil, fmt.Errorf("unable to create provider: %w", err)
+		return nil, fmt.Errorf("%s: unable to create provider: %w", op, err)
 	}
 	p.provider = provider
 
@@ -93,7 +93,7 @@ func (p *Provider) Done() {
 func (p *Provider) AuthURL(ctx context.Context, s State) (url string, e error) {
 	const op = "Provider.AuthURL"
 	if s.Id() == s.Nonce() {
-		return "", fmt.Errorf("state id and nonce cannot be equal: %w", ErrInvalidParameter)
+		return "", fmt.Errorf("%s: state id and nonce cannot be equal: %w", op, ErrInvalidParameter)
 	}
 	// Add the "openid" scope, which is a required scope for oidc flows
 	scopes := append([]string{oidc.ScopeOpenID}, p.config.Scopes...)
@@ -125,18 +125,18 @@ func (p *Provider) AuthURL(ctx context.Context, s State) (url string, e error) {
 func (p *Provider) Exchange(ctx context.Context, s State, authorizationState string, authorizationCode string) (*Tk, error) {
 	const op = "Provider.Exchange"
 	if p.config == nil {
-		return nil, fmt.Errorf("provider config is nil: %w", ErrNilParameter)
+		return nil, fmt.Errorf("%s: provider config is nil: %w", op, ErrNilParameter)
 	}
 	if s.Id() != authorizationState {
-		return nil, fmt.Errorf("authentication state and authorization state are not equal: %w", ErrInvalidParameter)
+		return nil, fmt.Errorf("%s: authentication state and authorization state are not equal: %w", op, ErrInvalidParameter)
 	}
 	if s.IsExpired() {
-		return nil, fmt.Errorf("authentication state is expired: %w", ErrInvalidParameter)
+		return nil, fmt.Errorf("%s: authentication state is expired: %w", op, ErrInvalidParameter)
 	}
 
 	client, err := p.config.HttpClient()
 	if err != nil {
-		return nil, fmt.Errorf("unable to create http client: %w", err)
+		return nil, fmt.Errorf("%s: unable to create http client: %w", op, err)
 	}
 	oidcCtx := HttpClientContext(ctx, client)
 
@@ -154,19 +154,19 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 
 	oauth2Token, err := oauth2Config.Exchange(oidcCtx, authorizationCode)
 	if err != nil {
-		return nil, fmt.Errorf("unable to exchange auth code with provider: %w", err)
+		return nil, fmt.Errorf("%s: unable to exchange auth code with provider: %w", op, err)
 	}
 
 	idToken, ok := oauth2Token.Extra("id_token").(string)
 	if !ok {
-		return nil, fmt.Errorf("id_token is missing from auth code exchange: %w", ErrMissingIdToken)
+		return nil, fmt.Errorf("%s: id_token is missing from auth code exchange: %w", op, ErrMissingIdToken)
 	}
 	t, err := NewToken(IdToken(idToken), oauth2Token)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create new id_token: %w", err)
+		return nil, fmt.Errorf("%s: unable to create new id_token: %w", op, err)
 	}
 	if err := p.VerifyIdToken(ctx, t.IdToken(), s.Nonce()); err != nil {
-		return nil, fmt.Errorf("id_token failed verification: %w", err)
+		return nil, fmt.Errorf("%s: id_token failed verification: %w", op, err)
 	}
 	return t, nil
 }
@@ -174,26 +174,26 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 // UserInfo gets the UserInfo claims from the provider using the token produced
 // by the tokenSource.
 func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource, claims interface{}) error {
-	const op = "Tk.UserInfo"
+	const op = "Provider.UserInfo"
 	if tokenSource == nil {
-		return fmt.Errorf("token source is nil: %w", ErrInvalidParameter)
+		return fmt.Errorf("%s: token source is nil: %w", op, ErrInvalidParameter)
 	}
 	if claims == nil {
-		return fmt.Errorf("claims interface is nil: %w", ErrNilParameter)
+		return fmt.Errorf("%s: claims interface is nil: %w", op, ErrNilParameter)
 	}
 	client, err := p.config.HttpClient()
 	if err != nil {
-		return fmt.Errorf("unable to create http client: %w", err)
+		return fmt.Errorf("%s: unable to create http client: %w", op, err)
 	}
 	oidcCtx := HttpClientContext(ctx, client)
 
 	userinfo, err := p.provider.UserInfo(oidcCtx, tokenSource)
 	if err != nil {
-		return fmt.Errorf("provider UserInfo request failed: %w", err)
+		return fmt.Errorf("%s: provider UserInfo request failed: %w", op, err)
 	}
 	err = userinfo.Claims(&claims)
 	if err != nil {
-		return fmt.Errorf("failed to get UserInfo claims: %w", err)
+		return fmt.Errorf("%s: failed to get UserInfo claims: %w", op, err)
 	}
 	return nil
 }
@@ -206,10 +206,10 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource,
 func (p *Provider) VerifyIdToken(ctx context.Context, t IdToken, nonce string) error {
 	const op = "Provider.VerifyIdToken"
 	if t == "" {
-		return fmt.Errorf("id_token is empty: %w", ErrInvalidParameter)
+		return fmt.Errorf("%s: id_token is empty: %w", op, ErrInvalidParameter)
 	}
 	if nonce == "" {
-		return fmt.Errorf("nonce is empty: %w", ErrInvalidParameter)
+		return fmt.Errorf("%s: nonce is empty: %w", op, ErrInvalidParameter)
 	}
 	algs := []string{}
 	for _, a := range p.config.SupportedSigningAlgs {
@@ -223,11 +223,11 @@ func (p *Provider) VerifyIdToken(ctx context.Context, t IdToken, nonce string) e
 
 	oidcIdToken, err := verifier.Verify(ctx, string(t))
 	if err != nil {
-		return fmt.Errorf("invalid id_token signature: %w", err)
+		return fmt.Errorf("%s: invalid id_token signature: %w", op, err)
 	}
 
 	if oidcIdToken.Nonce != nonce {
-		return fmt.Errorf("invalid id_token nonce: %w", ErrInvalidNonce)
+		return fmt.Errorf("%s: invalid id_token nonce: %w", op, ErrInvalidNonce)
 	}
 
 	if err := func() error {
@@ -241,7 +241,7 @@ func (p *Provider) VerifyIdToken(ctx context.Context, t IdToken, nonce string) e
 		}
 		return nil
 	}(); err != nil {
-		return fmt.Errorf("invalid id_token audiences: %w", err)
+		return fmt.Errorf("%s: invalid id_token audiences: %w", op, err)
 	}
 	return nil
 }
