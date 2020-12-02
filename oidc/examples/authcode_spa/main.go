@@ -23,6 +23,7 @@ const (
 const attemptExp = "attemptExp"
 
 func envConfig() (map[string]interface{}, error) {
+	const op = "envConfig"
 	env := map[string]interface{}{
 		clientId:     os.Getenv("OIDC_CLIENT_ID"),
 		clientSecret: os.Getenv("OIDC_CLIENT_SECRET"),
@@ -34,14 +35,14 @@ func envConfig() (map[string]interface{}, error) {
 		switch t := v.(type) {
 		case string:
 			if t == "" {
-				return nil, fmt.Errorf("%s is empty", k)
+				return nil, fmt.Errorf("%s: %s is empty", op, k)
 			}
 		case time.Duration:
 			if t == 0 {
-				return nil, fmt.Errorf("%s is empty", k)
+				return nil, fmt.Errorf("%s: %s is empty", op, k)
 			}
 		default:
-			return nil, fmt.Errorf("%s is an unhandled type %t", k, t)
+			return nil, fmt.Errorf("%s: %s is an unhandled type %t", op, k, t)
 		}
 	}
 	return env, nil

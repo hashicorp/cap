@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -31,6 +30,7 @@ const (
 const attemptExp = "attemptExp"
 
 func envConfig() (map[string]interface{}, error) {
+	const op = "envConfig"
 	env := map[string]interface{}{
 		clientId:     os.Getenv("OIDC_CLIENT_ID"),
 		clientSecret: os.Getenv("OIDC_CLIENT_SECRET"),
@@ -42,14 +42,14 @@ func envConfig() (map[string]interface{}, error) {
 		switch t := v.(type) {
 		case string:
 			if t == "" {
-				return nil, fmt.Errorf("%s is empty", k)
+				return nil, fmt.Errorf("%s: %s is empty", op, k)
 			}
 		case time.Duration:
 			if t == 0 {
-				return nil, fmt.Errorf("%s is empty", k)
+				return nil, fmt.Errorf("%s: %s is empty", op, k)
 			}
 		default:
-			return nil, fmt.Errorf("%s is an unhandled type %t", k, t)
+			return nil, fmt.Errorf("%s: %s is an unhandled type %t", op, k, t)
 		}
 	}
 	return env, nil
@@ -161,6 +161,7 @@ type successResp struct {
 }
 
 func success() (callback.SuccessResponseFunc, <-chan successResp) {
+	const op = "success"
 	doneCh := make(chan successResp)
 	return func(stateId string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
 		var responseErr error
@@ -170,37 +171,38 @@ func success() (callback.SuccessResponseFunc, <-chan successResp) {
 		}()
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte(successHTML)); err != nil {
-			responseErr = err
+			responseErr = fmt.Errorf("%s: %w", op, err)
 			fmt.Fprintf(os.Stderr, "error writing successful response: %s", err)
 		}
 	}, doneCh
 }
 
 func failed() (callback.ErrorResponseFunc, <-chan error) {
+	const op = "failed"
 	doneCh := make(chan error)
 	return func(stateId string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
 		var responseErr error
 		defer func() {
 			if _, err := w.Write([]byte(responseErr.Error())); err != nil {
-				fmt.Fprintf(os.Stderr, "error writing failed response: %s", err)
+				fmt.Fprintf(os.Stderr, "%s: error writing failed response: %s", op, err)
 			}
 			doneCh <- responseErr
 			close(doneCh)
 		}()
 
 		if e != nil {
-			fmt.Fprintf(os.Stderr, "callback error: %s", e.Error())
+			fmt.Fprintf(os.Stderr, "%s: callback error: %s", op, e.Error())
 			responseErr = e
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		if r != nil {
-			fmt.Fprintf(os.Stderr, "callback error from oidc provider: %s", r)
-			responseErr = fmt.Errorf("callback error from oidc provider: %s", r)
+			responseErr = fmt.Errorf("%s: callback error from oidc provider: %s", op, r)
+			fmt.Fprint(os.Stderr, responseErr.Error())
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		responseErr = errors.New("Unknown error from callback")
+		responseErr = fmt.Errorf("%s: unknown error from callback", op)
 	}, doneCh
 }
 
@@ -227,12 +229,13 @@ func openURL(url string) error {
 // isWSL tests if the binary is being run in Windows Subsystem for Linux
 // source: https://github.com/hashicorp/vault-plugin-auth-jwt
 func isWSL() bool {
+	const op = "isWSL"
 	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
 		return false
 	}
 	data, err := ioutil.ReadFile("/proc/version")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to read /proc/version.\n")
+		fmt.Fprintf(os.Stderr, "%s: unable to read /proc/version.\n", op)
 		return false
 	}
 	return strings.Contains(strings.ToLower(string(data)), "microsoft")
@@ -246,12 +249,13 @@ type respToken struct {
 }
 
 func printClaims(t oidc.IdToken) {
+	const op = "printClaims"
 	var tokenClaims map[string]interface{}
 	if err := t.Claims(&tokenClaims); err != nil {
 		fmt.Fprintf(os.Stderr, "IdToken claims: error parsing: %s", err)
 	} else {
 		if idData, err := json.MarshalIndent(tokenClaims, "", "    "); err != nil {
-			fmt.Fprint(os.Stderr, err)
+			fmt.Fprintf(os.Stderr, "%s: %s", op, err)
 		} else {
 			fmt.Fprintf(os.Stderr, "IdToken claims:%s\n", idData)
 		}
@@ -259,18 +263,19 @@ func printClaims(t oidc.IdToken) {
 }
 
 func printUserInfo(p *oidc.Provider, t oidc.Token) {
+	const op = "printUserInfo"
 	if t, ok := t.(interface {
 		StaticTokenSource() oauth2.TokenSource
 	}); ok {
 		var infoClaims map[string]interface{}
 		err := p.UserInfo(context.Background(), t.StaticTokenSource(), &infoClaims)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "channel received success, but error getting UserInfo claims: %s", err)
+			fmt.Fprintf(os.Stderr, "%s: channel received success, but error getting UserInfo claims: %s", op, err)
 			return
 		}
 		infoData, err := json.MarshalIndent(infoClaims, "", "    ")
 		if err != nil {
-			fmt.Fprint(os.Stderr, err)
+			fmt.Fprintf(os.Stderr, "%s: %s", op, err)
 			return
 		}
 		fmt.Fprintf(os.Stderr, "UserInfo claims:%s\n", infoData)
@@ -279,9 +284,10 @@ func printUserInfo(p *oidc.Provider, t oidc.Token) {
 }
 
 func printToken(t oidc.Token) {
+	const op = "printToken"
 	tokenData, err := json.MarshalIndent(printableToken(t), "", "    ")
 	if err != nil {
-		fmt.Fprint(os.Stderr, err)
+		fmt.Fprintf(os.Stderr, "%s: %s", op, err)
 		return
 	}
 	fmt.Fprintf(os.Stderr, "channel received success.\nToken:%s\n", tokenData)

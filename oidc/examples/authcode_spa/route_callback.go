@@ -34,6 +34,7 @@ func successFn(ctx context.Context, sc *stateCache) callback.SuccessResponseFunc
 }
 
 func failedFn(ctx context.Context, sc *stateCache) callback.ErrorResponseFunc {
+	const op = "failedFn"
 	return func(stateId string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
 		var responseErr error
 		defer func() {
@@ -50,7 +51,7 @@ func failedFn(ctx context.Context, sc *stateCache) callback.ErrorResponseFunc {
 		}
 		if r != nil {
 			fmt.Fprintf(os.Stderr, "callback error from oidc provider: %s\n", r)
-			responseErr = fmt.Errorf("callback error from oidc provider: %s", r)
+			responseErr = fmt.Errorf("%s: callback error from oidc provider: %s", op, r)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}

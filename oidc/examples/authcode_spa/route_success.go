@@ -12,6 +12,7 @@ import (
 )
 
 func SuccessHandler(ctx context.Context, sc *stateCache) http.HandlerFunc {
+	const op = "SuccessHandler"
 	return func(w http.ResponseWriter, r *http.Request) {
 		stateId := r.FormValue("state")
 		s, err := sc.Read(ctx, stateId)
@@ -23,7 +24,7 @@ func SuccessHandler(ctx context.Context, sc *stateCache) http.HandlerFunc {
 		defer sc.Delete(stateId)
 		extended, ok := s.(*extendedState)
 		if !ok {
-			err := fmt.Errorf("not an extended state")
+			err := fmt.Errorf("%s: not an extended state", op)
 			fmt.Fprint(os.Stderr, err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

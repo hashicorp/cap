@@ -28,14 +28,15 @@ func newStateCache(entryTimeout time.Duration, cleanupInterval time.Duration) *s
 // Read implements the callback.StateReader interface and will delete the state
 // before returning.
 func (sc *stateCache) Read(ctx context.Context, stateId string) (oidc.State, error) {
+	const op = "stateCache.Read"
 	if stateRaw, ok := sc.c.Get(stateId); ok {
 		if extended, ok := stateRaw.(*extendedState); ok {
 			return extended, nil
 		}
-		return nil, fmt.Errorf("not an extended state")
+		return nil, fmt.Errorf("%s: not an extended state", op)
 
 	}
-	return nil, fmt.Errorf("state %s not found", stateId)
+	return nil, fmt.Errorf("%s: state %s not found", op, stateId)
 }
 
 func (sc *stateCache) Add(s oidc.State) {
@@ -44,13 +45,14 @@ func (sc *stateCache) Add(s oidc.State) {
 }
 
 func (sc *stateCache) SetToken(id string, t oidc.Token) error {
+	const op = "stateCache.SetToken"
 	s, exp, ok := sc.c.GetWithExpiration(id)
 	if !ok {
-		return fmt.Errorf("%s not found", id)
+		return fmt.Errorf("%s not found", op, id)
 	}
 	extended, ok := s.(*extendedState)
 	if !ok {
-		return fmt.Errorf("not an extended state")
+		return fmt.Errorf("%s, not an extended state", op)
 	}
 	sc.c.Set(id, &extendedState{State: extended.State, t: t}, exp.Sub(time.Now()))
 	return nil
