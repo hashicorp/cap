@@ -2,12 +2,15 @@ package oidc
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 
 	"github.com/coreos/go-oidc"
-	strutil "github.com/hashicorp/cap/sdk/strutils"
+	"github.com/hashicorp/go-cleanhttp"
 	"golang.org/x/oauth2"
 )
 
@@ -16,6 +19,12 @@ import (
 type Provider struct {
 	config   *Config
 	provider *oidc.Provider
+
+	// client uses a pooled transport that uses the provider's config CA
+	// certificate PEM if provided, otherwise it will use the installed system
+	// CA chain.  This client's resources idle connections are closed in
+	// Provider.Done()
+	client *http.Client
 
 	mu sync.Mutex
 
@@ -52,13 +61,13 @@ func NewProvider(c *Config) (*Provider, error) {
 		backgroundCtxCancel: cancel,
 	}
 
-	client, err := c.HttpClient()
+	oidcCtx, err := p.HttpClientContext(p.backgroundCtx)
 	if err != nil {
 		p.Done() // release the backgroundCtxCancel resources
 		return nil, fmt.Errorf("%s: unable to create http client: %w", op, err)
 	}
 
-	provider, err := oidc.NewProvider(HttpClientContext(p.backgroundCtx, client), c.Issuer) // makes http req to issuer for discovery
+	provider, err := oidc.NewProvider(oidcCtx, c.Issuer) // makes http req to issuer for discovery
 	if err != nil {
 		p.Done() // release the backgroundCtxCancel resources
 		// we don't know what's causing the problem, so we won't classify the
@@ -81,6 +90,11 @@ func (p *Provider) Done() {
 	if p.backgroundCtxCancel != nil {
 		p.backgroundCtxCancel()
 		p.backgroundCtxCancel = nil
+	}
+
+	// release the http.Client's pooled transport resources.
+	if p.client != nil {
+		p.client.CloseIdleConnections()
 	}
 }
 
@@ -145,11 +159,10 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 		return nil, fmt.Errorf("%s: authentication state is expired: %w", op, ErrInvalidParameter)
 	}
 
-	client, err := p.config.HttpClient()
+	oidcCtx, err := p.HttpClientContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to create http client: %w", op, err)
 	}
-	oidcCtx := HttpClientContext(ctx, client)
 
 	// Add the "openid" scope, which is a required scope for oidc flows
 	// * TODO (jimlambrt 11/2020): make sure these additional scopes work as intended.
@@ -192,11 +205,10 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource,
 	if claims == nil {
 		return fmt.Errorf("%s: claims interface is nil: %w", op, ErrNilParameter)
 	}
-	client, err := p.config.HttpClient()
+	oidcCtx, err := p.HttpClientContext(ctx)
 	if err != nil {
 		return fmt.Errorf("%s: unable to create http client: %w", op, err)
 	}
-	oidcCtx := HttpClientContext(ctx, client)
 
 	userinfo, err := p.provider.UserInfo(oidcCtx, tokenSource)
 	if err != nil {
@@ -244,7 +256,7 @@ func (p *Provider) VerifyIdToken(ctx context.Context, t IdToken, nonce string) e
 	if err := func() error {
 		if len(p.config.Audiences) > 0 {
 			for _, v := range p.config.Audiences {
-				if strutil.StrListContains(oidcIdToken.Audience, v) {
+				if StrListContains(oidcIdToken.Audience, v) {
 					return nil
 				}
 			}
@@ -255,6 +267,57 @@ func (p *Provider) VerifyIdToken(ctx context.Context, t IdToken, nonce string) e
 		return fmt.Errorf("%s: invalid id_token audiences: %w", op, err)
 	}
 	return nil
+}
+
+// HttpClient returns an http.Client for the provider. The returned client uses
+// a pooled transport (so it can reuse connections) that uses the provider's
+// config CA certificate PEM if provided, otherwise it will use the installed
+// system CA chain.  This client's idle connections are closed in
+// Provider.Done()
+func (p *Provider) HttpClient() (*http.Client, error) {
+	const op = "Provider.NewHTTPClient"
+	if p.client != nil {
+		return p.client, nil
+	}
+	// since it's called by the provider factory, we need to check that the
+	// config isn't nil
+	if p.config == nil {
+		return nil, fmt.Errorf("%s: the provider's config is nil %w", op, ErrNilParameter)
+	}
+
+	tr := cleanhttp.DefaultPooledTransport()
+
+	if p.config.ProviderCA != "" {
+		certPool := x509.NewCertPool()
+		if ok := certPool.AppendCertsFromPEM([]byte(p.config.ProviderCA)); !ok {
+			return nil, fmt.Errorf("%s: %w", op, ErrInvalidCACert)
+		}
+
+		tr.TLSClientConfig = &tls.Config{
+			RootCAs: certPool,
+		}
+	}
+
+	c := &http.Client{
+		Transport: tr,
+	}
+	p.client = c
+	return p.client, nil
+}
+
+// HttpClientContext returns a new Context that carries the provider's HTTP
+// client. This method sets the same context key used by the
+// github.com/coreos/go-oidc and golang.org/x/oauth2 packages, so the returned
+// context works for those packages as well.
+func (p *Provider) HttpClientContext(ctx context.Context) (context.Context, error) {
+	const op = "Provider.HttpClientContext"
+	c, err := p.HttpClient()
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+
+	}
+	// simple to implement as a wrapper for the coreos package
+	return oidc.ClientContext(ctx, c), nil
 }
 
 type implicitFlow struct {
