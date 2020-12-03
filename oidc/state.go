@@ -48,12 +48,12 @@ var _ State = (*St)(nil)
 // NewState creates a new State (*St)
 func NewState(expireIn time.Duration) (*St, error) {
 	const op = "oidc.NewState"
-	nonce, err := NewId("n")
+	nonce, err := NewId(WithPrefix("n"))
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to generate a state's nonce: %w", op, err)
 	}
 
-	id, err := NewId("st")
+	id, err := NewId(WithPrefix("st"))
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to generate a state's id: %w", op, err)
 	}
