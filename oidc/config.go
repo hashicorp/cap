@@ -1,16 +1,9 @@
 package oidc
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
-
-	"github.com/coreos/go-oidc"
-	sdkHttp "github.com/hashicorp/cap/sdk/http"
-	strutil "github.com/hashicorp/cap/sdk/strutils"
 )
 
 type ClientSecret string
@@ -107,7 +100,7 @@ func (c *Config) Validate() error {
 	if err != nil {
 		return fmt.Errorf("%s: issuer %s is invalid: %w", op, c.Issuer, err)
 	}
-	if !strutil.StrListContains([]string{"https", "http"}, u.Scheme) {
+	if !StrListContains([]string{"https", "http"}, u.Scheme) {
 		return fmt.Errorf("%s: issuer %s schema is not http or https: %w", op, c.Issuer, err)
 	}
 	if len(c.SupportedSigningAlgs) == 0 {
@@ -121,29 +114,6 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// HttpClient is a helper function that creates a new http client for the
-// provider configured
-func (c *Config) HttpClient() (*http.Client, error) {
-	const op = "Config.NewHTTPClient"
-	client, err := sdkHttp.NewClient(c.ProviderCA)
-	if err != nil {
-		if errors.Is(err, sdkHttp.ErrInvalidCertificatePem) {
-			return nil, fmt.Errorf("%s: could not parse CA PEM value: %w", op, ErrInvalidCACert)
-		}
-		return nil, fmt.Errorf("%s: could not get an http client: %w", op, err)
-	}
-	return client, nil
-}
-
-// HttpClientContext is a helper function that returns a new Context that
-// carries the provided HTTP client. This method sets the same context key used
-// by the github.com/coreos/go-oidc and golang.org/x/oauth2 packages, so the
-// returned context works for those packages as well.
-func HttpClientContext(ctx context.Context, client *http.Client) context.Context {
-	// simple to implement as a wrapper for the coreos package
-	return oidc.ClientContext(ctx, client)
-}
-
 // configOptions is the set of available options
 type configOptions struct {
 	withScopes     []string
@@ -151,7 +121,7 @@ type configOptions struct {
 	withProviderCA string
 }
 
-// getProviderConfigDefaults is a handy way to get the defaults at runtime and
+// configDefaults is a handy way to get the defaults at runtime and
 // during unit tests.
 func configDefaults() configOptions {
 	return configOptions{}
