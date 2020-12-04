@@ -250,7 +250,6 @@ func TestConfig_Validate(t *testing.T) {
 		err := c.Validate()
 		assert.Truef(errors.Is(err, ErrNilParameter), "Config.Validate() = %v, want %v", err, ErrNilParameter)
 	})
-
 }
 
 func Test_WithScopes(t *testing.T) {
@@ -260,7 +259,6 @@ func Test_WithScopes(t *testing.T) {
 	testOpts := configDefaults()
 	testOpts.withScopes = []string{"alice", "bob"}
 	assert.Equal(opts, testOpts)
-
 }
 
 func Test_WithAudiences(t *testing.T) {
