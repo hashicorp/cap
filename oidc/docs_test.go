@@ -86,7 +86,6 @@ func ExampleNewProvider() {
 		[]oidc.Alg{oidc.RS256},
 		"http://YOUR_REDIRECT_URL",
 	)
-	fmt.Println(pc.ClientSecret.MarshalJSON())
 
 	// Create a provider
 	p, _ := oidc.NewProvider(pc)
