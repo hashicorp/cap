@@ -224,7 +224,7 @@ func (t IdToken) Claims(claims interface{}) error {
 func UnmarshalClaims(rawToken string, claims interface{}) error {
 	const op = "JwtClaims"
 	parts := strings.Split(string(rawToken), ".")
-	if len(parts) < 2 {
+	if len(parts) != 3 {
 		return fmt.Errorf("%s: malformed jwt, expected 3 parts got %d: %w", op, len(parts), ErrInvalidParameter)
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
