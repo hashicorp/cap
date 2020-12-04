@@ -24,7 +24,6 @@ func Test_WithExpirySkew(t *testing.T) {
 		testOpts.withExpirySkew = exp
 		assert.Equal(opts, testOpts)
 	})
-
 }
 
 func TestApplyOpts(t *testing.T) {
