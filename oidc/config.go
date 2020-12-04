@@ -1,6 +1,7 @@
 package oidc
 
 import (
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -55,7 +56,7 @@ type Config struct {
 }
 
 // NewConfig composes a new config for a provider. Supported options:
-// WithStateReadWriter, WithProviderCA, WithScopes
+// WithProviderCA, WithScopes, WithAudiences
 func NewConfig(issuer string, clientId string, clientSecret ClientSecret, supported []Alg, redirectUrl string, opt ...Option) (*Config, error) {
 	const op = "NewConfig"
 	opts := getConfigOpts(opt...)
@@ -67,6 +68,7 @@ func NewConfig(issuer string, clientId string, clientSecret ClientSecret, suppor
 		RedirectUrl:          redirectUrl,
 		Scopes:               opts.withScopes,
 		ProviderCA:           opts.withProviderCA,
+		Audiences:            opts.withAudiences,
 	}
 	if err := c.Validate(); err != nil {
 		return nil, fmt.Errorf("%s: invalid provider config: %w", op, err)
@@ -98,10 +100,10 @@ func (c *Config) Validate() error {
 	}
 	u, err := url.Parse(c.Issuer)
 	if err != nil {
-		return fmt.Errorf("%s: issuer %s is invalid: %w", op, c.Issuer, err)
+		return fmt.Errorf("%s: issuer %s is invalid (%s): %w", op, c.Issuer, err, ErrInvalidIssuer)
 	}
 	if !StrListContains([]string{"https", "http"}, u.Scheme) {
-		return fmt.Errorf("%s: issuer %s schema is not http or https: %w", op, c.Issuer, err)
+		return fmt.Errorf("%s: issuer %s schema is not http or https: %w", op, c.Issuer, ErrInvalidIssuer)
 	}
 	if len(c.SupportedSigningAlgs) == 0 {
 		return fmt.Errorf("%s: supported algorithms is empty: %w", op, ErrInvalidParameter)
@@ -109,6 +111,12 @@ func (c *Config) Validate() error {
 	for _, a := range c.SupportedSigningAlgs {
 		if _, ok := supportedAlgorithms[a]; !ok {
 			return fmt.Errorf("%s: unsupported algorithm %s: %w", op, a, ErrInvalidParameter)
+		}
+	}
+	if c.ProviderCA != "" {
+		certPool := x509.NewCertPool()
+		if ok := certPool.AppendCertsFromPEM([]byte(c.ProviderCA)); !ok {
+			return fmt.Errorf("%s: %w", op, ErrInvalidCACert)
 		}
 	}
 	return nil
@@ -136,19 +144,19 @@ func getConfigOpts(opt ...Option) configOptions {
 }
 
 // WithScopes provides an optional list of scopes for the provider's config
-func WithScopes(scopes []string) Option {
+func WithScopes(scopes ...string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*configOptions); ok {
-			o.withScopes = scopes
+			o.withScopes = append(o.withScopes, scopes...)
 		}
 	}
 }
 
 // WithAudiences provides an optional list of audiences for the provider's config
-func WithAudiences(auds []string) Option {
+func WithAudiences(auds ...string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*configOptions); ok {
-			o.withAudiences = auds
+			o.withAudiences = append(o.withAudiences, auds...)
 		}
 	}
 }
