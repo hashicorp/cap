@@ -57,7 +57,9 @@ func NewState(expireIn time.Duration) (*St, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to generate a state's id: %w", op, err)
 	}
-
+	if expireIn == 0 {
+		return nil, fmt.Errorf("%s: expireIn is zero: %w", op, ErrInvalidParameter)
+	}
 	return &St{
 		id:         id,
 		nonce:      nonce,
