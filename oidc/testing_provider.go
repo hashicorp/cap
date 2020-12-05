@@ -57,11 +57,12 @@ func (p *TestProvider) Stop() {
 	p.httpServer.Close()
 }
 
-// StartTestProvider creates a disposable TestProvider.  The port must not be
-// zero.
-func StartTestProvider(t *testing.T, port int) *TestProvider {
+// StartTestProvider creates a disposable TestProvider.  It supports the
+// options: WithTestPort and WithTestCleanupFunc
+func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 	t.Helper()
 	require := require.New(t)
+	opts := getTestProviderOpts(opt...)
 
 	p := &TestProvider{
 		allowedRedirectURIs: []string{
@@ -78,10 +79,13 @@ func StartTestProvider(t *testing.T, port int) *TestProvider {
 
 	p.jwks = testJWKS(t, p.ecdsaPublicKey)
 
-	p.httpServer = httptestNewUnstartedServerWithPort(t, p, port)
+	p.httpServer = httptestNewUnstartedServerWithPort(t, p, opts.withPort)
 	p.httpServer.Config.ErrorLog = log.New(ioutil.Discard, "", 0)
 	p.httpServer.StartTLS()
 	t.Cleanup(p.httpServer.Close)
+	if opts.withCleanupFunc != nil {
+		t.Cleanup(opts.withCleanupFunc)
+	}
 
 	cert := p.httpServer.Certificate()
 
@@ -91,6 +95,46 @@ func StartTestProvider(t *testing.T, port int) *TestProvider {
 	p.caCert = buf.String()
 
 	return p
+}
+
+// testProviderOptions is the set of available options for TestProvider
+// functions
+type testProviderOptions struct {
+	withPort        int
+	withCleanupFunc func()
+}
+
+// testProviderDefaults is a handy way to get the defaults at runtime and during unit
+// tests.
+func testProviderDefaults() testProviderOptions {
+	return testProviderOptions{}
+}
+
+// getTestProviderOpts gets the test provider defaults and applies the opt
+// overrides passed in
+func getTestProviderOpts(opt ...Option) testProviderOptions {
+	opts := testProviderDefaults()
+	ApplyOpts(&opts, opt...)
+	return opts
+}
+
+// WithTestPort provides an optional port for the test provider
+func WithTestPort(port int) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*testProviderOptions); ok {
+			o.withPort = port
+		}
+	}
+}
+
+// WithTestCleanupFunc provides an optional cleanup function for the test
+// provider
+func WithTestCleanupFunc(f func()) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*testProviderOptions); ok {
+			o.withCleanupFunc = f
+		}
+	}
 }
 
 // SetClientCreds is for configuring the client information required for the
@@ -395,8 +439,9 @@ func testJWKS(t *testing.T, pubKey string) *jose.JSONWebKeySet {
 func httptestNewUnstartedServerWithPort(t *testing.T, handler http.Handler, port int) *httptest.Server {
 	t.Helper()
 	require := require.New(t)
-	require.NotEmpty(port)
-
+	if port == 0 {
+		return httptest.NewUnstartedServer(handler)
+	}
 	addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
 	l, err := net.Listen("tcp", addr)
 	require.NoError(err)
