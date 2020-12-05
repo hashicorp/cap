@@ -73,6 +73,7 @@ func TestSignJWT(t *testing.T, ecdsaPrivKeyPEM string, claims jwt.Claims, privat
 	return raw
 }
 
+// testDefaultJwt is internally helpful, but for now we won't export it.
 func testDefaultJwt(t *testing.T, ecdsaPrivKeyPEM string, expireIn time.Duration, nonce string, additionalClaims map[string]interface{}) string {
 	t.Helper()
 	now := jwt.NewNumericDate(time.Now())
