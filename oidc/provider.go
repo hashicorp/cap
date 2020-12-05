@@ -130,7 +130,7 @@ func (p *Provider) AuthURL(ctx context.Context, s State, opt ...Option) (url str
 	}
 	if opts.withImplicitFlow != nil {
 		reqTokens := []string{"id_token"}
-		if !opts.withImplicitFlow.WithoutAccessToken {
+		if !opts.withImplicitFlow.withoutAccessToken {
 			reqTokens = append(reqTokens, "token")
 		}
 		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("response_mode", "form_post"), oauth2.SetAuthURLParam("response_type", strings.Join(reqTokens, " ")))
@@ -322,7 +322,7 @@ func (p *Provider) HttpClientContext(ctx context.Context) (context.Context, erro
 }
 
 type implicitFlow struct {
-	WithoutAccessToken bool
+	withoutAccessToken bool
 }
 
 // providerOptions is the set of available options
@@ -361,7 +361,7 @@ func WithImplicitFlow(args ...interface{}) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*providerOptions); ok {
 			o.withImplicitFlow = &implicitFlow{
-				WithoutAccessToken: withoutAccessToken,
+				withoutAccessToken: withoutAccessToken,
 			}
 		}
 	}
