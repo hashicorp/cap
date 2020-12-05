@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/coreos/go-oidc"
+	"github.com/hashicorp/cap/oidc/internal/strutils"
 	"github.com/hashicorp/go-cleanhttp"
 	"golang.org/x/oauth2"
 )
@@ -256,7 +257,7 @@ func (p *Provider) VerifyIdToken(ctx context.Context, t IdToken, nonce string) e
 	if err := func() error {
 		if len(p.config.Audiences) > 0 {
 			for _, v := range p.config.Audiences {
-				if StrListContains(oidcIdToken.Audience, v) {
+				if strutils.StrListContains(oidcIdToken.Audience, v) {
 					return nil
 				}
 			}

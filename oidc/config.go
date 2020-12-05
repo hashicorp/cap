@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+
+	"github.com/hashicorp/cap/oidc/internal/strutils"
 )
 
 type ClientSecret string
@@ -102,7 +104,7 @@ func (c *Config) Validate() error {
 	if err != nil {
 		return fmt.Errorf("%s: issuer %s is invalid (%s): %w", op, c.Issuer, err, ErrInvalidIssuer)
 	}
-	if !StrListContains([]string{"https", "http"}, u.Scheme) {
+	if !strutils.StrListContains([]string{"https", "http"}, u.Scheme) {
 		return fmt.Errorf("%s: issuer %s schema is not http or https: %w", op, c.Issuer, ErrInvalidIssuer)
 	}
 	if len(c.SupportedSigningAlgs) == 0 {

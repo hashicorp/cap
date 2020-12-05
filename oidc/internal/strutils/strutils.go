@@ -1,4 +1,4 @@
-package oidc
+package strutils
 
 // StrListContains looks for a string in a list of strings.
 func StrListContains(haystack []string, needle string) bool {

@@ -1,4 +1,4 @@
-package oidc
+package strutils
 
 import (
 	"testing"
