@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"gopkg.in/square/go-jose.v2"
@@ -70,4 +71,25 @@ func TestSignJWT(t *testing.T, ecdsaPrivKeyPEM string, claims jwt.Claims, privat
 	require.NoError(err)
 
 	return raw
+}
+
+func testDefaultJwt(t *testing.T, ecdsaPrivKeyPEM string, expireIn time.Duration, nonce string, additionalClaims map[string]interface{}) string {
+	t.Helper()
+	now := jwt.NewNumericDate(time.Now())
+	claims := jwt.Claims{
+		Issuer:    "https://example.com/",
+		IssuedAt:  now,
+		NotBefore: now,
+		Expiry:    jwt.NewNumericDate(time.Now()),
+		Audience:  []string{"www.example.com"},
+		Subject:   "alice@example.com",
+	}
+	privateClaims := map[string]interface{}{
+		nonce: nonce,
+	}
+	for k, v := range additionalClaims {
+		privateClaims[k] = v
+	}
+	testJwt := TestSignJWT(t, ecdsaPrivKeyPEM, claims, privateClaims)
+	return testJwt
 }
