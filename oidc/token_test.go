@@ -106,14 +106,13 @@ func TestNewToken(t *testing.T) {
 			require.NoError(err)
 			assert.Equalf(tt.want, got, "NewToken() = %v, want %v", got, tt.want)
 
-			assert.Equal(tt.wantIdToken, got.IdToken())
-			assert.Equal(tt.wantAccessToken, got.AccessToken())
-			assert.Equal(tt.wantRefreshToken, got.RefreshToken())
-			assert.Equal(tt.wantExpiry, got.Expiry())
-			assert.Equal(tt.wantTokenSource, got.StaticTokenSource())
-			assert.Equal(tt.wantExpired, got.Expired())
-			assert.Equal(tt.wantValid, got.Valid())
-
+			assert.Equalf(tt.wantIdToken, got.IdToken(), "t.IdToken() = %v, want %v", tt.wantIdToken, got.IdToken())
+			assert.Equalf(tt.wantAccessToken, got.AccessToken(), "t.AccessToken() = %v, want %v", tt.wantAccessToken, got.AccessToken())
+			assert.Equalf(tt.wantRefreshToken, got.RefreshToken(), "t.RefreshToken() = %v, want %v", tt.wantRefreshToken, got.RefreshToken())
+			assert.Equalf(tt.wantExpiry, got.Expiry(), "t.Expiry() = %v, want %v", tt.wantExpiry, got.Expiry())
+			assert.Equalf(tt.wantTokenSource, got.StaticTokenSource(), "t.StaticTokenSource() = %v, want %v", tt.wantTokenSource, got.StaticTokenSource())
+			assert.Equalf(tt.wantExpired, got.Expired(), "t.Expired() = %v, want %v", tt.wantExpired, got.Expired())
+			assert.Equalf(tt.wantValid, got.Valid(), "t.Valid() = %v, want %v", tt.wantValid, got.Valid())
 		})
 	}
 }
