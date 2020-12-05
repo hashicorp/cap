@@ -160,66 +160,6 @@ func getTokenOpts(opt ...Option) tokenOptions {
 	return opts
 }
 
-// AccessToken is an oauth access_token
-type AccessToken string
-
-// RedactedAccessToken is the redacted string or json for an oauth access_token
-const RedactedAccessToken = "[REDACTED: access_token]"
-
-// String will redact the token
-func (t AccessToken) String() string {
-	return RedactedAccessToken
-}
-
-// MarshalJSON will redact the token
-func (t AccessToken) MarshalJSON() ([]byte, error) {
-	return json.Marshal(RedactedAccessToken)
-}
-
-// RefreshToken is an oauth refresh_token
-type RefreshToken string
-
-// RedactedRefreshToken is the redacted string or json for an oauth refresh_token
-const RedactedRefreshToken = "[REDACTED: refresh_token]"
-
-// String will redact the token
-func (t RefreshToken) String() string {
-	return RedactedRefreshToken
-}
-
-// MarshalJSON will redact the token
-func (t RefreshToken) MarshalJSON() ([]byte, error) {
-	return json.Marshal(RedactedRefreshToken)
-}
-
-// IdToken is an oidc id_token
-type IdToken string
-
-// RedactedIdToken is the redacted string or json for an oidc id_token
-const RedactedIdToken = "[REDACTED: id_token]"
-
-// String will redact the token
-func (t IdToken) String() string {
-	return RedactedIdToken
-}
-
-// MarshalJSON will redact the token
-func (t IdToken) MarshalJSON() ([]byte, error) {
-	return json.Marshal(RedactedIdToken)
-}
-
-// Claims retrieves the IdToken claims.
-func (t IdToken) Claims(claims interface{}) error {
-	const op = "IdToken.Claims"
-	if len(t) == 0 {
-		return fmt.Errorf("%s: id_token is empty: %w", op, ErrInvalidParameter)
-	}
-	if claims == nil {
-		return fmt.Errorf("%s: claims interface is nil: %w", op, ErrNilParameter)
-	}
-	return UnmarshalClaims(string(t), claims)
-}
-
 // UnmarshalClaims will retrieve the claims from the provided raw JWT token.
 func UnmarshalClaims(rawToken string, claims interface{}) error {
 	const op = "JwtClaims"
