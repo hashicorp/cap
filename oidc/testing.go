@@ -25,6 +25,37 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
+func TestGenerateKeys(t *testing.T) (pub, priv string) {
+	t.Helper()
+	require := require.New(t)
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(err)
+
+	{
+		derBytes, err := x509.MarshalECPrivateKey(privateKey)
+		require.NoError(err)
+
+		pemBlock := &pem.Block{
+			Type:  "EC PRIVATE KEY",
+			Bytes: derBytes,
+		}
+		priv = string(pem.EncodeToMemory(pemBlock))
+	}
+	{
+		derBytes, err := x509.MarshalPKIXPublicKey(privateKey.Public())
+		require.NoError(err)
+
+		pemBlock := &pem.Block{
+			Type:  "PUBLIC KEY",
+			Bytes: derBytes,
+		}
+		pub = string(pem.EncodeToMemory(pemBlock))
+	}
+
+	return pub, priv
+}
+
+
 // TestSignJWT will bundle the provided claims into a signed JWT. The provided key
 // must be ECDSA.
 func TestSignJWT(t *testing.T, ecdsaPrivKeyPEM string, claims jwt.Claims, privateClaims interface{}) string {
@@ -105,7 +136,7 @@ func StartTestProvider(t *testing.T, port int) *TestProvider {
 			"flavor":      "umami",
 		},
 	}
-	p.ecdsaPublicKey, p.ecdsaPrivateKey = testGenerateKeys(t)
+	p.ecdsaPublicKey, p.ecdsaPrivateKey = TestGenerateKeys(t)
 
 	p.jwks = testJWKS(t, p.ecdsaPublicKey)
 
@@ -397,35 +428,6 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func testGenerateKeys(t *testing.T) (pub, priv string) {
-	t.Helper()
-	require := require.New(t)
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	require.NoError(err)
-
-	{
-		derBytes, err := x509.MarshalECPrivateKey(privateKey)
-		require.NoError(err)
-
-		pemBlock := &pem.Block{
-			Type:  "EC PRIVATE KEY",
-			Bytes: derBytes,
-		}
-		priv = string(pem.EncodeToMemory(pemBlock))
-	}
-	{
-		derBytes, err := x509.MarshalPKIXPublicKey(privateKey.Public())
-		require.NoError(err)
-
-		pemBlock := &pem.Block{
-			Type:  "PUBLIC KEY",
-			Bytes: derBytes,
-		}
-		pub = string(pem.EncodeToMemory(pemBlock))
-	}
-
-	return pub, priv
-}
 
 // testJWKS converts a pem-encoded public key into JWKS data suitable for a
 // verification endpoint response
