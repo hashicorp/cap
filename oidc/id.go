@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/cap/oidc/internal/base62"
 )
 
+// DefaultIdLength is the default length for generated IDs
 const DefaultIdLength = 10
 
 // NewId generates a ID with an optional prefix.   The ID generated is suitable
