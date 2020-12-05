@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 func TestIdToken_String(t *testing.T) {
@@ -36,7 +38,18 @@ type testSubClaims struct {
 }
 
 func TestIdToken_Claims(t *testing.T) {
-	const testJwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+	_, priv := TestGenerateKeys(t)
+	testIat := jwt.NewNumericDate(time.Now())
+	testExp := jwt.NewNumericDate(time.Now().Add(10 * time.Minute))
+
+	claims := jwt.Claims{
+		Issuer:   "https://example.com/",
+		IssuedAt: testIat,
+		Expiry:   testExp,
+		Audience: []string{"www.example.com"},
+		Subject:  "alice@example.com",
+	}
+	testJwt := TestSignJWT(t, priv, claims, map[string]interface{}{})
 	t.Parallel()
 	t.Run("all-claim", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
@@ -45,9 +58,11 @@ func TestIdToken_Claims(t *testing.T) {
 		err := tk.Claims(&claims)
 		require.NoError(err)
 		assert.Equal(map[string]interface{}{
-			"iat":  float64(1516239022),
-			"name": "John Doe",
-			"sub":  "1234567890",
+			"iat": float64(testIat.Time().Unix()),
+			"exp": float64(testExp.Time().Unix()),
+			"iss": "https://example.com/",
+			"sub": "alice@example.com",
+			"aud": []interface{}{"www.example.com"},
 		}, claims)
 	})
 	t.Run("only-sub-claim", func(t *testing.T) {
@@ -56,7 +71,7 @@ func TestIdToken_Claims(t *testing.T) {
 		var subOnly testSubClaims
 		err := tk.Claims(&subOnly)
 		require.NoError(err)
-		assert.Equal(testSubClaims{Sub: "1234567890"}, subOnly)
+		assert.Equal(testSubClaims{Sub: "alice@example.com"}, subOnly)
 	})
 	t.Run("no-token", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
