@@ -14,7 +14,7 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
-// TestGenerateKeys will generate an ECDSA P-256 pub/priv key pair
+// TestGenerateKeys will generate a test ECDSA P-256 pub/priv key pair
 func TestGenerateKeys(t *testing.T) (pub, priv string) {
 	t.Helper()
 	require := require.New(t)
@@ -45,7 +45,7 @@ func TestGenerateKeys(t *testing.T) (pub, priv string) {
 	return pub, priv
 }
 
-// TestSignJWT will bundle the provided claims into a signed JWT. The provided key
+// TestSignJWT will bundle the provided claims into a test signed JWT. The provided key
 // must be ECDSA.
 func TestSignJWT(t *testing.T, ecdsaPrivKeyPEM string, claims jwt.Claims, privateClaims interface{}) string {
 	t.Helper()
