@@ -3,7 +3,7 @@ package oidc
 import (
 	"fmt"
 
-	"github.com/hashicorp/vault/sdk/helper/base62"
+	"github.com/hashicorp/cap/oidc/internal/base62"
 )
 
 const DefaultIdLength = 10
