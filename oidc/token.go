@@ -113,9 +113,9 @@ func (t *Tk) StaticTokenSource() oauth2.TokenSource {
 	return oauth2.StaticTokenSource(t.underlying)
 }
 
-// Expired will return true if the token is expired.  Supports the
-// WithExpirySkew option and if none is provided it will use the
-// DefaultTokenExpirySkew.  It returns false if t.AccessToken() is empty.
+// Expired will return true if the token's access token is expired or empty.
+// Supports the WithExpirySkew option and if none is provided it will use the
+// DefaultTokenExpirySkew.
 func (t *Tk) Expired(opt ...Option) bool {
 	if t.underlying == nil {
 		return true
@@ -130,7 +130,7 @@ func (t *Tk) Expired(opt ...Option) bool {
 // Valid will ensure that the access_token is not empty or expired. It will
 // return false if t.AccessToken() is empty
 func (t *Tk) Valid() bool {
-	if t == nil {
+	if t == nil || t.underlying == nil {
 		return false
 	}
 	if t.underlying.AccessToken == "" {

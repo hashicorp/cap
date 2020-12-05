@@ -3,10 +3,120 @@ package oidc
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 )
+
+func TestNewToken(t *testing.T) {
+	t.Parallel()
+	_, priv := TestGenerateKeys(t)
+	testJwt := testDefaultJwt(t, priv, 1*time.Minute, "123456789", nil)
+	testAccessToken := "test_access_token"
+	testRefreshToken := "test_refresh_token"
+	testExpiry := time.Now().Add(1 * time.Minute)
+	testUnderlying := &oauth2.Token{
+		AccessToken:  testAccessToken,
+		RefreshToken: testRefreshToken,
+		Expiry:       testExpiry,
+	}
+
+	testUnderlyingZeroExpiry := &oauth2.Token{
+		AccessToken:  testAccessToken,
+		RefreshToken: testRefreshToken,
+	}
+
+	tests := []struct {
+		name             string
+		idToken          IdToken
+		oauthToken       *oauth2.Token
+		want             *Tk
+		wantIdToken      IdToken
+		wantAccessToken  AccessToken
+		wantRefreshToken RefreshToken
+		wantTokenSource  oauth2.TokenSource
+		wantExpiry       time.Time
+		wantExpired      bool
+		wantValid        bool
+		wantErr          bool
+		wantIsErr        error
+	}{
+		{
+			name:       "valid",
+			idToken:    IdToken(testJwt),
+			oauthToken: testUnderlying,
+			want: &Tk{
+				idToken:    IdToken(testJwt),
+				underlying: testUnderlying,
+			},
+			wantIdToken:      IdToken(testJwt),
+			wantAccessToken:  AccessToken(testAccessToken),
+			wantRefreshToken: RefreshToken(testRefreshToken),
+			wantTokenSource:  oauth2.StaticTokenSource(testUnderlying),
+			wantExpiry:       testExpiry,
+			wantExpired:      false,
+			wantValid:        true,
+		},
+		{
+			name:    "valid-without-accessToken",
+			idToken: IdToken(testJwt),
+			want: &Tk{
+				idToken: IdToken(testJwt),
+			},
+			wantIdToken: IdToken(testJwt),
+			wantExpired: true,
+			wantValid:   false,
+		},
+		{
+			name:       "valid-with-accessToken-and-zero-expiry",
+			idToken:    IdToken(testJwt),
+			oauthToken: testUnderlyingZeroExpiry,
+			want: &Tk{
+				idToken:    IdToken(testJwt),
+				underlying: testUnderlyingZeroExpiry,
+			},
+			wantIdToken:      IdToken(testJwt),
+			wantAccessToken:  AccessToken(testAccessToken),
+			wantRefreshToken: RefreshToken(testRefreshToken),
+			wantTokenSource:  oauth2.StaticTokenSource(testUnderlyingZeroExpiry),
+			wantExpired:      false,
+			wantValid:        true,
+		},
+		{
+			name:    "empty-idToken",
+			idToken: IdToken(""),
+			oauthToken: &oauth2.Token{
+				AccessToken: testAccessToken,
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidParameter,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert, require := assert.New(t), require.New(t)
+			got, err := NewToken(tt.idToken, tt.oauthToken)
+			if tt.wantErr {
+				require.Error(err)
+				assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)
+				return
+			}
+			require.NoError(err)
+			assert.Equalf(tt.want, got, "NewToken() = %v, want %v", got, tt.want)
+
+			assert.Equal(tt.wantIdToken, got.IdToken())
+			assert.Equal(tt.wantAccessToken, got.AccessToken())
+			assert.Equal(tt.wantRefreshToken, got.RefreshToken())
+			assert.Equal(tt.wantExpiry, got.Expiry())
+			assert.Equal(tt.wantTokenSource, got.StaticTokenSource())
+			assert.Equal(tt.wantExpired, got.Expired())
+			assert.Equal(tt.wantValid, got.Valid())
+
+		})
+	}
+}
 
 func TestUnmarshalClaims(t *testing.T) {
 	// UnmarshalClaims testing is covered by other tests but we do have just a
