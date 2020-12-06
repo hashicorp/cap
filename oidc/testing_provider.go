@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
@@ -12,6 +13,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -23,10 +25,9 @@ import (
 )
 
 // TestProvider is local server that supports test provider capabilities which
-// make writing tests much easier.  Most of this is from Consul's oauthtest
-// package with a few changes so it could become part of this package's public
-// testing API.  A big thanks to the original contributors to Consul's oauthtest
-// package.
+// make writing tests much easier.  Much of this TestProvider
+// design/implementation comes from Consul's oauthtest package. A big thanks to
+// the original package's contributors.
 type TestProvider struct {
 	httpServer *httptest.Server
 	caCert     string
@@ -35,6 +36,7 @@ type TestProvider struct {
 	allowedRedirectURIs []string
 	replySubject        string
 	replyUserinfo       map[string]interface{}
+	replyExpiry         time.Duration
 
 	mu                sync.Mutex
 	clientID          string
@@ -42,8 +44,9 @@ type TestProvider struct {
 	expectedAuthCode  string
 	expectedAuthNonce string
 	customClaims      map[string]interface{}
-	customAudience    string
+	customAudiences   []string
 	omitIDToken       bool
+	omitAccessToken   bool
 	disableUserInfo   bool
 
 	ecdsaPublicKey  string
@@ -58,7 +61,16 @@ func (p *TestProvider) Stop() {
 }
 
 // StartTestProvider creates a disposable TestProvider.  It supports the
-// options: WithTestPort and WithTestCleanupFunc
+// WithTestPort option.
+//
+//  Test endpoints supported:
+//    * OIDC discovery: GET /.well-known/openid-configuration
+//    * OIDC authorization: GET and POST  /authorize
+//    * JWKs used to verify JWTs issued: GET /.well-known/jwks.json
+//    * Invalid JWKs: GET /.well-known/invalid-jwks.json
+//    * Missing JWKs: GET /.well-known/missing-jwks.json
+//    * POST /token
+//    * GET /userinfo
 func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 	t.Helper()
 	require := require.New(t)
@@ -78,14 +90,12 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 	p.ecdsaPublicKey, p.ecdsaPrivateKey = TestGenerateKeys(t)
 
 	p.jwks = testJWKS(t, p.ecdsaPublicKey)
+	p.replyExpiry = 5 * time.Second // set a reasonable default
 
 	p.httpServer = httptestNewUnstartedServerWithPort(t, p, opts.withPort)
 	p.httpServer.Config.ErrorLog = log.New(ioutil.Discard, "", 0)
 	p.httpServer.StartTLS()
 	t.Cleanup(p.httpServer.Close)
-	if opts.withCleanupFunc != nil {
-		t.Cleanup(opts.withCleanupFunc)
-	}
 
 	cert := p.httpServer.Certificate()
 
@@ -100,8 +110,7 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 // testProviderOptions is the set of available options for TestProvider
 // functions
 type testProviderOptions struct {
-	withPort        int
-	withCleanupFunc func()
+	withPort int
 }
 
 // testProviderDefaults is a handy way to get the defaults at runtime and during unit
@@ -127,14 +136,12 @@ func WithTestPort(port int) Option {
 	}
 }
 
-// WithTestCleanupFunc provides an optional cleanup function for the test
-// provider
-func WithTestCleanupFunc(f func()) Option {
-	return func(o interface{}) {
-		if o, ok := o.(*testProviderOptions); ok {
-			o.withCleanupFunc = f
-		}
-	}
+// SetExpectedExpiry is for configuring the expected expiry for any JWTs issued
+// by the provider (the default is 5 seconds)
+func (p *TestProvider) SetExpectedExpiry(exp time.Duration) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.replyExpiry = exp
 }
 
 // SetClientCreds is for configuring the client information required for the
@@ -180,10 +187,10 @@ func (p *TestProvider) SetCustomClaims(customClaims map[string]interface{}) {
 
 // SetCustomAudience configures what audience value to embed in the JWT issued
 // by the OIDC workflow.
-func (p *TestProvider) SetCustomAudience(customAudience string) {
+func (p *TestProvider) SetCustomAudience(customAudiences ...string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.customAudience = customAudience
+	p.customAudiences = customAudiences
 }
 
 // OmitIDTokens forces an error state where the /token endpoint does not return
@@ -194,6 +201,13 @@ func (p *TestProvider) OmitIDTokens() {
 	p.omitIDToken = true
 }
 
+// OmitAccessTokens the /token endpoint does not return an access_token.
+func (p *TestProvider) OmitAccessTokens() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.omitAccessToken = true
+}
+
 // DisableUserInfo makes the userinfo endpoint return 404 and omits it from the
 // discovery config.
 func (p *TestProvider) DisableUserInfo() {
@@ -202,7 +216,8 @@ func (p *TestProvider) DisableUserInfo() {
 	p.disableUserInfo = true
 }
 
-// Addr returns the current base URL for the test provider's running webserver.
+// Addr returns the current base URL for the test provider's running webserver,
+// which can be used as an OIDC issuer for discovery.
 func (p *TestProvider) Addr() string { return p.httpServer.URL }
 
 // CACert returns the pem-encoded CA certificate used by the test provider's
@@ -219,20 +234,75 @@ func (p *TestProvider) writeJSON(w http.ResponseWriter, out interface{}) error {
 	return enc.Encode(out)
 }
 
+// writeImplicitResponse will write the required form data response for an
+// implicit flow response to the OIDC authorize endpoint
+func (p *TestProvider) writeImplicitResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
+	const respForm = `
+<!DOCTYPE html>
+<html lang="en">
+<head><title>Submit This Form</title></head>
+<body onload="javascript:document.forms[0].submit()">
+	<form method="post" action="https://client.example.org/callback">
+	<input type="hidden" name="state"
+	value="%s"/>
+	%s
+	</form>
+</body>
+</html>`
+	const tokenField = `<input type="hidden" name="%s" value="%s"/>`
+	jwtData := p.issueSignedJWT()
+	var respTokens strings.Builder
+	if !p.omitAccessToken {
+		respTokens.WriteString(fmt.Sprintf(tokenField, "access_token", jwtData))
+	}
+	if !p.omitIDToken {
+		respTokens.WriteString(fmt.Sprintf(tokenField, "id_token", jwtData))
+	}
+	if _, err := w.Write([]byte(fmt.Sprintf(respForm, p.expectedAuthCode, respTokens.String()))); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *TestProvider) issueSignedJWT() string {
+	stdClaims := jwt.Claims{
+		Subject:   p.replySubject,
+		Issuer:    p.Addr(),
+		NotBefore: jwt.NewNumericDate(time.Now().Add(-p.replyExpiry)),
+		Expiry:    jwt.NewNumericDate(time.Now().Add(p.replyExpiry)),
+		Audience:  jwt.Audience{p.clientID},
+	}
+	if len(p.customAudiences) != 0 {
+		stdClaims.Audience = append(stdClaims.Audience, p.customAudiences...)
+	}
+
+	if p.expectedAuthNonce != "" {
+		p.customClaims["nonce"] = p.expectedAuthNonce
+	}
+	return TestSignJWT(p.t, p.ecdsaPrivateKey, stdClaims, p.customClaims)
+}
+
+// writeAuthErrorResponse writes a standard OIDC authentication error response.
+// See: https://openid.net/specs/openid-connect-core-1_0.html#AuthError
 func (p *TestProvider) writeAuthErrorResponse(w http.ResponseWriter, req *http.Request, errorCode, errorMessage string) {
 	qv := req.URL.Query()
 
+	// state and error are required error response parameters
 	redirectURI := qv.Get("redirect_uri") +
 		"?state=" + url.QueryEscape(qv.Get("state")) +
 		"&error=" + url.QueryEscape(errorCode)
 
 	if errorMessage != "" {
+		// add optional error response parameter
 		redirectURI += "&error_description=" + url.QueryEscape(errorMessage)
 	}
 
 	http.Redirect(w, req, redirectURI, http.StatusFound)
 }
 
+// writeTokenErrorResponse writes a standard OIDC token error response.
+// See: https://openid.net/specs/openid-connect-core-1_0.html#TokenErrorResponse
 func (p *TestProvider) writeTokenErrorResponse(w http.ResponseWriter, req *http.Request, statusCode int, errorCode, errorMessage string) error {
 	body := struct {
 		Code string `json:"error"`
@@ -248,15 +318,30 @@ func (p *TestProvider) writeTokenErrorResponse(w http.ResponseWriter, req *http.
 
 // ServeHTTP implements the test provider's http.Handler.
 func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+
+	// define all the endpoints supported
+	const (
+		openidConfiguration = "/.well-known/openid-configuration"
+		authorize           = "/authorize"
+		token               = "/token"
+		userInfo            = "/userinfo"
+		jwks                = "/.well-known/jwks.json"
+		missingJwks         = "/.well-known/missing-jwks.json"
+		invalidJwks         = "/.well-known/invalid-jwks.json"
+	)
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	p.t.Helper()
+	require := require.New(p.t)
 
+	// set a default Content-Type which will be overridden as needed.
 	w.Header().Set("Content-Type", "application/json")
 
 	switch req.URL.Path {
-	case "/.well-known/openid-configuration":
+	case openidConfiguration:
+		// OIDC Discovery endpoint request
+		// See: https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationResponse
 		if req.Method != "GET" {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
@@ -270,7 +355,7 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			UserinfoEndpoint string `json:"userinfo_endpoint,omitempty"`
 		}{
 			Issuer:           p.Addr(),
-			AuthEndpoint:     p.Addr() + "/auth",
+			AuthEndpoint:     p.Addr() + "/authorize",
 			TokenEndpoint:    p.Addr() + "/token",
 			JWKSURI:          p.Addr() + "/certs",
 			UserinfoEndpoint: p.Addr() + "/userinfo",
@@ -279,23 +364,29 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			reply.UserinfoEndpoint = ""
 		}
 
-		if err := p.writeJSON(w, &reply); err != nil {
-			return
-		}
+		err := p.writeJSON(w, &reply)
+		require.NoErrorf(err, "%s: internal error: %w", openidConfiguration, err)
 
-	case "/auth":
-		if req.Method != "GET" {
+		return
+	case authorize:
+		// Supports both the authorization code and implicit flows
+		// See: https://openid.net/specs/openid-connect-core-1_0.html#AuthorizationEndpoint
+		if !strutils.StrListContains([]string{"POST", "GET"}, req.Method) {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
 
-		qv := req.URL.Query()
+		err := req.ParseForm()
+		require.NoErrorf(err, "%s: internal error: %w", authorize, err)
 
-		if qv.Get("response_type") != "code" {
+		respType := req.FormValue("code")
+		scopes := req.Form["scope"]
+
+		if respType != "code" {
 			p.writeAuthErrorResponse(w, req, "unsupported_response_type", "")
 			return
 		}
-		if qv.Get("scope") != "openid" {
+		if !strutils.StrListContains(scopes, "openid") {
 			p.writeAuthErrorResponse(w, req, "invalid_scope", "")
 			return
 		}
@@ -305,21 +396,27 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		nonce := qv.Get("nonce")
+		nonce := req.FormValue("nonce")
 		if p.expectedAuthNonce != "" && p.expectedAuthNonce != nonce {
 			p.writeAuthErrorResponse(w, req, "access_denied", "")
 			return
 		}
 
-		state := qv.Get("state")
+		state := req.FormValue("state")
 		if state == "" {
 			p.writeAuthErrorResponse(w, req, "invalid_request", "missing state parameter")
 			return
 		}
 
-		redirectURI := qv.Get("redirect_uri")
+		redirectURI := req.FormValue("redirect_uri")
 		if redirectURI == "" {
 			p.writeAuthErrorResponse(w, req, "invalid_request", "missing redirect_uri parameter")
+			return
+		}
+
+		if req.FormValue("response_mode") == "form_post" {
+			err := p.writeImplicitResponse(w)
+			require.NoErrorf(err, "%s: internal error: %w", token, err)
 			return
 		}
 
@@ -330,23 +427,22 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		return
 
-	case "/certs":
+	case jwks:
 		if req.Method != "GET" {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-
-		if err := p.writeJSON(w, p.jwks); err != nil {
-			return
-		}
-
-	case "/certs_missing":
+		err := p.writeJSON(w, p.jwks)
+		require.NoErrorf(err, "%s: internal error: %w", jwks, err)
+		return
+	case missingJwks:
 		w.WriteHeader(http.StatusNotFound)
-
-	case "/certs_invalid":
-		_, _ = w.Write([]byte("It's not a keyset!"))
-
-	case "/token":
+		return
+	case invalidJwks:
+		_, err := w.Write([]byte("It's not a keyset!"))
+		require.NoErrorf(err, "%s: internal error: %w", invalidJwks, err)
+		return
+	case token:
 		if req.Method != "POST" {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
@@ -364,21 +460,9 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		stdClaims := jwt.Claims{
-			Subject:   p.replySubject,
-			Issuer:    p.Addr(),
-			NotBefore: jwt.NewNumericDate(time.Now().Add(-5 * time.Second)),
-			Expiry:    jwt.NewNumericDate(time.Now().Add(5 * time.Second)),
-			Audience:  jwt.Audience{p.clientID},
-		}
-		if p.customAudience != "" {
-			stdClaims.Audience = jwt.Audience{p.customAudience}
-		}
-
-		jwtData := TestSignJWT(p.t, p.ecdsaPrivateKey, stdClaims, p.customClaims)
-
+		jwtData := p.issueSignedJWT()
 		reply := struct {
-			AccessToken string `json:"access_token"`
+			AccessToken string `json:"access_token,omitempty"`
 			IDToken     string `json:"id_token,omitempty"`
 		}{
 			AccessToken: jwtData,
@@ -387,11 +471,16 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		if p.omitIDToken {
 			reply.IDToken = ""
 		}
-		if err := p.writeJSON(w, &reply); err != nil {
-			return
+		if p.omitAccessToken {
+			reply.AccessToken = ""
 		}
 
-	case "/userinfo":
+		if err := p.writeJSON(w, &reply); err != nil {
+			require.NoErrorf(err, "%s: internal error: %w", token, err)
+			return
+		}
+		return
+	case userInfo:
 		if p.disableUserInfo {
 			w.WriteHeader(http.StatusNotFound)
 			return
@@ -402,11 +491,14 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 
 		if err := p.writeJSON(w, p.replyUserinfo); err != nil {
+			require.NoErrorf(err, "%s: internal error: %w", userInfo, err)
 			return
 		}
+		return
 
 	default:
 		w.WriteHeader(http.StatusNotFound)
+		return
 	}
 }
 
