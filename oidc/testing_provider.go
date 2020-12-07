@@ -83,14 +83,17 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 	opts := getTestProviderOpts(opt...)
 
 	p := &TestProvider{
+		t: t,
 		allowedRedirectURIs: []string{
 			"https://example.com",
 		},
-		replySubject: "r3qXcK2bix9eFECzsU3Sbmh0K16fatW6@clients",
+		replySubject: "alice@example.com",
 		replyUserinfo: map[string]interface{}{
-			"color":       "red",
-			"temperature": "76",
-			"flavor":      "umami",
+			"dob":           "1978",
+			"friend":        "bob",
+			"nickname":      "A",
+			"advisor":       "Faythe",
+			"nosy-neighbor": "Eve",
 		},
 	}
 	p.ecdsaPublicKey, p.ecdsaPrivateKey = TestGenerateKeys(t)
@@ -157,6 +160,19 @@ func (p *TestProvider) SetClientCreds(clientID, clientSecret string) {
 	defer p.mu.Unlock()
 	p.clientID = clientID
 	p.clientSecret = clientSecret
+}
+
+// ClientCreds returns the client information required for the
+// OIDC workflows.
+func (p *TestProvider) ClientCreds() (clientID, clientSecret string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.clientID, p.clientSecret
+}
+
+// SigningAlgorithm returns the algorithm used to sign JWTs for the test provider.
+func (p *TestProvider) SigningAlgorithm() Alg {
+	return ES256
 }
 
 // SetExpectedAuthCode configures the auth code to return from /auth and the
