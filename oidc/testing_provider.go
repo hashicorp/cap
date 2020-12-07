@@ -97,6 +97,7 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 		},
 	}
 	p.ecdsaPublicKey, p.ecdsaPrivateKey = TestGenerateKeys(t)
+	p.customClaims = map[string]interface{}{}
 
 	p.jwks = testJWKS(t, p.ecdsaPublicKey)
 	p.replyExpiry = 5 * time.Second // set a reasonable default
@@ -248,6 +249,8 @@ func (p *TestProvider) CACert() string { return p.caCert }
 
 // SigningKeys returns the test provider's pem-encoded keys used to sign JWTs.
 func (p *TestProvider) SigningKeys() (pub, priv string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	return p.ecdsaPublicKey, p.ecdsaPrivateKey
 }
 
@@ -377,10 +380,10 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			UserinfoEndpoint string `json:"userinfo_endpoint,omitempty"`
 		}{
 			Issuer:           p.Addr(),
-			AuthEndpoint:     p.Addr() + "/authorize",
-			TokenEndpoint:    p.Addr() + "/token",
-			JWKSURI:          p.Addr() + "/certs",
-			UserinfoEndpoint: p.Addr() + "/userinfo",
+			AuthEndpoint:     p.Addr() + authorize,
+			TokenEndpoint:    p.Addr() + token,
+			JWKSURI:          p.Addr() + wellKnownJwks,
+			UserinfoEndpoint: p.Addr() + userInfo,
 		}
 		if p.disableUserInfo {
 			reply.UserinfoEndpoint = ""
