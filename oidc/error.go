@@ -5,8 +5,8 @@ import (
 )
 
 var (
-	ErrInvalidParameter          = errors.New("Invalid parameter")
-	ErrNilParameter              = errors.New("Nil parameter")
+	ErrInvalidParameter          = errors.New("invalid parameter")
+	ErrNilParameter              = errors.New("nil parameter")
 	ErrInvalidCACert             = errors.New("invalid CA certificate")
 	ErrInvalidIssuer             = errors.New("invalid issuer")
 	ErrIdGeneratorFailed         = errors.New("id generation failed")
