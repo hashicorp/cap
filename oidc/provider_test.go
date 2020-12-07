@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -275,4 +276,132 @@ func TestProvider_AuthURL(t *testing.T) {
 			require.Equalf(tt.wantUrl, gotUrl, "Provider.AuthURL() = %v, want %v", gotUrl, tt.wantUrl)
 		})
 	}
+}
+
+func TestProvider_Exchange(t *testing.T) {
+	ctx := context.Background()
+	clientId := "test-client-id"
+	clientSecret := "test-client-secret"
+	redirect := "test-redirect"
+
+	tp := StartTestProvider(t)
+	tp.SetAllowedRedirectURIs([]string{redirect})
+	p := testNewProvider(t, clientId, clientSecret, redirect, tp)
+
+	validState, err := NewState(10 * time.Second)
+	require.NoError(t, err)
+
+	expiredState, err := NewState(1 * time.Nanosecond)
+	require.NoError(t, err)
+
+	type args struct {
+		ctx           context.Context
+		s             State
+		authState     string
+		authCode      string
+		expectedNonce string
+	}
+	tests := []struct {
+		name      string
+		p         *Provider
+		args      args
+		wantErr   bool
+		wantIsErr error
+	}{
+		{
+			name: "valid",
+			p:    p,
+			args: args{
+				ctx:       ctx,
+				s:         validState,
+				authState: validState.Id(),
+				authCode:  "test-code",
+			},
+		},
+		{
+			name:      "nil-config",
+			p:         &Provider{},
+			wantErr:   true,
+			wantIsErr: ErrNilParameter,
+		},
+		{
+			name: "states-don't-match",
+			p:    p,
+			args: args{
+				ctx:       ctx,
+				s:         validState,
+				authState: "not-equal",
+				authCode:  "test-code",
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidParameter,
+		},
+		{
+			name: "expired-state",
+			p:    p,
+			args: args{
+				ctx:       ctx,
+				s:         expiredState,
+				authState: expiredState.Id(),
+				authCode:  "test-code",
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidParameter,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert, require := assert.New(t), require.New(t)
+			tp.SetExpectedAuthCode(tt.args.authCode)
+
+			// default to the state's nonce...
+			if tt.args.s != nil {
+				tp.SetExpectedAuthNonce(tt.args.s.Nonce())
+			}
+			if tt.args.expectedNonce != "" {
+				tp.SetExpectedAuthNonce(tt.args.expectedNonce)
+			}
+			gotTk, err := tt.p.Exchange(tt.args.ctx, tt.args.s, tt.args.authState, tt.args.authCode)
+			if tt.wantErr {
+				require.Error(err)
+				assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)
+				return
+			}
+			require.NoError(err)
+			require.NotEmptyf(gotTk, "Provider.Exchange() = %v, wanted not nil", gotTk)
+			assert.NotEmptyf(gotTk.IdToken(), "gotTk.IdToken() = %v, wanted not empty", gotTk.IdToken())
+			assert.NotEmptyf(gotTk.AccessToken(), "gotTk.AccessToken() = %v, wanted not empty", gotTk.AccessToken())
+			assert.Truef(gotTk.Valid(), "gotTk.Valid() = %v, wanted true", gotTk.Valid())
+			assert.Truef(!gotTk.Expired(), "gotTk.Expired() = %v, wanted false", gotTk.Expired())
+		})
+	}
+
+	t.Run("bad-expected-auth-code", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		code := "code-doesn't-match-state"
+		tp.SetExpectedAuthCode(code)
+		gotTk, err := p.Exchange(ctx, validState, validState.Id(), "bad-code")
+		require.Error(err)
+		assert.Truef(strings.Contains(err.Error(), "401 Unauthorized"), "wanted strings.Contains \"%s\" but got \"%s\"", "401 Unauthorized", err)
+		assert.Empty(gotTk)
+	})
+	t.Run("omit-id-token", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		tp.SetOmitIDTokens(true)
+		tp.SetExpectedAuthCode("valid-code")
+		gotTk, err := p.Exchange(ctx, validState, validState.Id(), "valid-code")
+		require.Error(err)
+		assert.Truef(errors.Is(err, ErrMissingIdToken), "wanted \"%s\" but got \"%s\"", ErrMissingIdToken, err)
+		assert.Empty(gotTk)
+	})
+	t.Run("expired-token", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		tp.SetOmitIDTokens(false)
+		tp.SetExpectedAuthCode("valid-code")
+		tp.SetExpectedExpiry(-1 * time.Minute)
+		gotTk, err := p.Exchange(ctx, validState, validState.Id(), "valid-code")
+		require.Error(err)
+		assert.Truef(strings.Contains(err.Error(), "token is expired"), "wanted strings.Contains \"%s\" but got \"%s\"", "token is expired", err)
+		assert.Empty(gotTk)
+	})
 }
