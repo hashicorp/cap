@@ -15,8 +15,16 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// Provider provides integration with a provider using the typical
-// 3-legged OIDC authorization code flow.
+// Provider provides integration with an OIDC provider.
+//  It's primary capabilities include:
+//   * Kicking off a user authentication with p.AuthURL(...)
+//
+//   * The authorization code flow by exchanging an auth code for tokens in
+//     p.Exchange(...)
+//
+//   * Verifying an id_token issued by a provider with p.VerifyIdToken(...)
+//
+//   * Retrieving a user's OAuth claims with p.UserInfo(...)
 type Provider struct {
 	config   *Config
 	provider *oidc.Provider
@@ -106,7 +114,7 @@ func (p *Provider) Done() {
 // the default authorization code default flow.
 //
 //  See NewState() to create an oidc flow State with a valid Id and Nonce that
-// will uniquely identify the user's authentication attempt through out the flow.
+// will uniquely identify the user's authentication attempt throughout the flow.
 func (p *Provider) AuthURL(ctx context.Context, s State, opt ...Option) (url string, e error) {
 	const op = "Provider.AuthURL"
 	opts := getProviderOpts(opt...)
@@ -139,15 +147,14 @@ func (p *Provider) AuthURL(ctx context.Context, s State, opt ...Option) (url str
 }
 
 // Exchange will request a token from the oidc token endpoint, using the
-// authorizationCode and authorizationState it received in an earlier successful oidc
-// authentication response.
+// authorizationCode and authorizationState it received in an earlier successful
+// oidc authentication response.
 //
 // It will also validate the authorizationState it receives against the
 // existing State for the user's oidc authentication flow.
 //
 // On success, the Token returned will include IdToken and AccessToken.  Based
-// on the IdP, it may include a RefreshToken.  Based on the provider config, it
-// may include UserInfoClaims.
+// on the IdP, it may include a RefreshToken.
 func (p *Provider) Exchange(ctx context.Context, s State, authorizationState string, authorizationCode string) (*Tk, error) {
 	const op = "Provider.Exchange"
 	if p.config == nil {

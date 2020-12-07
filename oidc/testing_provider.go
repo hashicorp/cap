@@ -25,7 +25,7 @@ import (
 )
 
 // TestProvider is local http server that supports test provider capabilities
-// which make writing tests much easier.  Much of this TestProvider
+// which makes writing tests much easier.  Much of this TestProvider
 // design/implementation comes from Consul's oauthtest package. A big thanks to
 // the original package's contributors.
 //  Once you've started a TestProvider http server with StartTestProvider(),
