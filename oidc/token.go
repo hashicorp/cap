@@ -32,9 +32,9 @@ type Token interface {
 	// Valid will ensure that the access_token is not empty or expired.
 	Valid() bool
 
-	// Expired will return true if the token is expired.  Implementations may
+	// IsExpired will return true if the token is expired.  Implementations may
 	// want to support the WithExpirySkew option.
-	Expired(opt ...Option) bool
+	IsExpired(opt ...Option) bool
 }
 
 // StaticTokenSource is a single function interface that defines a method to
@@ -113,10 +113,10 @@ func (t *Tk) StaticTokenSource() oauth2.TokenSource {
 	return oauth2.StaticTokenSource(t.underlying)
 }
 
-// Expired will return true if the token's access token is expired or empty.
+// IsExpired will return true if the token's access token is expired or empty.
 // Supports the WithExpirySkew option and if none is provided it will use the
 // DefaultTokenExpirySkew.
-func (t *Tk) Expired(opt ...Option) bool {
+func (t *Tk) IsExpired(opt ...Option) bool {
 	if t.underlying == nil {
 		return true
 	}
@@ -136,7 +136,7 @@ func (t *Tk) Valid() bool {
 	if t.underlying.AccessToken == "" {
 		return false
 	}
-	return !t.Expired()
+	return !t.IsExpired()
 }
 
 // tokenOptions is the set of available options for Token functions
