@@ -84,6 +84,11 @@ func Implicit(ctx context.Context, p *oidc.Provider, rw StateReader, sFn Success
 			eFn(reqState, nil, responseErr, w, req)
 			return
 		}
+		if err := p.VerifyIdToken(ctx, responseToken.IdToken(), state.Nonce()); err != nil {
+			responseErr := fmt.Errorf("%s: unable to verify id_token: %w", op, err)
+			eFn(reqState, nil, responseErr, w, req)
+			return
+		}
 		sFn(reqState, responseToken, w, req)
 	}
 }
