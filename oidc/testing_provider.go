@@ -216,16 +216,15 @@ func (p *TestProvider) SetCustomAudience(customAudiences ...string) {
 	p.customAudiences = customAudiences
 }
 
-// OmitIDTokens forces an error state where the /token endpoint does not return
-// id_token.
-func (p *TestProvider) OmitIDTokens() {
+// SetOmitIDTokens turn on/off the omitting of of id_tokens from the /token endpoint.
+func (p *TestProvider) SetOmitIDTokens(omitIdTokens bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.omitIDToken = true
+	p.omitIDToken = omitIdTokens
 }
 
-// OmitAccessTokens the /token endpoint does not return an access_token.
-func (p *TestProvider) OmitAccessTokens() {
+// OmitAccessTokens turn on/off the omitting of of access_tokens from the /token endpoint.
+func (p *TestProvider) SetOmitAccessTokens(omitAccessTokens bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.omitAccessToken = true
