@@ -94,3 +94,44 @@ func testDefaultJwt(t *testing.T, ecdsaPrivKeyPEM string, expireIn time.Duration
 	testJwt := TestSignJWT(t, ecdsaPrivKeyPEM, claims, privateClaims)
 	return testJwt
 }
+
+// testNewConfig creates a new config from the TestProvider.  The TestProvider
+// must have already set it's client id and secret via
+// tp.SetClientCreds("TEST-CLIENT-ID", "TEST-CLIENT-SECRET")
+// This is helpful internally, but intentionally not exported.
+func testNewConfig(t *testing.T, clientId, clientSecret, redirectUrl string, tp *TestProvider) *Config {
+	const op = "testNewConfig"
+	t.Helper()
+	require := require.New(t)
+
+	require.NotEmptyf(clientId, "%s: client id is empty", op)
+	require.NotEmptyf(clientSecret, "%s: client secret is empty", op)
+	require.NotEmptyf(redirectUrl, "%s: redirect URL is empty", op)
+
+	tp.SetClientCreds(clientId, clientSecret)
+
+	c, err := NewConfig(
+		tp.Addr(),
+		clientId,
+		ClientSecret(clientSecret),
+		[]Alg{tp.SigningAlgorithm()},
+		redirectUrl,
+		WithProviderCA(tp.CACert()),
+	)
+	require.NoError(err)
+	return c
+}
+
+func testNewProvider(t *testing.T, clientId, clientSecret, redirectUrl string, tp *TestProvider) *Provider {
+	const op = "testNewProvider"
+	t.Helper()
+	require := require.New(t)
+	require.NotEmptyf(clientId, "%s: client id is empty", op)
+	require.NotEmptyf(clientSecret, "%s: client secret is empty", op)
+	require.NotEmptyf(redirectUrl, "%s: redirect URL is empty", op)
+
+	tc := testNewConfig(t, clientId, clientSecret, redirectUrl, tp)
+	p, err := NewProvider(tc)
+	require.NoError(err)
+	return p
+}
