@@ -118,10 +118,16 @@ func (p *Provider) Done() {
 func (p *Provider) AuthURL(ctx context.Context, s State, opt ...Option) (url string, e error) {
 	const op = "Provider.AuthURL"
 	opts := getProviderOpts(opt...)
-
+	if s.Id() == "" {
+		return "", fmt.Errorf("%s: state id is empty: %w", op, ErrInvalidParameter)
+	}
+	if s.Nonce() == "" {
+		return "", fmt.Errorf("%s: state nonce is empty: %w", op, ErrInvalidParameter)
+	}
 	if s.Id() == s.Nonce() {
 		return "", fmt.Errorf("%s: state id and nonce cannot be equal: %w", op, ErrInvalidParameter)
 	}
+
 	// Add the "openid" scope, which is a required scope for oidc flows
 	scopes := append([]string{oidc.ScopeOpenID}, p.config.Scopes...)
 
