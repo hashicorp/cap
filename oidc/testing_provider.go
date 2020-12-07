@@ -24,7 +24,7 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
-// TestProvider is local http server that supports test provider capabilities
+// TestProvider is a local http server that supports test provider capabilities
 // which makes writing tests much easier.  Much of this TestProvider
 // design/implementation comes from Consul's oauthtest package. A big thanks to
 // the original package's contributors.
