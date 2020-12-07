@@ -23,7 +23,7 @@ type State interface {
 	Nonce() string
 
 	// IsExpired returns true if the state has expired. Implementations should
-	// supports a WithExpirySkew option and if none is provided it will use the
+	// supports a WithExpirySkew option and if none is provided it will use
 	// a default skew (perhaps DefaultStateExpirySkew)
 	IsExpired(opt ...Option) bool
 }
