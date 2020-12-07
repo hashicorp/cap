@@ -7,7 +7,6 @@ import (
 )
 
 func TestWithImplicitFlow(t *testing.T) {
-
 	t.Parallel()
 	assert := assert.New(t)
 	opts := getProviderOpts(WithImplicitFlow())

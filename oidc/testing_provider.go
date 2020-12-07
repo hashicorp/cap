@@ -24,10 +24,26 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
-// TestProvider is local server that supports test provider capabilities which
-// make writing tests much easier.  Much of this TestProvider
+// TestProvider is local http server that supports test provider capabilities
+// which make writing tests much easier.  Much of this TestProvider
 // design/implementation comes from Consul's oauthtest package. A big thanks to
 // the original package's contributors.
+//  Once you've started a TestProvider http server with StartTestProvider(),
+//  the following test endpoints are supported:
+//
+//    * GET /.well-known/openid-configuration    OIDC Discovery
+//
+//    * GET or POST  /authorize                  OIDC authorization (supporting both
+//                                               the authorization code flow and the implicit
+//                                               flow with form_post):
+//
+//    * POST /token                              OIDC token
+//
+//    * GET /userinfo                            OAuth UserInfo
+//
+//    * GET /.well-known/jwks.json               JWKs used to verify issued JWT tokens
+//    * GET /.well-known/invalid-jwks.json       Invalid JWKs
+//    * GET /.well-known/missing-jwks.json       Missing JWKs
 type TestProvider struct {
 	httpServer *httptest.Server
 	caCert     string
@@ -60,17 +76,7 @@ func (p *TestProvider) Stop() {
 	p.httpServer.Close()
 }
 
-// StartTestProvider creates a disposable TestProvider.  It supports the
-// WithTestPort option.
-//
-//  Test endpoints supported:
-//    * OIDC discovery: GET /.well-known/openid-configuration
-//    * OIDC authorization: GET and POST  /authorize
-//    * JWKs used to verify JWTs issued: GET /.well-known/jwks.json
-//    * Invalid JWKs: GET /.well-known/invalid-jwks.json
-//    * Missing JWKs: GET /.well-known/missing-jwks.json
-//    * POST /token
-//    * GET /userinfo
+// StartTestProvider creates and starts a running TestProvider http server.
 func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 	t.Helper()
 	require := require.New(t)
@@ -325,7 +331,7 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		authorize           = "/authorize"
 		token               = "/token"
 		userInfo            = "/userinfo"
-		jwks                = "/.well-known/jwks.json"
+		wellKnownJwks       = "/.well-known/jwks.json"
 		missingJwks         = "/.well-known/missing-jwks.json"
 		invalidJwks         = "/.well-known/invalid-jwks.json"
 	)
@@ -427,13 +433,13 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		return
 
-	case jwks:
+	case wellKnownJwks:
 		if req.Method != "GET" {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
 		err := p.writeJSON(w, p.jwks)
-		require.NoErrorf(err, "%s: internal error: %w", jwks, err)
+		require.NoErrorf(err, "%s: internal error: %w", wellKnownJwks, err)
 		return
 	case missingJwks:
 		w.WriteHeader(http.StatusNotFound)
