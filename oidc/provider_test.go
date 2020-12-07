@@ -12,6 +12,7 @@ import (
 	"github.com/coreos/go-oidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 )
 
 func TestWithImplicitFlow(t *testing.T) {
@@ -428,4 +429,35 @@ func TestHttpClient(t *testing.T) {
 		assert.Truef(t, errors.Is(err, ErrInvalidCACert), "wanted \"%s\" but got \"%s\"", ErrInvalidCACert, err)
 		assert.Empty(t, c)
 	})
+}
+
+func TestProvider_UserInfo(t *testing.T) {
+	ctx := context.Background()
+	clientId := "test-client-id"
+	clientSecret := "test-client-secret"
+	redirect := "test-redirect"
+
+	tp := StartTestProvider(t)
+	tp.SetAllowedRedirectURIs([]string{redirect})
+	p := testNewProvider(t, clientId, clientSecret, redirect, tp)
+
+	type args struct {
+		tokenSource oauth2.TokenSource
+		claims      interface{}
+	}
+	tests := []struct {
+		name    string
+		p       *Provider
+		args    args
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := p.UserInfo(ctx, tt.args.tokenSource, tt.args.claims); (err != nil) != tt.wantErr {
+				t.Errorf("Provider.UserInfo() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }
