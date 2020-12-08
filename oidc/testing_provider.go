@@ -28,6 +28,10 @@ import (
 // which makes writing tests much easier.  Much of this TestProvider
 // design/implementation comes from Consul's oauthtest package. A big thanks to
 // the original package's contributors.
+//
+// It's important to remember that the TestProvider is stateful (see any of it's
+// receiver functions that begin with Set*).
+//
 //  Once you've started a TestProvider http server with StartTestProvider(),
 //  the following test endpoints are supported:
 //
@@ -216,14 +220,18 @@ func (p *TestProvider) SetCustomAudience(customAudiences ...string) {
 	p.customAudiences = customAudiences
 }
 
-// SetOmitIDTokens turn on/off the omitting of of id_tokens from the /token endpoint.
+// SetOmitIDTokens turn on/off the omitting of of id_tokens from the /token
+// endpoint.  If set to true, the test provider will not omit (issue) id_tokens
+// from the /token endpoint.
 func (p *TestProvider) SetOmitIDTokens(omitIdTokens bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.omitIDToken = omitIdTokens
 }
 
-// OmitAccessTokens turn on/off the omitting of of access_tokens from the /token endpoint.
+// OmitAccessTokens turn on/off the omitting of of access_tokens from the /token
+// endpoint.  If set to true, the test provider will not omit (issue)
+// access_tokens from the /token endpoint.
 func (p *TestProvider) SetOmitAccessTokens(omitAccessTokens bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
