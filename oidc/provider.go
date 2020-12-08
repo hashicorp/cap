@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"sync"
 
@@ -214,10 +215,13 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource, claims interface{}) error {
 	const op = "Provider.UserInfo"
 	if tokenSource == nil {
-		return fmt.Errorf("%s: token source is nil: %w", op, ErrInvalidParameter)
+		return fmt.Errorf("%s: token source is nil: %w", op, ErrNilParameter)
 	}
 	if claims == nil {
 		return fmt.Errorf("%s: claims interface is nil: %w", op, ErrNilParameter)
+	}
+	if reflect.ValueOf(claims).Kind() != reflect.Ptr {
+		return fmt.Errorf("%s: interface parameter must to be a pointer: %w", op, ErrInvalidParameter)
 	}
 	oidcCtx, err := p.HttpClientContext(ctx)
 	if err != nil {
