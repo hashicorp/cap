@@ -280,6 +280,7 @@ func TestProvider_AuthURL(t *testing.T) {
 }
 
 func TestProvider_Exchange(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	clientId := "test-client-id"
 	clientSecret := "test-client-secret"
@@ -446,18 +447,92 @@ func TestProvider_UserInfo(t *testing.T) {
 		claims      interface{}
 	}
 	tests := []struct {
-		name    string
-		p       *Provider
-		args    args
-		wantErr bool
+		name       string
+		p          *Provider
+		args       args
+		wantClaims interface{}
+		wantErr    bool
+		wantIsErr  error
 	}{
-		// TODO: Add test cases.
+		{
+			name: "valid",
+			p:    p,
+			args: args{
+				tokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+					AccessToken: "dummy_access_token",
+					Expiry:      time.Now().Add(10 * time.Second),
+				}),
+				claims: &map[string]interface{}{},
+			},
+			wantClaims: &map[string]interface{}{
+				"advisor":       "Faythe",
+				"dob":           "1978",
+				"friend":        "bob",
+				"nickname":      "A",
+				"nosy-neighbor": "Eve",
+			},
+		},
+		{
+			name: "nil-tokensource",
+			p:    p,
+			args: args{
+				tokenSource: nil,
+				claims:      &map[string]interface{}{},
+			},
+			wantErr:   true,
+			wantIsErr: ErrNilParameter,
+		},
+		{
+			name: "nil-claims",
+			p:    p,
+			args: args{
+				tokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+					AccessToken: "dummy_access_token",
+					Expiry:      time.Now().Add(10 * time.Second),
+				}),
+				claims: nil,
+			},
+			wantErr:   true,
+			wantIsErr: ErrNilParameter,
+		},
+		{
+			name: "non-ptr-claims",
+			p:    p,
+			args: args{
+				tokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+					AccessToken: "dummy_access_token",
+					Expiry:      time.Now().Add(10 * time.Second),
+				}),
+				claims: map[string]interface{}{},
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidParameter,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := p.UserInfo(ctx, tt.args.tokenSource, tt.args.claims); (err != nil) != tt.wantErr {
-				t.Errorf("Provider.UserInfo() error = %v, wantErr %v", err, tt.wantErr)
+			assert, require := assert.New(t), require.New(t)
+			err := p.UserInfo(ctx, tt.args.tokenSource, tt.args.claims)
+			if tt.wantErr {
+				require.Error(err)
+				assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)
+				return
 			}
+			require.NoError(err)
+			require.NotEmptyf(tt.args.claims, "expected claims to not be empty")
+			require.Equalf(tt.wantClaims, tt.args.claims, "wanted \"%s\" but got \"%s\"", tt.wantClaims, tt.args.claims)
 		})
 	}
+	t.Run("failed-request", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		tokenSource := oauth2.StaticTokenSource(&oauth2.Token{
+			AccessToken: "dummy_access_token",
+			Expiry:      time.Now().Add(10 * time.Second),
+		})
+		tp.DisableUserInfo()
+		var claims interface{}
+		err := p.UserInfo(ctx, tokenSource, &claims)
+		require.Error(err)
+		assert.Empty(claims)
+	})
 }
