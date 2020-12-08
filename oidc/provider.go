@@ -159,8 +159,8 @@ func (p *Provider) AuthURL(ctx context.Context, s State, opt ...Option) (url str
 // It will also validate the authorizationState it receives against the
 // existing State for the user's oidc authentication flow.
 //
-// On success, the Token returned will include IdToken and AccessToken.  Based
-// on the IdP, it may include a RefreshToken.
+// On success, the Token returned will include an IDToken and may include an
+// AccessToken and RefreshToken.
 func (p *Provider) Exchange(ctx context.Context, s State, authorizationState string, authorizationCode string) (*Tk, error) {
 	const op = "Provider.Exchange"
 	if p.config == nil {
@@ -203,7 +203,7 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to create new id_token: %w", op, err)
 	}
-	if err := p.VerifyIdToken(ctx, t.IdToken(), s.Nonce()); err != nil {
+	if err := p.VerifyIDToken(ctx, t.IdToken(), s.Nonce()); err != nil {
 		return nil, fmt.Errorf("%s: id_token failed verification: %w", op, err)
 	}
 	return t, nil
@@ -235,12 +235,12 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource,
 	return nil
 }
 
-// VerifyIdToken will verify the inbound IdToken.  It verifies it's been signed
+// VerifyIDToken will verify the inbound IdToken.  It verifies it's been signed
 // by the provider, it validates the nonce, and performs checks any additional
 // checks depending on the provider's config (audiences, etc).
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
-func (p *Provider) VerifyIdToken(ctx context.Context, t IdToken, nonce string) error {
+func (p *Provider) VerifyIDToken(ctx context.Context, t IdToken, nonce string) error {
 	const op = "Provider.VerifyIdToken"
 	if t == "" {
 		return fmt.Errorf("%s: id_token is empty: %w", op, ErrInvalidParameter)
