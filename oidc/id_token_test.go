@@ -11,25 +11,25 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
-func TestIdToken_String(t *testing.T) {
+func TestIDToken_String(t *testing.T) {
 	t.Parallel()
 	t.Run("redacted", func(t *testing.T) {
 		assert := assert.New(t)
-		const want = RedactedIdToken
-		tk := IdToken("super secret token")
-		assert.Equalf(want, tk.String(), "IdToken.String() = %v, want %v", tk.String(), want)
+		const want = RedactedIDToken
+		tk := IDToken("super secret token")
+		assert.Equalf(want, tk.String(), "IDToken.String() = %v, want %v", tk.String(), want)
 	})
 }
 
-func TestIdToken_MarshalJSON(t *testing.T) {
+func TestIDToken_MarshalJSON(t *testing.T) {
 	t.Parallel()
 	t.Run("redacted", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		want := fmt.Sprintf(`"%s"`, RedactedIdToken)
-		tk := IdToken("super secret token")
+		want := fmt.Sprintf(`"%s"`, RedactedIDToken)
+		tk := IDToken("super secret token")
 		got, err := tk.MarshalJSON()
 		require.NoError(err)
-		assert.Equalf([]byte(want), got, "IdToken.MarshalJSON() = %s, want %s", got, want)
+		assert.Equalf([]byte(want), got, "IDToken.MarshalJSON() = %s, want %s", got, want)
 	})
 }
 
@@ -37,7 +37,7 @@ type testSubClaims struct {
 	Sub string
 }
 
-func TestIdToken_Claims(t *testing.T) {
+func TestIDToken_Claims(t *testing.T) {
 	_, priv := TestGenerateKeys(t)
 	testIat := jwt.NewNumericDate(time.Now())
 	testExp := jwt.NewNumericDate(time.Now().Add(10 * time.Minute))
@@ -49,11 +49,11 @@ func TestIdToken_Claims(t *testing.T) {
 		Audience: []string{"www.example.com"},
 		Subject:  "alice@example.com",
 	}
-	testJwt := TestSignJWT(t, priv, claims, map[string]interface{}{})
+	testJWT := TestSignJWT(t, priv, claims, map[string]interface{}{})
 	t.Parallel()
 	t.Run("all-claim", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		tk := IdToken(testJwt)
+		tk := IDToken(testJWT)
 		var claims map[string]interface{}
 		err := tk.Claims(&claims)
 		require.NoError(err)
@@ -67,7 +67,7 @@ func TestIdToken_Claims(t *testing.T) {
 	})
 	t.Run("only-sub-claim", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		tk := IdToken(testJwt)
+		tk := IDToken(testJWT)
 		var subOnly testSubClaims
 		err := tk.Claims(&subOnly)
 		require.NoError(err)
@@ -75,7 +75,7 @@ func TestIdToken_Claims(t *testing.T) {
 	})
 	t.Run("no-token", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		tk := IdToken("")
+		tk := IDToken("")
 		var claims map[string]interface{}
 		err := tk.Claims(&claims)
 		require.Error(err)
@@ -83,7 +83,7 @@ func TestIdToken_Claims(t *testing.T) {
 	})
 	t.Run("nil-claims", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		tk := IdToken(testJwt)
+		tk := IDToken(testJWT)
 		err := tk.Claims(nil)
 		require.Error(err)
 		assert.Truef(errors.Is(err, ErrNilParameter), "wanted \"%s\" but got \"%s\"", ErrNilParameter, err)

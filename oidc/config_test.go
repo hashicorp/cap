@@ -36,10 +36,10 @@ func TestNewConfig(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		issuer       string
-		clientId     string
+		clientID     string
 		clientSecret ClientSecret
 		supported    []Alg
-		redirectUrl  string
+		redirectURL  string
 		opt          []Option
 	}
 	tests := []struct {
@@ -53,10 +53,10 @@ func TestNewConfig(t *testing.T) {
 			name: "valid-with-all-valid-opts",
 			args: args{
 				issuer:       "http://YOUR_ISSUER/",
-				clientId:     "YOUR_CLIENT_ID",
+				clientID:     "YOUR_CLIENT_ID",
 				clientSecret: "YOUR_CLIENT_SECRET",
 				supported:    []Alg{RS512},
-				redirectUrl:  "http://YOUR_REDIRECT_URL",
+				redirectURL:  "http://YOUR_REDIRECT_URL",
 				opt: []Option{
 					WithAudiences("YOUR_AUD1", "YOUR_AUD2"),
 					WithScopes("email", "profile"),
@@ -65,10 +65,10 @@ func TestNewConfig(t *testing.T) {
 			},
 			want: &Config{
 				Issuer:               "http://YOUR_ISSUER/",
-				ClientId:             "YOUR_CLIENT_ID",
+				ClientID:             "YOUR_CLIENT_ID",
 				ClientSecret:         "YOUR_CLIENT_SECRET",
 				SupportedSigningAlgs: []Alg{RS512},
-				RedirectUrl:          "http://YOUR_REDIRECT_URL",
+				RedirectURL:          "http://YOUR_REDIRECT_URL",
 				Audiences:            []string{"YOUR_AUD1", "YOUR_AUD2"},
 				Scopes:               []string{"email", "profile"},
 				ProviderCA:           testCaPem,
@@ -78,10 +78,10 @@ func TestNewConfig(t *testing.T) {
 			name: "empty-issuer",
 			args: args{
 				issuer:       "",
-				clientId:     "YOUR_CLIENT_ID",
+				clientID:     "YOUR_CLIENT_ID",
 				clientSecret: "YOUR_CLIENT_SECRET",
 				supported:    []Alg{RS512},
-				redirectUrl:  "http://YOUR_REDIRECT_URL",
+				redirectURL:  "http://YOUR_REDIRECT_URL",
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidParameter,
@@ -90,10 +90,10 @@ func TestNewConfig(t *testing.T) {
 			name: "bad-issuer-scheme",
 			args: args{
 				issuer:       "ldap://bad-scheme",
-				clientId:     "YOUR_CLIENT_ID",
+				clientID:     "YOUR_CLIENT_ID",
 				clientSecret: "YOUR_CLIENT_SECRET",
 				supported:    []Alg{RS512},
-				redirectUrl:  "http://YOUR_REDIRECT_URL",
+				redirectURL:  "http://YOUR_REDIRECT_URL",
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidIssuer,
@@ -102,10 +102,10 @@ func TestNewConfig(t *testing.T) {
 			name: "bad-issuer-url",
 			args: args{
 				issuer:       "http://bad-url\\",
-				clientId:     "YOUR_CLIENT_ID",
+				clientID:     "YOUR_CLIENT_ID",
 				clientSecret: "YOUR_CLIENT_SECRET",
 				supported:    []Alg{RS512},
-				redirectUrl:  "http://YOUR_REDIRECT_URL",
+				redirectURL:  "http://YOUR_REDIRECT_URL",
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidIssuer,
@@ -114,10 +114,10 @@ func TestNewConfig(t *testing.T) {
 			name: "empty-client-id",
 			args: args{
 				issuer:       "http://YOUR_ISSUER/",
-				clientId:     "",
+				clientID:     "",
 				clientSecret: "YOUR_CLIENT_SECRET",
 				supported:    []Alg{RS512},
-				redirectUrl:  "http://YOUR_REDIRECT_URL",
+				redirectURL:  "http://YOUR_REDIRECT_URL",
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidParameter,
@@ -126,10 +126,10 @@ func TestNewConfig(t *testing.T) {
 			name: "empty-client-secret",
 			args: args{
 				issuer:       "http://YOUR_ISSUER/",
-				clientId:     "YOUR_CLIENT_ID",
+				clientID:     "YOUR_CLIENT_ID",
 				clientSecret: "",
 				supported:    []Alg{RS512},
-				redirectUrl:  "http://YOUR_REDIRECT_URL",
+				redirectURL:  "http://YOUR_REDIRECT_URL",
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidParameter,
@@ -138,10 +138,10 @@ func TestNewConfig(t *testing.T) {
 			name: "empty-algs",
 			args: args{
 				issuer:       "http://YOUR_ISSUER/",
-				clientId:     "YOUR_CLIENT_ID",
+				clientID:     "YOUR_CLIENT_ID",
 				clientSecret: "YOUR_CLIENT_SECRET",
 				supported:    nil,
-				redirectUrl:  "http://YOUR_REDIRECT_URL",
+				redirectURL:  "http://YOUR_REDIRECT_URL",
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidParameter,
@@ -150,10 +150,10 @@ func TestNewConfig(t *testing.T) {
 			name: "empty-redirect",
 			args: args{
 				issuer:       "http://YOUR_ISSUER/",
-				clientId:     "YOUR_CLIENT_ID",
+				clientID:     "YOUR_CLIENT_ID",
 				clientSecret: "YOUR_CLIENT_SECRET",
 				supported:    []Alg{RS512},
-				redirectUrl:  "",
+				redirectURL:  "",
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidParameter,
@@ -162,10 +162,10 @@ func TestNewConfig(t *testing.T) {
 			name: "invalid-providerCA",
 			args: args{
 				issuer:       "http://YOUR_ISSUER/",
-				clientId:     "YOUR_CLIENT_ID",
+				clientID:     "YOUR_CLIENT_ID",
 				clientSecret: "YOUR_CLIENT_SECRET",
 				supported:    []Alg{RS512},
-				redirectUrl:  "http://YOUR_REDIRECT_URL",
+				redirectURL:  "http://YOUR_REDIRECT_URL",
 				opt: []Option{
 					WithProviderCA("bad certificate"),
 				},
@@ -177,10 +177,10 @@ func TestNewConfig(t *testing.T) {
 			name: "invalid-alg",
 			args: args{
 				issuer:       "http://YOUR_ISSUER/",
-				clientId:     "YOUR_CLIENT_ID",
+				clientID:     "YOUR_CLIENT_ID",
 				clientSecret: "YOUR_CLIENT_SECRET",
 				supported:    []Alg{"bad alg"},
-				redirectUrl:  "http://YOUR_REDIRECT_URL",
+				redirectURL:  "http://YOUR_REDIRECT_URL",
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidParameter,
@@ -189,7 +189,7 @@ func TestNewConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			got, err := NewConfig(tt.args.issuer, tt.args.clientId, tt.args.clientSecret, tt.args.supported, tt.args.redirectUrl, tt.args.opt...)
+			got, err := NewConfig(tt.args.issuer, tt.args.clientID, tt.args.clientSecret, tt.args.supported, tt.args.redirectURL, tt.args.opt...)
 			if tt.wantErr {
 				require.Error(err)
 				assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)

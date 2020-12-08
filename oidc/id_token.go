@@ -5,25 +5,25 @@ import (
 	"fmt"
 )
 
-// IdToken is an oidc id_token
-type IdToken string
+// IDToken is an oidc id_token
+type IDToken string
 
-// RedactedIdToken is the redacted string or json for an oidc id_token
-const RedactedIdToken = "[REDACTED: id_token]"
+// RedactedIDToken is the redacted string or json for an oidc id_token
+const RedactedIDToken = "[REDACTED: id_token]"
 
 // String will redact the token
-func (t IdToken) String() string {
-	return RedactedIdToken
+func (t IDToken) String() string {
+	return RedactedIDToken
 }
 
 // MarshalJSON will redact the token
-func (t IdToken) MarshalJSON() ([]byte, error) {
-	return json.Marshal(RedactedIdToken)
+func (t IDToken) MarshalJSON() ([]byte, error) {
+	return json.Marshal(RedactedIDToken)
 }
 
-// Claims retrieves the IdToken claims.
-func (t IdToken) Claims(claims interface{}) error {
-	const op = "IdToken.Claims"
+// Claims retrieves the IDToken claims.
+func (t IDToken) Claims(claims interface{}) error {
+	const op = "IDToken.Claims"
 	if len(t) == 0 {
 		return fmt.Errorf("%s: id_token is empty: %w", op, ErrInvalidParameter)
 	}

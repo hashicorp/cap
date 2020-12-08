@@ -23,8 +23,8 @@ type Token interface {
 	// AccessToken returns the Token's access_token
 	AccessToken() AccessToken
 
-	// IdToken returns the Token's id_token
-	IdToken() IdToken
+	// IDToken returns the Token's id_token
+	IDToken() IDToken
 
 	// Expiry returns the expiration of the access_token
 	Expiry() time.Time
@@ -49,16 +49,16 @@ type StaticTokenSource interface {
 // refresh_token (including the the access_token expiry), as well as an OIDC
 // id_token.  The access_token and refresh_token may be empty.
 type Tk struct {
-	idToken    IdToken
+	idToken    IDToken
 	underlying *oauth2.Token
 }
 
 // ensure that Tk implements the Token interface
 var _ Token = (*Tk)(nil)
 
-// NewToken creates a new Token (*Tk).  The IdToken is required and the
+// NewToken creates a new Token (*Tk).  The IDToken is required and the
 // *oauth2.Token may be nil.
-func NewToken(i IdToken, t *oauth2.Token) (*Tk, error) {
+func NewToken(i IDToken, t *oauth2.Token) (*Tk, error) {
 	// since oauth2 is part of stdlib we're not going to worry about it leaking
 	// into our abstraction in this factory
 	const op = "NewToken"
@@ -91,8 +91,8 @@ func (t *Tk) RefreshToken() RefreshToken {
 	return RefreshToken(t.underlying.RefreshToken)
 }
 
-// IdToken implements the IdToken.IdToken() interface function
-func (t *Tk) IdToken() IdToken { return IdToken(t.idToken) }
+// IDToken implements the IDToken.IDToken() interface function
+func (t *Tk) IDToken() IDToken { return IDToken(t.idToken) }
 
 // Expiry implements the Token.Expiry() interface function and may return a
 // "zero" time if the token's AccessToken is empty
@@ -162,7 +162,7 @@ func getTokenOpts(opt ...Option) tokenOptions {
 
 // UnmarshalClaims will retrieve the claims from the provided raw JWT token.
 func UnmarshalClaims(rawToken string, claims interface{}) error {
-	const op = "JwtClaims"
+	const op = "UnmarshalClaims"
 	parts := strings.Split(string(rawToken), ".")
 	if len(parts) != 3 {
 		return fmt.Errorf("%s: malformed jwt, expected 3 parts got %d: %w", op, len(parts), ErrInvalidParameter)

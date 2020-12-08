@@ -76,8 +76,8 @@ func TestSignJWT(t *testing.T, ecdsaPrivKeyPEM string, claims jwt.Claims, privat
 	return raw
 }
 
-// testDefaultJwt is internally helpful, but for now we won't export it.
-func testDefaultJwt(t *testing.T, ecdsaPrivKeyPEM string, expireIn time.Duration, nonce string, additionalClaims map[string]interface{}) string {
+// testDefaultJWT is internally helpful, but for now we won't export it.
+func testDefaultJWT(t *testing.T, ecdsaPrivKeyPEM string, expireIn time.Duration, nonce string, additionalClaims map[string]interface{}) string {
 	t.Helper()
 	now := jwt.NewNumericDate(time.Now())
 	claims := jwt.Claims{
@@ -94,8 +94,8 @@ func testDefaultJwt(t *testing.T, ecdsaPrivKeyPEM string, expireIn time.Duration
 	for k, v := range additionalClaims {
 		privateClaims[k] = v
 	}
-	testJwt := TestSignJWT(t, ecdsaPrivKeyPEM, claims, privateClaims)
-	return testJwt
+	testJWT := TestSignJWT(t, ecdsaPrivKeyPEM, claims, privateClaims)
+	return testJWT
 }
 
 func TestGenerateCA(t *testing.T, hosts []string) string {

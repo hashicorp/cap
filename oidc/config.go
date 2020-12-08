@@ -27,8 +27,8 @@ func (t ClientSecret) MarshalJSON() ([]byte, error) {
 // Config represents the configuration for a typical 3-legged OIDC
 // authorization code flow.
 type Config struct {
-	// ClientId is the relying party id
-	ClientId string
+	// ClientID is the relying party id
+	ClientID string
 
 	// ClientSecret is the relying party secret
 	ClientSecret ClientSecret
@@ -48,7 +48,7 @@ type Config struct {
 	// PS256, PS384, PS512
 	SupportedSigningAlgs []Alg
 
-	RedirectUrl string
+	RedirectURL string
 
 	// Audiences is a list optional case-sensitive strings used when verifying an id_token's "aud" claim
 	Audiences []string
@@ -59,15 +59,15 @@ type Config struct {
 
 // NewConfig composes a new config for a provider. Supported options:
 // WithProviderCA, WithScopes, WithAudiences
-func NewConfig(issuer string, clientId string, clientSecret ClientSecret, supported []Alg, redirectUrl string, opt ...Option) (*Config, error) {
+func NewConfig(issuer string, clientID string, clientSecret ClientSecret, supported []Alg, redirectURL string, opt ...Option) (*Config, error) {
 	const op = "NewConfig"
 	opts := getConfigOpts(opt...)
 	c := &Config{
 		Issuer:               issuer,
-		ClientId:             clientId,
+		ClientID:             clientID,
 		ClientSecret:         clientSecret,
 		SupportedSigningAlgs: supported,
-		RedirectUrl:          redirectUrl,
+		RedirectURL:          redirectURL,
 		Scopes:               opts.withScopes,
 		ProviderCA:           opts.withProviderCA,
 		Audiences:            opts.withAudiences,
@@ -88,8 +88,8 @@ func (c *Config) Validate() error {
 	if c == nil {
 		return fmt.Errorf("%s: provider config is nil: %w", op, ErrNilParameter)
 	}
-	if c.ClientId == "" {
-		return fmt.Errorf("%s: client id is empty: %w", op, ErrInvalidParameter)
+	if c.ClientID == "" {
+		return fmt.Errorf("%s: client ID is empty: %w", op, ErrInvalidParameter)
 	}
 	if c.ClientSecret == "" {
 		return fmt.Errorf("%s: client secret is empty: %w", op, ErrInvalidParameter)
@@ -97,7 +97,7 @@ func (c *Config) Validate() error {
 	if c.Issuer == "" {
 		return fmt.Errorf("%s: discovery URL is empty: %w", op, ErrInvalidParameter)
 	}
-	if c.RedirectUrl == "" {
+	if c.RedirectURL == "" {
 		return fmt.Errorf("%s: redirect URL is empty: %w", op, ErrInvalidParameter)
 	}
 	u, err := url.Parse(c.Issuer)

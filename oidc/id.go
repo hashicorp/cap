@@ -6,17 +6,17 @@ import (
 	"github.com/hashicorp/cap/oidc/internal/base62"
 )
 
-// DefaultIdLength is the default length for generated IDs
-const DefaultIdLength = 10
+// DefaultIDLength is the default length for generated IDs
+const DefaultIDLength = 10
 
-// NewId generates a ID with an optional prefix.   The ID generated is suitable
-// for a State's Id or Nonce
-func NewId(opt ...Option) (string, error) {
-	const op = "NewId"
-	opts := getIdOpts(opt...)
+// NewID generates a ID with an optional prefix.   The ID generated is suitable
+// for a State's ID or Nonce
+func NewID(opt ...Option) (string, error) {
+	const op = "NewID"
+	opts := getIDOpts(opt...)
 	id, err := base62.Random(opts.withLen)
 	if err != nil {
-		return "", fmt.Errorf("%s: unable to generate id: %w", op, err)
+		return "", fmt.Errorf("%s: unable to generate ID: %w", op, err)
 	}
 	switch {
 	case opts.withPrefix != "":
@@ -36,13 +36,13 @@ type idOptions struct {
 // during unit tests.
 func idDefaults() idOptions {
 	return idOptions{
-		withLen: DefaultIdLength,
+		withLen: DefaultIDLength,
 	}
 }
 
 // getConfigOpts gets the defaults and applies the opt overrides passed
 // in.
-func getIdOpts(opt ...Option) idOptions {
+func getIDOpts(opt ...Option) idOptions {
 	opts := idDefaults()
 	ApplyOpts(&opts, opt...)
 	return opts

@@ -8,18 +8,18 @@ import (
 // State basically represents one OIDC authentication flow for a user. It
 // contains the data needed to uniquely represent that one-time flow across the
 // multiple interactions needed to complete the OIDC flow the user is
-// attempting.  Id() is passed throughout the OIDC interactions to uniquely
-// identify the flow's state. The Id() and Nonce() cannot cannot be equal, and
+// attempting.  ID() is passed throughout the OIDC interactions to uniquely
+// identify the flow's state. The ID() and Nonce() cannot cannot be equal, and
 // will be used during the OIDC flow to prevent CSRF and replay attacks (see the
 // oidc spec for specifics).
 type State interface {
-	//	Id is a unique identifier and an opaque value used to maintain state
-	//	between the oidc request and the callback. Id cannot equal the Nonce.
-	Id() string
+	//	ID is a unique identifier and an opaque value used to maintain state
+	//	between the oidc request and the callback. ID cannot equal the Nonce.
+	ID() string
 
 	//	Nonce is a unique nonce and a string value used to associate a Client
 	//	session with an ID Token, and to mitigate replay attacks. Nonce cannot
-	//	equal the Id
+	//	equal the ID
 	Nonce() string
 
 	// IsExpired returns true if the state has expired. Implementations should
@@ -28,7 +28,7 @@ type State interface {
 	IsExpired(opt ...Option) bool
 }
 
-// St represents the oidc state used for oidc flows.  The St.Id()1 is passed
+// St represents the oidc state used for oidc flows.  The St.ID() is passed
 // throughout the flows to uniquely identify a specific flow's state.
 type St struct {
 	//	id is a unique identifier and an opaque value used to maintain state
@@ -48,12 +48,12 @@ var _ State = (*St)(nil)
 // NewState creates a new State (*St)
 func NewState(expireIn time.Duration) (*St, error) {
 	const op = "oidc.NewState"
-	nonce, err := NewId(WithPrefix("n"))
+	nonce, err := NewID(WithPrefix("n"))
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to generate a state's nonce: %w", op, err)
 	}
 
-	id, err := NewId(WithPrefix("st"))
+	id, err := NewID(WithPrefix("st"))
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to generate a state's id: %w", op, err)
 	}
@@ -67,8 +67,8 @@ func NewState(expireIn time.Duration) (*St, error) {
 	}, nil
 }
 
-func (s *St) Id() string    { return s.id }    // Id implements the State.Id() interface function
-func (s *St) Nonce() string { return s.nonce } // Nonce implements the Nonce.Id() interface function
+func (s *St) ID() string    { return s.id }    // ID implements the State.ID() interface function
+func (s *St) Nonce() string { return s.nonce } // Nonce implements the State.Nonce() interface function
 
 // DefaultStateExpirySkew defines a default time skew when checking a State's
 // expiration.

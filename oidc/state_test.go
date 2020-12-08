@@ -46,8 +46,8 @@ func TestNewState(t *testing.T) {
 			require.NoError(err)
 			assert.True(got.expiration.Before(tt.wantExpBefore))
 			assert.True(got.expiration.After(tt.wantExpAfter))
-			assert.NotEqualf(got.Id(), got.Nonce(), "%s id should not equal %s nonce", got.Id(), got.Nonce())
-			assert.NotEmpty(got.Id())
+			assert.NotEqualf(got.ID(), got.Nonce(), "%s id should not equal %s nonce", got.ID(), got.Nonce())
+			assert.NotEmpty(got.ID())
 			assert.NotEmpty(got.Nonce())
 		})
 	}
