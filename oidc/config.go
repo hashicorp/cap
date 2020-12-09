@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/hashicorp/cap/oidc/internal/strutils"
 )
@@ -55,10 +56,13 @@ type Config struct {
 
 	// ProviderCA is an optional CA cert to use when sending requests to the provider.
 	ProviderCA string
+
+	// NowFunc is a time func that returns the current time. Defaults to time.Now
+	NowFunc func() time.Time
 }
 
 // NewConfig composes a new config for a provider. Supported options:
-// WithProviderCA, WithScopes, WithAudiences
+// WithProviderCA, WithScopes, WithAudiences, WithNow
 func NewConfig(issuer string, clientId string, clientSecret ClientSecret, supported []Alg, redirectUrl string, opt ...Option) (*Config, error) {
 	const op = "NewConfig"
 	opts := getConfigOpts(opt...)
@@ -71,6 +75,7 @@ func NewConfig(issuer string, clientId string, clientSecret ClientSecret, suppor
 		Scopes:               opts.withScopes,
 		ProviderCA:           opts.withProviderCA,
 		Audiences:            opts.withAudiences,
+		NowFunc:              opts.withNowFunc,
 	}
 	if err := c.Validate(); err != nil {
 		return nil, fmt.Errorf("%s: invalid provider config: %w", op, err)
@@ -124,11 +129,20 @@ func (c *Config) Validate() error {
 	return nil
 }
 
+// Now will return the current time which can be overridden by the NowFunc
+func (c *Config) Now() time.Time {
+	if c.NowFunc != nil {
+		return c.NowFunc()
+	}
+	return time.Now() // fallback to this default
+}
+
 // configOptions is the set of available options
 type configOptions struct {
 	withScopes     []string
 	withAudiences  []string
 	withProviderCA string
+	withNowFunc    func() time.Time
 }
 
 // configDefaults is a handy way to get the defaults at runtime and

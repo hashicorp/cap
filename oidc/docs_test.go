@@ -74,7 +74,7 @@ func ExampleNewConfig() {
 	fmt.Println(pc)
 
 	// Output:
-	// &{YOUR_CLIENT_ID [REDACTED: client secret] [] http://YOUR_ISSUER/ [RS256] http://YOUR_REDIRECT_URL [] }
+	// &{YOUR_CLIENT_ID [REDACTED: client secret] [] http://YOUR_ISSUER/ [RS256] http://YOUR_REDIRECT_URL []  <nil>}
 }
 
 func ExampleNewProvider() {

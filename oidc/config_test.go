@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -73,6 +74,9 @@ func TestClientSecret_MarshalJSON(t *testing.T) {
 
 func TestNewConfig(t *testing.T) {
 	t.Parallel()
+	testNow := func() time.Time {
+		return time.Now().Add(-1 * time.Minute)
+	}
 	type args struct {
 		issuer       string
 		clientId     string
@@ -100,6 +104,7 @@ func TestNewConfig(t *testing.T) {
 					WithAudiences("YOUR_AUD1", "YOUR_AUD2"),
 					WithScopes("email", "profile"),
 					WithProviderCA(testCaPem),
+					WithNow(testNow),
 				},
 			},
 			want: &Config{
@@ -111,6 +116,7 @@ func TestNewConfig(t *testing.T) {
 				Audiences:            []string{"YOUR_AUD1", "YOUR_AUD2"},
 				Scopes:               []string{"email", "profile"},
 				ProviderCA:           testCaPem,
+				NowFunc:              testNow,
 			},
 		},
 		{
@@ -235,7 +241,15 @@ func TestNewConfig(t *testing.T) {
 				return
 			}
 			require.NoError(err)
-			assert.Equalf(tt.want, got, "NewConfig() = %v, want %v", got, tt.want)
+			assert.Equalf(tt.want.ClientId, got.ClientId, "NewConfig() = %v, want %v", got.ClientId, tt.want.ClientId)
+			assert.Equalf(tt.want.ClientSecret, got.ClientSecret, "NewConfig() = %v, want %v", got.ClientSecret, tt.want.ClientSecret)
+			assert.Equalf(tt.want.Scopes, got.Scopes, "NewConfig() = %v, want %v", got.Scopes, tt.want.Scopes)
+			assert.Equalf(tt.want.Issuer, got.Issuer, "NewConfig() = %v, want %v", got.Issuer, tt.want.Issuer)
+			assert.Equalf(tt.want.SupportedSigningAlgs, got.SupportedSigningAlgs, "NewConfig() = %v, want %v", got.SupportedSigningAlgs, tt.want.SupportedSigningAlgs)
+			assert.Equalf(tt.want.RedirectUrl, got.RedirectUrl, "NewConfig() = %v, want %v", got.RedirectUrl, tt.want.RedirectUrl)
+			assert.Equalf(tt.want.Audiences, got.Audiences, "NewConfig() = %v, want %v", got.Audiences, tt.want.Audiences)
+			assert.Equalf(tt.want.ProviderCA, got.ProviderCA, "NewConfig() = %v, want %v", got.ProviderCA, tt.want.ProviderCA)
+			testAssertEqualFunc(t, tt.want.NowFunc, got.NowFunc, "now = %p,want %p", tt.want.NowFunc, got.NowFunc)
 		})
 	}
 }
@@ -277,4 +291,40 @@ func Test_WithProviderCA(t *testing.T) {
 	testOpts := configDefaults()
 	testOpts.withProviderCA = testCaPem
 	assert.Equal(opts, testOpts)
+}
+
+func TestConfig_Now(t *testing.T) {
+	tests := []struct {
+		name    string
+		nowFunc func() time.Time
+		want    func() time.Time
+		skew    time.Duration
+	}{
+		{
+			name:    "default-time",
+			nowFunc: nil,
+			want:    time.Now,
+			skew:    1 * time.Millisecond,
+		},
+		{
+			name:    "time-travel-backward",
+			nowFunc: func() time.Time { return time.Now().Add(-10 * time.Millisecond) },
+			want:    func() time.Time { return time.Now().Add(-10 * time.Millisecond) },
+			skew:    1 * time.Millisecond,
+		},
+		{
+			name:    "time-travel-forward",
+			nowFunc: func() time.Time { return time.Now().Add(10 * time.Millisecond) },
+			want:    func() time.Time { return time.Now().Add(10 * time.Millisecond) },
+			skew:    1 * time.Millisecond,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert := assert.New(t)
+			c := &Config{NowFunc: tt.nowFunc}
+			assert.True(c.Now().Before(tt.want()))
+			assert.True(c.Now().Add(tt.skew).After(tt.want()))
+		})
+	}
 }

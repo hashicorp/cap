@@ -65,9 +65,11 @@ type TestProvider struct {
 	expectedAuthNonce string
 	customClaims      map[string]interface{}
 	customAudiences   []string
+	omitAuthTimeClaim bool
 	omitIDToken       bool
 	omitAccessToken   bool
 	disableUserInfo   bool
+	nowFunc           func() time.Time
 
 	ecdsaPublicKey  string
 	ecdsaPrivateKey string
@@ -87,7 +89,11 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 	opts := getTestProviderOpts(opt...)
 
 	p := &TestProvider{
-		t: t,
+		t:            t,
+		nowFunc:      time.Now,
+		customClaims: map[string]interface{}{},
+		replyExpiry:  5 * time.Second,
+
 		allowedRedirectURIs: []string{
 			"https://example.com",
 		},
@@ -101,10 +107,7 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 		},
 	}
 	p.ecdsaPublicKey, p.ecdsaPrivateKey = TestGenerateKeys(t)
-	p.customClaims = map[string]interface{}{}
-
 	p.jwks = testJWKS(t, p.ecdsaPublicKey)
-	p.replyExpiry = 5 * time.Second // set a reasonable default
 
 	p.httpServer = httptestNewUnstartedServerWithPort(t, p, opts.withPort)
 	p.httpServer.Config.ErrorLog = log.New(ioutil.Discard, "", 0)
@@ -220,7 +223,24 @@ func (p *TestProvider) SetCustomAudience(customAudiences ...string) {
 	p.customAudiences = customAudiences
 }
 
-// SetOmitIDTokens turn on/off the omitting of of id_tokens from the /token
+// SetNowFunc configures how the test provider will determine the current time.  The
+// default is time.Now()
+func (p *TestProvider) SetNowFunc(now func() time.Time) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.nowFunc = now
+}
+
+// SetOmitAuthTimeClaim turn on/off the omitting of an auth_time claim from
+// id_tokens from the /token endpoint.  If set to true, the test provider will
+// not include the auth_time claim in issued id_tokens from the /token endpoint.
+func (p *TestProvider) SetOmitAuthTimeClaim(omitAuthTime bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.omitAuthTimeClaim = omitAuthTime
+}
+
+// SetOmitIDTokens turn on/off the omitting of id_tokens from the /token
 // endpoint.  If set to true, the test provider will not omit (issue) id_tokens
 // from the /token endpoint.
 func (p *TestProvider) SetOmitIDTokens(omitIdTokens bool) {
@@ -229,7 +249,7 @@ func (p *TestProvider) SetOmitIDTokens(omitIdTokens bool) {
 	p.omitIDToken = omitIdTokens
 }
 
-// OmitAccessTokens turn on/off the omitting of of access_tokens from the /token
+// OmitAccessTokens turn on/off the omitting of access_tokens from the /token
 // endpoint.  If set to true, the test provider will not omit (issue)
 // access_tokens from the /token endpoint.
 func (p *TestProvider) SetOmitAccessTokens(omitAccessTokens bool) {
@@ -301,8 +321,8 @@ func (p *TestProvider) issueSignedJWT() string {
 	stdClaims := jwt.Claims{
 		Subject:   p.replySubject,
 		Issuer:    p.Addr(),
-		NotBefore: jwt.NewNumericDate(time.Now().Add(-p.replyExpiry)),
-		Expiry:    jwt.NewNumericDate(time.Now().Add(p.replyExpiry)),
+		NotBefore: jwt.NewNumericDate(p.nowFunc().Add(-p.replyExpiry)),
+		Expiry:    jwt.NewNumericDate(p.nowFunc().Add(p.replyExpiry)),
 		Audience:  jwt.Audience{p.clientID},
 	}
 	if len(p.customAudiences) != 0 {

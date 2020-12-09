@@ -27,12 +27,17 @@ func TestNewToken(t *testing.T) {
 		AccessToken:  testAccessToken,
 		RefreshToken: testRefreshToken,
 	}
+	testNow := func() time.Time {
+		return time.Now().Add(-1 * time.Minute)
+	}
 
 	tests := []struct {
 		name             string
 		idToken          IdToken
 		oauthToken       *oauth2.Token
+		opts             []Option
 		want             *Tk
+		wantNowFunc      func() time.Time
 		wantIdToken      IdToken
 		wantAccessToken  AccessToken
 		wantRefreshToken RefreshToken
@@ -47,6 +52,25 @@ func TestNewToken(t *testing.T) {
 			name:       "valid",
 			idToken:    IdToken(testJwt),
 			oauthToken: testUnderlying,
+			opts:       []Option{WithNow(testNow)},
+			want: &Tk{
+				idToken:    IdToken(testJwt),
+				underlying: testUnderlying,
+				nowFunc:    testNow,
+			},
+			wantIdToken:      IdToken(testJwt),
+			wantAccessToken:  AccessToken(testAccessToken),
+			wantRefreshToken: RefreshToken(testRefreshToken),
+			wantTokenSource:  oauth2.StaticTokenSource(testUnderlying),
+			wantExpiry:       testExpiry,
+			wantExpired:      false,
+			wantValid:        true,
+		},
+		{
+			name:       "valid-def-now-func",
+			idToken:    IdToken(testJwt),
+			oauthToken: testUnderlying,
+			opts:       []Option{},
 			want: &Tk{
 				idToken:    IdToken(testJwt),
 				underlying: testUnderlying,
@@ -97,15 +121,14 @@ func TestNewToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			got, err := NewToken(tt.idToken, tt.oauthToken)
+			got, err := NewToken(tt.idToken, tt.oauthToken, tt.opts...)
 			if tt.wantErr {
 				require.Error(err)
 				assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)
 				return
 			}
 			require.NoError(err)
-			assert.Equalf(tt.want, got, "NewToken() = %v, want %v", got, tt.want)
-
+			assert.Equalf(tt.want.underlying, got.underlying, "NewToken() = %v, want %v", got.underlying, tt.want.underlying)
 			assert.Equalf(tt.wantIdToken, got.IdToken(), "t.IdToken() = %v, want %v", tt.wantIdToken, got.IdToken())
 			assert.Equalf(tt.wantAccessToken, got.AccessToken(), "t.AccessToken() = %v, want %v", tt.wantAccessToken, got.AccessToken())
 			assert.Equalf(tt.wantRefreshToken, got.RefreshToken(), "t.RefreshToken() = %v, want %v", tt.wantRefreshToken, got.RefreshToken())
@@ -113,6 +136,7 @@ func TestNewToken(t *testing.T) {
 			assert.Equalf(tt.wantTokenSource, got.StaticTokenSource(), "t.StaticTokenSource() = %v, want %v", tt.wantTokenSource, got.StaticTokenSource())
 			assert.Equalf(tt.wantExpired, got.Expired(), "t.Expired() = %v, want %v", tt.wantExpired, got.Expired())
 			assert.Equalf(tt.wantValid, got.Valid(), "t.Valid() = %v, want %v", tt.wantValid, got.Valid())
+			testAssertEqualFunc(t, tt.want.nowFunc, got.nowFunc, "now = %p,want %p", tt.want.nowFunc, got.nowFunc)
 		})
 	}
 }

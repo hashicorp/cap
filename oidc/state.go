@@ -40,14 +40,20 @@ type St struct {
 
 	// Expiration is the expiration time for the State
 	expiration time.Time
+
+	// nowFunc is an optional function that returns the current time
+	nowFunc func() time.Time
 }
 
 // ensure that St implements the State interface
 var _ State = (*St)(nil)
 
-// NewState creates a new State (*St)
-func NewState(expireIn time.Duration) (*St, error) {
+// NewState creates a new State (*St). Supports the WithNow option (with a default to
+// time.Now).
+func NewState(expireIn time.Duration, opt ...Option) (*St, error) {
 	const op = "oidc.NewState"
+	opts := getStOpts(opt...)
+
 	nonce, err := NewId(WithPrefix("n"))
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to generate a state's nonce: %w", op, err)
@@ -60,11 +66,13 @@ func NewState(expireIn time.Duration) (*St, error) {
 	if expireIn == 0 || expireIn < 0 {
 		return nil, fmt.Errorf("%s: expireIn not greater than zero: %w", op, ErrInvalidParameter)
 	}
-	return &St{
-		id:         id,
-		nonce:      nonce,
-		expiration: time.Now().Add(expireIn),
-	}, nil
+	s := &St{
+		id:      id,
+		nonce:   nonce,
+		nowFunc: opts.withNowFunc,
+	}
+	s.expiration = s.now().Add(expireIn)
+	return s, nil
 }
 
 func (s *St) Id() string    { return s.id }    // Id implements the State.Id() interface function
@@ -82,9 +90,18 @@ func (s *St) IsExpired(opt ...Option) bool {
 	return s.expiration.Before(time.Now().Add(opts.withExpirySkew))
 }
 
+// now returns the current time using the optional timeFn
+func (s *St) now() time.Time {
+	if s.nowFunc != nil {
+		return s.nowFunc()
+	}
+	return time.Now() // fallback to this default
+}
+
 // stOptions is the set of available options for St functions
 type stOptions struct {
 	withExpirySkew time.Duration
+	withNowFunc    func() time.Time
 }
 
 // stDefaults is a handy way to get the defaults at runtime and during unit

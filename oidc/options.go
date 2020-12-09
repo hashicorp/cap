@@ -28,3 +28,21 @@ func WithExpirySkew(d time.Duration) Option {
 		}
 	}
 }
+
+// WithNow provides an optional func for determining what the current time it is
+// for: Config, Tk and St
+func WithNow(now func() time.Time) Option {
+	return func(o interface{}) {
+		if now == nil {
+			return
+		}
+		switch v := o.(type) {
+		case *configOptions:
+			v.withNowFunc = now
+		case *tokenOptions:
+			v.withNowFunc = now
+		case *stOptions:
+			v.withNowFunc = now
+		}
+	}
+}
