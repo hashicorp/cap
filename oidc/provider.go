@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/coreos/go-oidc"
 	"github.com/hashicorp/cap/oidc/internal/strutils"
@@ -200,12 +201,17 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 	if !ok {
 		return nil, fmt.Errorf("%s: id_token is missing from auth code exchange: %w", op, ErrMissingIdToken)
 	}
-	t, err := NewToken(IdToken(idToken), oauth2Token)
+	t, err := NewToken(IdToken(idToken), oauth2Token, WithNow(p.config.NowFunc))
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to create new id_token: %w", op, err)
 	}
 	if err := p.VerifyIDToken(ctx, t.IdToken(), s.Nonce()); err != nil {
 		return nil, fmt.Errorf("%s: id_token failed verification: %w", op, err)
+	}
+	if t.AccessToken() != "" {
+		if err := t.IdToken().VerifyAccessToken(t.AccessToken()); err != nil {
+			return nil, fmt.Errorf("%s: access_token failed verification: %w", op, err)
+		}
 	}
 	return t, nil
 }
@@ -213,6 +219,8 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 // UserInfo gets the UserInfo claims from the provider using the token produced
 // by the tokenSource.
 func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource, claims interface{}) error {
+	// TODO: make sure we follow the spec for validating the response.
+	// https://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponseValidation
 	const op = "Provider.UserInfo"
 	if tokenSource == nil {
 		return fmt.Errorf("%s: token source is nil: %w", op, ErrNilParameter)
@@ -239,9 +247,15 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource,
 	return nil
 }
 
-// VerifyIDToken will verify the inbound IdToken.  It verifies it's been signed
-// by the provider, it validates the nonce, and performs checks any additional
-// checks depending on the provider's config (audiences, etc).
+// VerifyIDToken will verify the inbound IdToken.
+//  It verifies provider's signature and the following claims:
+//   * issuer (iss)
+//   * expiration (exp)
+//   * issued at (iat) with a leeway of 1 min
+//   * not before (nbf) with a leeway of 1 min
+//   * nonce (nonce)
+//   * aud (aud) contains the configured client_id and additional audiences
+//   *
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
 func (p *Provider) VerifyIDToken(ctx context.Context, t IdToken, nonce string) error {
@@ -259,22 +273,40 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IdToken, nonce string) e
 	oidcConfig := &oidc.Config{
 		SupportedSigningAlgs: algs,
 		ClientID:             p.config.ClientId,
+		Now:                  p.config.Now,
 	}
 	verifier := p.provider.Verifier(oidcConfig)
+	nowTime := p.config.Now() // intialized right after the Verifier so there idea of nowTime sort of coresponds.
+	leeway := 1 * time.Minute
 
-	oidcIdToken, err := verifier.Verify(ctx, string(t))
+	// verifier.Verify will check the supported algs, signature, iss, exp, nbf, the aud includes the client_id
+	oidcIDToken, err := verifier.Verify(ctx, string(t))
 	if err != nil {
 		return fmt.Errorf("%s: invalid id_token signature: %w", op, err)
 	}
-
-	if oidcIdToken.Nonce != nonce {
+	// so.. we still need to check: nonce, iat, auth_time, azp, the aud includes
+	// additional audiences configured.
+	if oidcIDToken.Nonce != nonce {
 		return fmt.Errorf("%s: invalid id_token nonce: %w", op, ErrInvalidNonce)
+	}
+	if nowTime.Add(leeway).Before(oidcIDToken.IssuedAt) {
+		return fmt.Errorf("%s: invalid id_token current time %v before the iat (issued at) time %v: %w", op, nowTime, oidcIDToken.IssuedAt, ErrInvalidIssuedAt)
+	}
+
+	var claims map[string]interface{}
+	if err := t.Claims(&claims); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	if azp, ok := claims["azp"]; ok {
+		if azp != p.config.ClientId {
+			return fmt.Errorf("%s: invalid id_token: authorized party (%s) is not equal client_id (%s): %w", op, azp, p.config.ClientId, ErrInvalidAuthorizedParty)
+		}
 	}
 
 	if err := func() error {
 		if len(p.config.Audiences) > 0 {
 			for _, v := range p.config.Audiences {
-				if strutils.StrListContains(oidcIdToken.Audience, v) {
+				if strutils.StrListContains(oidcIDToken.Audience, v) {
 					return nil
 				}
 			}
