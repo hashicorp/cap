@@ -1,6 +1,11 @@
 package oidc
 
 import (
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/rsa"
 	"errors"
 	"fmt"
 	"testing"
@@ -49,7 +54,7 @@ func TestIdToken_Claims(t *testing.T) {
 		Audience: []string{"www.example.com"},
 		Subject:  "alice@example.com",
 	}
-	testJwt := TestSignJWT(t, priv, claims, map[string]interface{}{})
+	testJwt := TestSignJWT(t, priv, ES256, claims, map[string]interface{}{})
 	t.Parallel()
 	t.Run("all-claim", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
@@ -88,4 +93,129 @@ func TestIdToken_Claims(t *testing.T) {
 		require.Error(err)
 		assert.Truef(errors.Is(err, ErrNilParameter), "wanted \"%s\" but got \"%s\"", ErrNilParameter, err)
 	})
+}
+
+func TestIdToken_VerifyAccessToken(t *testing.T) {
+	t.Parallel()
+	testIat := jwt.NewNumericDate(time.Now())
+	testExp := jwt.NewNumericDate(time.Now().Add(10 * time.Minute))
+	stdClaims := jwt.Claims{
+		Issuer:   "https://example.com/",
+		IssuedAt: testIat,
+		Expiry:   testExp,
+		Audience: []string{"www.example.com"},
+		Subject:  "alice@example.com",
+	}
+	tests := []struct {
+		name        string
+		t           IdToken
+		priKey      crypto.PrivateKey
+		alg         Alg
+		accessToken AccessToken
+		wantErr     bool
+		wantIsErr   error
+	}{
+		{
+			name: "RS256",
+			alg:  RS256,
+			priKey: func() crypto.PrivateKey {
+				k, err := rsa.GenerateKey(rand.Reader, 2048)
+				require.NoError(t, err)
+				return k
+			}(),
+			accessToken: "test-access-token",
+		},
+		{
+			name: "ES256",
+			alg:  ES256,
+			priKey: func() crypto.PrivateKey {
+				k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+				require.NoError(t, err)
+				return k
+			}(),
+			accessToken: "test-access-token",
+		},
+		{
+			name: "PS256",
+			alg:  PS256,
+			priKey: func() crypto.PrivateKey {
+				k, err := rsa.GenerateKey(rand.Reader, 2048)
+				require.NoError(t, err)
+				return k
+			}(),
+			accessToken: "test-access-token",
+		},
+		{
+			name: "RS384",
+			alg:  RS384,
+			priKey: func() crypto.PrivateKey {
+				k, err := rsa.GenerateKey(rand.Reader, 2048)
+				require.NoError(t, err)
+				return k
+			}(),
+			accessToken: "test-access-token",
+		},
+		{
+			name: "ES384",
+			alg:  ES384,
+			priKey: func() crypto.PrivateKey {
+				k, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+				require.NoError(t, err)
+				return k
+			}(),
+			accessToken: "test-access-token",
+		},
+		{
+			name: "PS384",
+			alg:  PS384,
+			priKey: func() crypto.PrivateKey {
+				k, err := rsa.GenerateKey(rand.Reader, 2048)
+				require.NoError(t, err)
+				return k
+			}(),
+			accessToken: "test-access-token",
+		},
+		{
+			name: "RS512",
+			alg:  RS512,
+			priKey: func() crypto.PrivateKey {
+				k, err := rsa.GenerateKey(rand.Reader, 2048)
+				require.NoError(t, err)
+				return k
+			}(),
+			accessToken: "test-access-token",
+		},
+		{
+			name: "ES512",
+			alg:  ES512,
+			priKey: func() crypto.PrivateKey {
+				k, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+				require.NoError(t, err)
+				return k
+			}(),
+			accessToken: "test-access-token",
+		},
+		{
+			name: "PS512",
+			alg:  PS512,
+			priKey: func() crypto.PrivateKey {
+				k, err := rsa.GenerateKey(rand.Reader, 2048)
+				require.NoError(t, err)
+				return k
+			}(),
+			accessToken: "test-access-token",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			additionalClaims := map[string]interface{}{
+				"at_hash": testHashAccessToken(t, tt.alg, tt.accessToken),
+			}
+			testJWT := TestSignJWT(t, tt.priKey, tt.alg, stdClaims, additionalClaims)
+			tk := IdToken(testJWT)
+			err := tk.VerifyAccessToken(tt.accessToken)
+			require.NoError(err)
+		})
+	}
 }
