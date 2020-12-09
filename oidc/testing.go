@@ -6,9 +6,12 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
+	"reflect"
+	"runtime"
 	"testing"
 	"time"
 
+	"github.com/bmizerany/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
@@ -134,4 +137,11 @@ func testNewProvider(t *testing.T, clientId, clientSecret, redirectUrl string, t
 	p, err := NewProvider(tc)
 	require.NoError(err)
 	return p
+}
+
+func testAssertEqualFunc(t *testing.T, wantFunc, gotFunc interface{}, format string, args ...interface{}) {
+	t.Helper()
+	want := runtime.FuncForPC(reflect.ValueOf(wantFunc).Pointer()).Name()
+	got := runtime.FuncForPC(reflect.ValueOf(gotFunc).Pointer()).Name()
+	assert.Equalf(t, want, got, format, args...)
 }
