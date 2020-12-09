@@ -13,19 +13,21 @@ import (
 // will be used during the OIDC flow to prevent CSRF and replay attacks (see the
 // oidc spec for specifics).
 type State interface {
-	//	ID is a unique identifier and an opaque value used to maintain state
-	//	between the oidc request and the callback. ID cannot equal the Nonce.
+	// ID is a unique identifier and an opaque value used to maintain state
+	// between the oidc request and the callback. ID cannot equal the Nonce.
+	// See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest.
 	ID() string
 
-	//	Nonce is a unique nonce and a string value used to associate a Client
-	//	session with an ID Token, and to mitigate replay attacks. Nonce cannot
-	//	equal the ID
+	// Nonce is a unique nonce and a string value used to associate a Client
+	// session with an ID Token, and to mitigate replay attacks. Nonce cannot
+	// equal the ID
+	// See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+	// and https://openid.net/specs/openid-connect-core-1_0.html#NonceNotes.
 	Nonce() string
 
 	// IsExpired returns true if the state has expired. Implementations should
-	// supports a WithExpirySkew option and if none is provided it will use
-	// a default skew (perhaps DefaultStateExpirySkew)
-	IsExpired(opt ...Option) bool
+	// support a time skew (perhaps StateExpirySkew) when checking expiration.
+	IsExpired() bool
 }
 
 // St represents the oidc state used for oidc flows.  The St.ID() is passed
@@ -70,16 +72,13 @@ func NewState(expireIn time.Duration) (*St, error) {
 func (s *St) ID() string    { return s.id }    // ID implements the State.ID() interface function
 func (s *St) Nonce() string { return s.nonce } // Nonce implements the State.Nonce() interface function
 
-// DefaultStateExpirySkew defines a default time skew when checking a State's
-// expiration.
-const DefaultStateExpirySkew = 1 * time.Second
+// StateExpirySkew defines a time skew when checking a State's expiration.
+const StateExpirySkew = 1 * time.Second
 
-// IsExpired returns true if the state has expired. Supports the
-// WithExpirySkew option and if none is provided it will use the
-// DefaultStateExpirySkew.
-func (s *St) IsExpired(opt ...Option) bool {
-	opts := getStOpts(opt...)
-	return s.expiration.Before(time.Now().Add(opts.withExpirySkew))
+// IsExpired returns true if the state has expired.
+func (s *St) IsExpired() bool {
+	// opts := getStOpts(opt...)
+	return s.expiration.Before(time.Now().Add(StateExpirySkew))
 }
 
 // stOptions is the set of available options for St functions
@@ -91,7 +90,7 @@ type stOptions struct {
 // tests.
 func stDefaults() stOptions {
 	return stOptions{
-		withExpirySkew: DefaultStateExpirySkew,
+		withExpirySkew: StateExpirySkew,
 	}
 }
 

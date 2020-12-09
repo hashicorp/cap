@@ -3,6 +3,7 @@ package oidc
 import "encoding/json"
 
 // RefreshToken is an oauth refresh_token
+// See https://tools.ietf.org/html/rfc6749#section-1.5.
 type RefreshToken string
 
 // RedactedRefreshToken is the redacted string or json for an oauth refresh_token

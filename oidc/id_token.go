@@ -6,6 +6,7 @@ import (
 )
 
 // IDToken is an oidc id_token
+// See https://openid.net/specs/openid-connect-core-1_0.html#IDToken.
 type IDToken string
 
 // RedactedIDToken is the redacted string or json for an oidc id_token

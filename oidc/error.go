@@ -11,7 +11,7 @@ var (
 	ErrInvalidIssuer             = errors.New("invalid issuer")
 	ErrIDGeneratorFailed         = errors.New("id generation failed")
 	ErrExpiredState              = errors.New("state is expired")
-	ErrResponseStateInvalid      = errors.New("oidc response state")
+	ErrResponseStateInvalid      = errors.New("invalid response state")
 	ErrMissingIDToken            = errors.New("id_token is missing")
 	ErrIDTokenVerificationFailed = errors.New("id_token verification failed")
 	ErrInvalidSignature          = errors.New("invalid signature")

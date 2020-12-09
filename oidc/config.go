@@ -41,11 +41,18 @@ type Config struct {
 	// Issuer is a case-sensitive URL string using the https scheme that
 	// contains scheme, host, and optionally, port number and path components
 	// and no query or fragment components.
+	//  See the Issuer Identifier spec: https://openid.net/specs/openid-connect-core-1_0.html#IssuerIdentifier
+	//  See the OIDC connect discovery spec: https://openid.net/specs/openid-connect-discovery-1_0.html#IdentifierNormalization
+	//  See the id_token spec: https://tools.ietf.org/html/rfc7519#section-4.1.1
 	Issuer string
 
 	// SupportedSigningAlgs is a list of supported signing algorithms. List of
 	// currently supported algs: RS256, RS384, RS512, ES256, ES384, ES512,
 	// PS256, PS384, PS512
+	//
+	// The list can be used to limit the supported algorithms when verifying
+	// id_token signatures, an id_token's at_hash claim against an
+	// access_token, etc.
 	SupportedSigningAlgs []Alg
 
 	// RedirectURL is the URL where the provider will send responses to
@@ -53,7 +60,8 @@ type Config struct {
 	RedirectURL string
 
 	// Audiences is a list optional case-sensitive strings used when verifying
-	// an id_token's "aud" claim
+	// an id_token's "aud" claim (which is also a list) If provided, the
+	// audiences of an id_token must match one of the configured audiences.
 	Audiences []string
 
 	// ProviderCA is an optional CA cert to use when sending requests to the
@@ -117,7 +125,7 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("%s: supported algorithms is empty: %w", op, ErrInvalidParameter)
 	}
 	for _, a := range c.SupportedSigningAlgs {
-		if _, ok := supportedAlgorithms[a]; !ok {
+		if !supportedAlgorithms[a] {
 			return fmt.Errorf("%s: unsupported algorithm %s: %w", op, a, ErrInvalidParameter)
 		}
 	}
