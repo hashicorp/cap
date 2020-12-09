@@ -2,6 +2,8 @@ package oidc
 
 import (
 	"bytes"
+	"crypto"
+	"crypto/ecdsa"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
@@ -71,8 +73,7 @@ type TestProvider struct {
 	disableUserInfo   bool
 	nowFunc           func() time.Time
 
-	ecdsaPublicKey  string
-	ecdsaPrivateKey string
+	privKey *ecdsa.PrivateKey
 
 	t *testing.T
 }
@@ -106,8 +107,20 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 			"nosy-neighbor": "Eve",
 		},
 	}
-	p.ecdsaPublicKey, p.ecdsaPrivateKey = TestGenerateKeys(t)
-	p.jwks = testJWKS(t, p.ecdsaPublicKey)
+
+	_, privKey := TestGenerateKeys(t)
+	p.privKey = privKey.(*ecdsa.PrivateKey)
+
+	derBytes, err := x509.MarshalPKIXPublicKey(p.privKey.Public())
+	require.NoError(err)
+
+	pemBlock := &pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: derBytes,
+	}
+	pub := string(pem.EncodeToMemory(pemBlock))
+
+	p.jwks = testJWKS(t, pub)
 
 	p.httpServer = httptestNewUnstartedServerWithPort(t, p, opts.withPort)
 	p.httpServer.Config.ErrorLog = log.New(ioutil.Discard, "", 0)
@@ -117,7 +130,7 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 	cert := p.httpServer.Certificate()
 
 	var buf bytes.Buffer
-	err := pem.Encode(&buf, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+	err = pem.Encode(&buf, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
 	require.NoError(err)
 	p.caCert = buf.String()
 
@@ -275,10 +288,10 @@ func (p *TestProvider) Addr() string { return p.httpServer.URL }
 func (p *TestProvider) CACert() string { return p.caCert }
 
 // SigningKeys returns the test provider's pem-encoded keys used to sign JWTs.
-func (p *TestProvider) SigningKeys() (pub, priv string) {
+func (p *TestProvider) SigningKeys() (crypto.PrivateKey, crypto.PublicKey) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return p.ecdsaPublicKey, p.ecdsaPrivateKey
+	return p.privKey, p.privKey.Public
 }
 
 func (p *TestProvider) writeJSON(w http.ResponseWriter, out interface{}) error {
@@ -332,7 +345,7 @@ func (p *TestProvider) issueSignedJWT() string {
 	if p.expectedAuthNonce != "" {
 		p.customClaims["nonce"] = p.expectedAuthNonce
 	}
-	return TestSignJWT(p.t, p.ecdsaPrivateKey, stdClaims, p.customClaims)
+	return TestSignJWT(p.t, p.privKey, ES256, stdClaims, p.customClaims)
 }
 
 // writeAuthErrorResponse writes a standard OIDC authentication error response.

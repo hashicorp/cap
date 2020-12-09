@@ -1,11 +1,14 @@
 package oidc
 
 import (
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/x509"
-	"encoding/pem"
+	"crypto/sha256"
+	"crypto/sha512"
+	"encoding/base64"
+	"hash"
 	"reflect"
 	"runtime"
 	"testing"
@@ -18,51 +21,22 @@ import (
 )
 
 // TestGenerateKeys will generate a test ECDSA P-256 pub/priv key pair
-func TestGenerateKeys(t *testing.T) (pub, priv string) {
+func TestGenerateKeys(t *testing.T) (crypto.PublicKey, crypto.PrivateKey) {
 	t.Helper()
 	require := require.New(t)
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(err)
-
-	{
-		derBytes, err := x509.MarshalECPrivateKey(privateKey)
-		require.NoError(err)
-
-		pemBlock := &pem.Block{
-			Type:  "EC PRIVATE KEY",
-			Bytes: derBytes,
-		}
-		priv = string(pem.EncodeToMemory(pemBlock))
-	}
-	{
-		derBytes, err := x509.MarshalPKIXPublicKey(privateKey.Public())
-		require.NoError(err)
-
-		pemBlock := &pem.Block{
-			Type:  "PUBLIC KEY",
-			Bytes: derBytes,
-		}
-		pub = string(pem.EncodeToMemory(pemBlock))
-	}
-
-	return pub, priv
+	return priv.PublicKey, priv
 }
 
 // TestSignJWT will bundle the provided claims into a test signed JWT. The provided key
 // must be ECDSA.
-func TestSignJWT(t *testing.T, ecdsaPrivKeyPEM string, claims jwt.Claims, privateClaims interface{}) string {
+func TestSignJWT(t *testing.T, key crypto.PrivateKey, alg Alg, claims jwt.Claims, privateClaims interface{}) string {
 	t.Helper()
 	require := require.New(t)
-	var key *ecdsa.PrivateKey
-	block, _ := pem.Decode([]byte(ecdsaPrivKeyPEM))
-	if block != nil {
-		var err error
-		key, err = x509.ParseECPrivateKey(block.Bytes)
-		require.NoError(err)
-	}
 
 	sig, err := jose.NewSigner(
-		jose.SigningKey{Algorithm: jose.ES256, Key: key},
+		jose.SigningKey{Algorithm: jose.SignatureAlgorithm(alg), Key: key},
 		(&jose.SignerOptions{}).WithType("JWT"),
 	)
 	require.NoError(err)
@@ -76,8 +50,29 @@ func TestSignJWT(t *testing.T, ecdsaPrivKeyPEM string, claims jwt.Claims, privat
 	return raw
 }
 
+func testHashAccessToken(t *testing.T, idSigTokenAlg Alg, token AccessToken) string {
+	t.Helper()
+	require := require.New(t)
+	var h hash.Hash
+	switch idSigTokenAlg {
+	case RS256, ES256, PS256:
+		h = sha256.New()
+	case RS384, ES384, PS384:
+		h = sha512.New384()
+	case RS512, ES512, PS512:
+		h = sha512.New()
+	default:
+		require.FailNowf("testHashAccessToken: unsupported signing algorithm %q: %w", string(idSigTokenAlg))
+	}
+	require.NotNil(h)
+	_, _ = h.Write([]byte(string(token))) // hash documents that Write will never return an error
+	sum := h.Sum(nil)[:h.Size()/2]
+	actual := base64.RawURLEncoding.EncodeToString(sum)
+	return actual
+}
+
 // testDefaultJwt is internally helpful, but for now we won't export it.
-func testDefaultJwt(t *testing.T, ecdsaPrivKeyPEM string, expireIn time.Duration, nonce string, additionalClaims map[string]interface{}) string {
+func testDefaultJwt(t *testing.T, privKey crypto.PrivateKey, expireIn time.Duration, nonce string, additionalClaims map[string]interface{}) string {
 	t.Helper()
 	now := jwt.NewNumericDate(time.Now())
 	claims := jwt.Claims{
@@ -94,7 +89,7 @@ func testDefaultJwt(t *testing.T, ecdsaPrivKeyPEM string, expireIn time.Duration
 	for k, v := range additionalClaims {
 		privateClaims[k] = v
 	}
-	testJwt := TestSignJWT(t, ecdsaPrivKeyPEM, claims, privateClaims)
+	testJwt := TestSignJWT(t, privKey, ES256, claims, privateClaims)
 	return testJwt
 }
 
