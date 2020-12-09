@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/coreos/go-oidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -70,7 +71,7 @@ func TestNewConfig(t *testing.T) {
 				SupportedSigningAlgs: []Alg{RS512},
 				RedirectURL:          "http://YOUR_REDIRECT_URL",
 				Audiences:            []string{"YOUR_AUD1", "YOUR_AUD2"},
-				Scopes:               []string{"email", "profile"},
+				Scopes:               []string{oidc.ScopeOpenID, "email", "profile"},
 				ProviderCA:           testCaPem,
 			},
 		},
@@ -218,7 +219,7 @@ func Test_WithScopes(t *testing.T) {
 	assert := assert.New(t)
 	opts := getConfigOpts(WithScopes("alice", "bob"))
 	testOpts := configDefaults()
-	testOpts.withScopes = []string{"alice", "bob"}
+	testOpts.withScopes = []string{oidc.ScopeOpenID, "alice", "bob"}
 	assert.Equal(opts, testOpts)
 }
 

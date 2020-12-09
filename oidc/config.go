@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/coreos/go-oidc"
 	"github.com/hashicorp/cap/oidc/internal/strutils"
 )
 
@@ -34,9 +35,7 @@ type Config struct {
 	// ClientSecret is the relying party secret
 	ClientSecret ClientSecret
 
-	// Scopes is a list of additional oidc scopes to request of the provider
-	// The required "oidc" scope is requested by default, and should be part of
-	// this optional list.
+	// Scopes is a list oidc scopes to request of the provider.
 	Scopes []string
 
 	// Issuer is a case-sensitive URL string using the https scheme that
@@ -53,15 +52,19 @@ type Config struct {
 	// authentication requests.
 	RedirectURL string
 
-	// Audiences is a list optional case-sensitive strings used when verifying an id_token's "aud" claim
+	// Audiences is a list optional case-sensitive strings used when verifying
+	// an id_token's "aud" claim
 	Audiences []string
 
-	// ProviderCA is an optional CA cert to use when sending requests to the provider.
+	// ProviderCA is an optional CA cert to use when sending requests to the
+	// provider.
 	ProviderCA string
 }
 
-// NewConfig composes a new config for a provider. Supported options:
-// WithProviderCA, WithScopes, WithAudiences
+// NewConfig composes a new config for a provider.  The "oidc" scope will always
+// be added the new configuration's Scopes, regardless of what additional scopes
+// are requested via the WithScopes option and duplicate scopes are allowed.
+// Supported options: WithProviderCA, WithScopes, WithAudiences
 func NewConfig(issuer string, clientID string, clientSecret ClientSecret, supported []Alg, redirectURL string, opt ...Option) (*Config, error) {
 	const op = "NewConfig"
 	opts := getConfigOpts(opt...)
@@ -137,7 +140,9 @@ type configOptions struct {
 // configDefaults is a handy way to get the defaults at runtime and
 // during unit tests.
 func configDefaults() configOptions {
-	return configOptions{}
+	return configOptions{
+		withScopes: []string{oidc.ScopeOpenID},
+	}
 }
 
 // getConfigOpts gets the defaults and applies the opt overrides passed
