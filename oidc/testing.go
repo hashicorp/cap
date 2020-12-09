@@ -98,6 +98,7 @@ func testDefaultJWT(t *testing.T, ecdsaPrivKeyPEM string, expireIn time.Duration
 	return testJWT
 }
 
+// TestGenerateCA will generate a test x509 CA cert encoded in a PEM format.
 func TestGenerateCA(t *testing.T, hosts []string) string {
 	t.Helper()
 	require := require.New(t)

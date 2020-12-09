@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/cap/oidc/internal/strutils"
 )
 
+// ClientSecret oauth client Secret
 type ClientSecret string
 
 // RedactedClientSecret is the redacted string or json for an oauth client secret
@@ -48,6 +49,8 @@ type Config struct {
 	// PS256, PS384, PS512
 	SupportedSigningAlgs []Alg
 
+	// RedirectURL is the URL where the provider will send responses to
+	// authentication requests.
 	RedirectURL string
 
 	// Audiences is a list optional case-sensitive strings used when verifying an id_token's "aud" claim
