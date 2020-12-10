@@ -6,7 +6,7 @@ import (
 	"github.com/hashicorp/cap/oidc/internal/base62"
 )
 
-// defaultIDLength is the default length for generated IDs
+// defaultIDLength is the default length for generated IDs.
 const defaultIDLength = 10
 
 // NewID generates a ID with an optional prefix.   The ID generated is suitable
@@ -52,7 +52,7 @@ func getIDOpts(opt ...Option) idOptions {
 
 // WithPrefix provides an optional prefix for an new ID.  When this options is
 // provided, NewID will prepend the prefix and an underscore to the new
-// identifier.  
+// identifier.
 func WithPrefix(prefix string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*idOptions); ok {

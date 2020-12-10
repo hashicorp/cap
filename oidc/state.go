@@ -20,7 +20,7 @@ type State interface {
 
 	// Nonce is a unique nonce and a string value used to associate a Client
 	// session with an ID Token, and to mitigate replay attacks. Nonce cannot
-	// equal the ID
+	// equal the ID.
 	// See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
 	// and https://openid.net/specs/openid-connect-core-1_0.html#NonceNotes.
 	Nonce() string
@@ -33,21 +33,21 @@ type State interface {
 // St represents the oidc state used for oidc flows.  The St.ID() is passed
 // throughout the flows to uniquely identify a specific flow's state.
 type St struct {
-	//	id is a unique identifier and an opaque value used to maintain state
-	//	between the oidc request and the callback
+	// id is a unique identifier and an opaque value used to maintain state
+	// between the oidc request and the callback.
 	id string
 
-	// nonce is a unique nonce and suitable for use as an oidc nonce
+	// nonce is a unique nonce and suitable for use as an oidc nonce.
 	nonce string
 
-	// Expiration is the expiration time for the State
+	// Expiration is the expiration time for the State.
 	expiration time.Time
 }
 
-// ensure that St implements the State interface
+// ensure that St implements the State interface.
 var _ State = (*St)(nil)
 
-// NewState creates a new State (*St)
+// NewState creates a new State (*St).
 func NewState(expireIn time.Duration) (*St, error) {
 	const op = "oidc.NewState"
 	nonce, err := NewID(WithPrefix("n"))
@@ -69,8 +69,8 @@ func NewState(expireIn time.Duration) (*St, error) {
 	}, nil
 }
 
-func (s *St) ID() string    { return s.id }    // ID implements the State.ID() interface function
-func (s *St) Nonce() string { return s.nonce } // Nonce implements the State.Nonce() interface function
+func (s *St) ID() string    { return s.id }    // ID implements the State.ID() interface function.
+func (s *St) Nonce() string { return s.nonce } // Nonce implements the State.Nonce() interface function.
 
 // StateExpirySkew defines a time skew when checking a State's expiration.
 const StateExpirySkew = 1 * time.Second
@@ -81,7 +81,7 @@ func (s *St) IsExpired() bool {
 	return s.expiration.Before(time.Now().Add(StateExpirySkew))
 }
 
-// stOptions is the set of available options for St functions
+// stOptions is the set of available options for St functions.
 type stOptions struct {
 	withExpirySkew time.Duration
 }
@@ -94,7 +94,8 @@ func stDefaults() stOptions {
 	}
 }
 
-// getStateOpts gets the state defaults and applies the opt overrides passed in
+// getStateOpts gets the state defaults and applies the opt overrides
+// passed in.
 func getStOpts(opt ...Option) stOptions {
 	opts := stDefaults()
 	ApplyOpts(&opts, opt...)

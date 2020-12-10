@@ -12,18 +12,19 @@ import (
 	"github.com/hashicorp/cap/oidc/internal/strutils"
 )
 
-// ClientSecret oauth client Secret
+// ClientSecret oauth client Secret.
 type ClientSecret string
 
-// RedactedClientSecret is the redacted string or json for an oauth client secret
+// RedactedClientSecret is the redacted string or json for an oauth client
+// secret.
 const RedactedClientSecret = "[REDACTED: client secret]"
 
-// String will redact the client secret
+// String will redact the client secret.
 func (t ClientSecret) String() string {
 	return RedactedClientSecret
 }
 
-// MarshalJSON will redact the client secret
+// MarshalJSON will redact the client secret.
 func (t ClientSecret) MarshalJSON() ([]byte, error) {
 	return json.Marshal(RedactedClientSecret)
 }
@@ -31,10 +32,10 @@ func (t ClientSecret) MarshalJSON() ([]byte, error) {
 // Config represents the configuration for a typical 3-legged OIDC
 // authorization code flow.
 type Config struct {
-	// ClientID is the relying party id
+	// ClientID is the relying party id.
 	ClientID string
 
-	// ClientSecret is the relying party secret
+	// ClientSecret is the relying party secret.
 	ClientSecret ClientSecret
 
 	// Scopes is a list oidc scopes to request of the provider.
@@ -43,14 +44,17 @@ type Config struct {
 	// Issuer is a case-sensitive URL string using the https scheme that
 	// contains scheme, host, and optionally, port number and path components
 	// and no query or fragment components.
-	//  See the Issuer Identifier spec: https://openid.net/specs/openid-connect-core-1_0.html#IssuerIdentifier
-	//  See the OIDC connect discovery spec: https://openid.net/specs/openid-connect-discovery-1_0.html#IdentifierNormalization
-	//  See the id_token spec: https://tools.ietf.org/html/rfc7519#section-4.1.1
+	// See the Issuer Identifier spec:
+	// https://openid.net/specs/openid-connect-core-1_0.html#IssuerIdentifier.
+	// See the OIDC connect discovery spec:
+	// https://openid.net/specs/openid-connect-discovery-1_0.html#IdentifierNormalization.
+	// See the id_token spec:
+	// https://tools.ietf.org/html/rfc7519#section-4.1.1.
 	Issuer string
 
 	// SupportedSigningAlgs is a list of supported signing algorithms. List of
 	// currently supported algs: RS256, RS384, RS512, ES256, ES384, ES512,
-	// PS256, PS384, PS512
+	// PS256, PS384, PS512.
 	//
 	// The list can be used to limit the supported algorithms when verifying
 	// id_token signatures, an id_token's at_hash claim against an
@@ -75,7 +79,7 @@ type Config struct {
 // NewConfig composes a new config for a provider.  The "oidc" scope will always
 // be added the new configuration's Scopes, regardless of what additional scopes
 // are requested via the WithScopes option and duplicate scopes are allowed.
-// Supported options: WithProviderCA, WithScopes, WithAudiences
+// Supported options: WithProviderCA, WithScopes, WithAudiences.
 func NewConfig(issuer string, clientID string, clientSecret ClientSecret, supported []Alg, redirectURL string, opt ...Option) (*Config, error) {
 	const op = "NewConfig"
 	opts := getConfigOpts(opt...)
@@ -99,7 +103,7 @@ func NewConfig(issuer string, clientID string, clientSecret ClientSecret, suppor
 // the issuer is not empty, but it doesn't verify the Issuer is discoverable via
 // an http request.  SupportedSigningAlgs are validated against the list of
 // currently supported algs: RS256, RS384, RS512, ES256, ES384, ES512, PS256,
-// PS384, PS512
+// PS384, PS512.
 func (c *Config) Validate() error {
 	const op = "Config.Validate"
 	if c == nil {
@@ -141,7 +145,7 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// configOptions is the set of available options
+// configOptions is the set of available options.
 type configOptions struct {
 	withScopes     []string
 	withAudiences  []string
@@ -164,7 +168,8 @@ func getConfigOpts(opt ...Option) configOptions {
 	return opts
 }
 
-// WithScopes provides an optional list of scopes for the provider's config
+// WithScopes provides an optional list of scopes for the provider's
+// config.
 func WithScopes(scopes ...string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*configOptions); ok {
@@ -173,7 +178,8 @@ func WithScopes(scopes ...string) Option {
 	}
 }
 
-// WithAudiences provides an optional list of audiences for the provider's config
+// WithAudiences provides an optional list of audiences for the provider's
+// config.
 func WithAudiences(auds ...string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*configOptions); ok {
