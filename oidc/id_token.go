@@ -5,19 +5,19 @@ import (
 	"fmt"
 )
 
-// IDToken is an oidc id_token
+// IDToken is an oidc id_token.
 // See https://openid.net/specs/openid-connect-core-1_0.html#IDToken.
 type IDToken string
 
-// RedactedIDToken is the redacted string or json for an oidc id_token
+// RedactedIDToken is the redacted string or json for an oidc id_token.
 const RedactedIDToken = "[REDACTED: id_token]"
 
-// String will redact the token
+// String will redact the token.
 func (t IDToken) String() string {
 	return RedactedIDToken
 }
 
-// MarshalJSON will redact the token
+// MarshalJSON will redact the token.
 func (t IDToken) MarshalJSON() ([]byte, error) {
 	return json.Marshal(RedactedIDToken)
 }

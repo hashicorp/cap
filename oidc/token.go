@@ -11,18 +11,18 @@ import (
 )
 
 // Token interface represents an OIDC id_token, as well as an Oauth2
-// access_token and refresh_token (including the the access_token expiry)
+// access_token and refresh_token (including the the access_token expiry).
 type Token interface {
-	// RefreshToken returns the Token's refresh_token
+	// RefreshToken returns the Token's refresh_token.
 	RefreshToken() RefreshToken
 
-	// AccessToken returns the Token's access_token
+	// AccessToken returns the Token's access_token.
 	AccessToken() AccessToken
 
-	// IDToken returns the Token's id_token
+	// IDToken returns the Token's id_token.
 	IDToken() IDToken
 
-	// Expiry returns the expiration of the access_token
+	// Expiry returns the expiration of the access_token.
 	Expiry() time.Time
 
 	// Valid will ensure that the access_token is not empty or expired.
@@ -36,7 +36,7 @@ type Token interface {
 // StaticTokenSource is a single function interface that defines a method to
 // create a oauth2.TokenSource that always returns the same token. Because the
 // token is never refreshed.  A TokenSource can be used to when calling a
-// provider's UserInfo(), among other things
+// provider's UserInfo(), among other things.
 type StaticTokenSource interface {
 	StaticTokenSource() oauth2.TokenSource
 }
@@ -49,7 +49,7 @@ type Tk struct {
 	underlying *oauth2.Token
 }
 
-// ensure that Tk implements the Token interface
+// ensure that Tk implements the Token interface.
 var _ Token = (*Tk)(nil)
 
 // NewToken creates a new Token (*Tk).  The IDToken is required and the
@@ -79,7 +79,7 @@ func (t *Tk) AccessToken() AccessToken {
 }
 
 // RefreshToken implements the Token.RefreshToken() interface function and may
-// return an empty RefreshToken
+// return an empty RefreshToken.
 func (t *Tk) RefreshToken() RefreshToken {
 	if t.underlying == nil {
 		return ""
@@ -87,14 +87,14 @@ func (t *Tk) RefreshToken() RefreshToken {
 	return RefreshToken(t.underlying.RefreshToken)
 }
 
-// IDToken implements the IDToken.IDToken() interface function
+// IDToken implements the IDToken.IDToken() interface function.
 func (t *Tk) IDToken() IDToken { return IDToken(t.idToken) }
 
 // TokenExpirySkew defines a time skew when checking a Token's expiration.
 const TokenExpirySkew = 10 * time.Second
 
 // Expiry implements the Token.Expiry() interface function and may return a
-// "zero" time if the token's AccessToken is empty
+// "zero" time if the token's AccessToken is empty.
 func (t *Tk) Expiry() time.Time {
 	if t.underlying == nil {
 		return time.Time{}
@@ -124,7 +124,7 @@ func (t *Tk) IsExpired() bool {
 }
 
 // Valid will ensure that the access_token is not empty or expired. It will
-// return false if t.AccessToken() is empty
+// return false if t.AccessToken() is empty.
 func (t *Tk) Valid() bool {
 	if t == nil || t.underlying == nil {
 		return false

@@ -12,32 +12,34 @@ import (
 	"github.com/hashicorp/cap/oidc/internal/strutils"
 )
 
-// ClientSecret oauth client Secret
+// ClientSecret is an oauth client Secret.
 type ClientSecret string
 
-// RedactedClientSecret is the redacted string or json for an oauth client secret
+// RedactedClientSecret is the redacted string or json for an oauth client secret.
 const RedactedClientSecret = "[REDACTED: client secret]"
 
-// String will redact the client secret
+// String will redact the client secret.
 func (t ClientSecret) String() string {
 	return RedactedClientSecret
 }
 
-// MarshalJSON will redact the client secret
+// MarshalJSON will redact the client secret.
 func (t ClientSecret) MarshalJSON() ([]byte, error) {
 	return json.Marshal(RedactedClientSecret)
 }
 
-// Config represents the configuration for a typical 3-legged OIDC
-// authorization code flow.
+// Config represents the configuration for OIDC provider used by a relying
+// party.
 type Config struct {
-	// ClientID is the relying party id
+	// ClientID is the relying party ID.
 	ClientID string
 
-	// ClientSecret is the relying party secret
+	// ClientSecret is the relying party secret.
 	ClientSecret ClientSecret
 
-	// Scopes is a list oidc scopes to request of the provider.
+	// Scopes is a list of default oidc scopes to request of the provider. The
+	// required "oidc" scope is requested by default, and should be part of this
+	// optional list.
 	Scopes []string
 
 	// Issuer is a case-sensitive URL string using the https scheme that
@@ -141,7 +143,7 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// configOptions is the set of available options
+// configOptions is the set of available options.
 type configOptions struct {
 	withScopes     []string
 	withAudiences  []string
@@ -164,7 +166,7 @@ func getConfigOpts(opt ...Option) configOptions {
 	return opts
 }
 
-// WithScopes provides an optional list of scopes for the provider's config
+// WithScopes provides an optional list of scopes for the provider's config.
 func WithScopes(scopes ...string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*configOptions); ok {
@@ -173,7 +175,7 @@ func WithScopes(scopes ...string) Option {
 	}
 }
 
-// WithAudiences provides an optional list of audiences for the provider's config
+// WithAudiences provides an optional list of audiences for the provider's config.
 func WithAudiences(auds ...string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*configOptions); ok {

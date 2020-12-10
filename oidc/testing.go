@@ -17,7 +17,7 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
-// TestGenerateKeys will generate a test ECDSA P-256 pub/priv key pair
+// TestGenerateKeys will generate a test ECDSA P-256 pub/priv key pair.
 func TestGenerateKeys(t *testing.T) (pub, priv string) {
 	t.Helper()
 	require := require.New(t)
