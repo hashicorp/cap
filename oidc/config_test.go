@@ -1,6 +1,7 @@
 package oidc
 
 import (
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"testing"
@@ -33,7 +34,7 @@ func TestClientSecret_MarshalJSON(t *testing.T) {
 }
 
 func TestNewConfig(t *testing.T) {
-	testCaPem := TestGenerateCA(t, []string{"localhost"})
+	_, testCaPem := TestGenerateCA(t, []string{"localhost"})
 	t.Parallel()
 	type args struct {
 		issuer       string
@@ -234,10 +235,53 @@ func Test_WithAudiences(t *testing.T) {
 
 func Test_WithProviderCA(t *testing.T) {
 	t.Parallel()
-	testCaPem := TestGenerateCA(t, []string{"localhost"})
+	_, testCaPem := TestGenerateCA(t, []string{"localhost"})
 	assert := assert.New(t)
 	opts := getConfigOpts(WithProviderCA(testCaPem))
 	testOpts := configDefaults()
 	testOpts.withProviderCA = testCaPem
 	assert.Equal(opts, testOpts)
+}
+
+func TestEncodeCertificates(t *testing.T) {
+	testCert, testPem := TestGenerateCA(t, []string{"localhost"})
+
+	tests := []struct {
+		name      string
+		certs     []*x509.Certificate
+		want      string
+		wantErr   bool
+		wantIsErr error
+	}{
+		{
+			name:  "valid",
+			certs: []*x509.Certificate{testCert, testCert},
+			want:  testPem + testPem,
+		},
+		{
+			name:      "no-certs",
+			wantErr:   true,
+			wantIsErr: ErrInvalidParameter,
+		},
+		{
+			name:      "nil-cert",
+			certs:     []*x509.Certificate{testCert, nil},
+			wantErr:   true,
+			wantIsErr: ErrNilParameter,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert, require := assert.New(t), require.New(t)
+			got, err := EncodeCertificates(tt.certs...)
+			if tt.wantErr {
+				require.Error(err)
+				assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("EncodeCertificates() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

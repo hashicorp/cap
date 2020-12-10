@@ -1,8 +1,10 @@
 package oidc
 
 import (
+	"bytes"
 	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"net/url"
 
@@ -179,11 +181,35 @@ func WithAudiences(auds ...string) Option {
 	}
 }
 
-// WithProviderCA provides an optional CA cert for the provider's config
+// WithProviderCA provides optional CA certs (PEM encoded) for the provider's
+// config.  These certs will can be used when making http requests to the
+// provider. See EncodeCertificates(...) to PEM encode a number of certs.
 func WithProviderCA(cert string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*configOptions); ok {
 			o.withProviderCA = cert
 		}
 	}
+}
+
+// EncodeCertificates will encode a number of x509 certificates to PEM.  It will
+// help encode certs for use with the WithProviderCA(...) option.
+func EncodeCertificates(certs ...*x509.Certificate) (string, error) {
+	const op = "EncodeCert"
+	var buffer bytes.Buffer
+	if len(certs) == 0 {
+		return "", fmt.Errorf("%s: no certs provided: %w", op, ErrInvalidParameter)
+	}
+	for _, cert := range certs {
+		if cert == nil {
+			return "", fmt.Errorf("%s: empty cert: %w", op, ErrNilParameter)
+		}
+		if err := pem.Encode(&buffer, &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: cert.Raw,
+		}); err != nil {
+			return "", fmt.Errorf("%s: unable to encode cert: %w", op, err)
+		}
+	}
+	return buffer.String(), nil
 }
