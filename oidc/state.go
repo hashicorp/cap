@@ -80,23 +80,3 @@ func (s *St) IsExpired() bool {
 	// opts := getStOpts(opt...)
 	return s.expiration.Before(time.Now().Add(StateExpirySkew))
 }
-
-// stOptions is the set of available options for St functions
-type stOptions struct {
-	withExpirySkew time.Duration
-}
-
-// stDefaults is a handy way to get the defaults at runtime and during unit
-// tests.
-func stDefaults() stOptions {
-	return stOptions{
-		withExpirySkew: StateExpirySkew,
-	}
-}
-
-// getStateOpts gets the state defaults and applies the opt overrides passed in
-func getStOpts(opt ...Option) stOptions {
-	opts := stDefaults()
-	ApplyOpts(&opts, opt...)
-	return opts
-}
