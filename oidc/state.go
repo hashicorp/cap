@@ -9,7 +9,7 @@ import (
 // contains the data needed to uniquely represent that one-time flow across the
 // multiple interactions needed to complete the OIDC flow the user is
 // attempting.  ID() is passed throughout the OIDC interactions to uniquely
-// identify the flow's state. The ID() and Nonce() cannot cannot be equal, and
+// identify the flow's state. The ID() and Nonce() cannot be equal, and
 // will be used during the OIDC flow to prevent CSRF and replay attacks (see the
 // oidc spec for specifics).
 type State interface {
