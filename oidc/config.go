@@ -66,8 +66,9 @@ type Config struct {
 	// audiences of an id_token must match one of the configured audiences.
 	Audiences []string
 
-	// ProviderCA is an optional CA cert to use when sending requests to the
-	// provider.
+	// ProviderCA is an optional CA certs (PEM encoded) to use when sending
+	// requests to the provider. If you have a list of *x509.Certificates, then
+	// see EncodeCertificates(...) to PEM encode them.
 	ProviderCA string
 }
 
