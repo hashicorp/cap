@@ -185,7 +185,7 @@ func TestProvider_AuthURL(t *testing.T) {
 					clientId,
 					validState.Nonce(),
 					redirect,
-					validState.Id(),
+					validState.ID(),
 				)
 			}(),
 		},
@@ -204,7 +204,7 @@ func TestProvider_AuthURL(t *testing.T) {
 					clientId,
 					validState.Nonce(),
 					redirect,
-					validState.Id(),
+					validState.ID(),
 				)
 			}(),
 		},
@@ -223,7 +223,7 @@ func TestProvider_AuthURL(t *testing.T) {
 					clientId,
 					validState.Nonce(),
 					redirect,
-					validState.Id(),
+					validState.ID(),
 				)
 			}(),
 		},
@@ -316,7 +316,7 @@ func TestProvider_Exchange(t *testing.T) {
 			args: args{
 				ctx:       ctx,
 				s:         validState,
-				authState: validState.Id(),
+				authState: validState.ID(),
 				authCode:  "test-code",
 			},
 		},
@@ -344,7 +344,7 @@ func TestProvider_Exchange(t *testing.T) {
 			args: args{
 				ctx:       ctx,
 				s:         expiredState,
-				authState: expiredState.Id(),
+				authState: expiredState.ID(),
 				authCode:  "test-code",
 			},
 			wantErr:   true,
@@ -371,10 +371,10 @@ func TestProvider_Exchange(t *testing.T) {
 			}
 			require.NoError(err)
 			require.NotEmptyf(gotTk, "Provider.Exchange() = %v, wanted not nil", gotTk)
-			assert.NotEmptyf(gotTk.IdToken(), "gotTk.IdToken() = %v, wanted not empty", gotTk.IdToken())
+			assert.NotEmptyf(gotTk.IDToken(), "gotTk.IdToken() = %v, wanted not empty", gotTk.IDToken())
 			assert.NotEmptyf(gotTk.AccessToken(), "gotTk.AccessToken() = %v, wanted not empty", gotTk.AccessToken())
 			assert.Truef(gotTk.Valid(), "gotTk.Valid() = %v, wanted true", gotTk.Valid())
-			assert.Truef(!gotTk.Expired(), "gotTk.Expired() = %v, wanted false", gotTk.Expired())
+			assert.Truef(!gotTk.IsExpired(), "gotTk.Expired() = %v, wanted false", gotTk.IsExpired())
 		})
 	}
 
@@ -382,7 +382,7 @@ func TestProvider_Exchange(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
 		code := "code-doesn't-match-state"
 		tp.SetExpectedAuthCode(code)
-		gotTk, err := p.Exchange(ctx, validState, validState.Id(), "bad-code")
+		gotTk, err := p.Exchange(ctx, validState, validState.ID(), "bad-code")
 		require.Error(err)
 		assert.Truef(strings.Contains(err.Error(), "401 Unauthorized"), "wanted strings.Contains \"%s\" but got \"%s\"", "401 Unauthorized", err)
 		assert.Empty(gotTk)
@@ -391,7 +391,7 @@ func TestProvider_Exchange(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
 		tp.SetOmitIDTokens(true)
 		tp.SetExpectedAuthCode("valid-code")
-		gotTk, err := p.Exchange(ctx, validState, validState.Id(), "valid-code")
+		gotTk, err := p.Exchange(ctx, validState, validState.ID(), "valid-code")
 		require.Error(err)
 		assert.Truef(errors.Is(err, ErrMissingIdToken), "wanted \"%s\" but got \"%s\"", ErrMissingIdToken, err)
 		assert.Empty(gotTk)
@@ -401,7 +401,7 @@ func TestProvider_Exchange(t *testing.T) {
 		tp.SetOmitIDTokens(false)
 		tp.SetExpectedAuthCode("valid-code")
 		tp.SetExpectedExpiry(-1 * time.Minute)
-		gotTk, err := p.Exchange(ctx, validState, validState.Id(), "valid-code")
+		gotTk, err := p.Exchange(ctx, validState, validState.ID(), "valid-code")
 		require.Error(err)
 		assert.Truef(strings.Contains(err.Error(), "token is expired"), "wanted strings.Contains \"%s\" but got \"%s\"", "token is expired", err)
 		assert.Empty(gotTk)

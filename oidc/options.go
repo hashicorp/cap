@@ -17,18 +17,6 @@ func ApplyOpts(opts interface{}, opt ...Option) {
 	}
 }
 
-// WithExpirySkew provides an optional expiry skew duration for: Token, State
-func WithExpirySkew(d time.Duration) Option {
-	return func(o interface{}) {
-		switch v := o.(type) {
-		case *tokenOptions:
-			v.withExpirySkew = d
-		case *stOptions:
-			v.withExpirySkew = d
-		}
-	}
-}
-
 // WithNow provides an optional func for determining what the current time it is
 // for: Config, Tk and St
 func WithNow(now func() time.Time) Option {

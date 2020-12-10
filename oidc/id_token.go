@@ -11,25 +11,26 @@ import (
 	"gopkg.in/square/go-jose.v2"
 )
 
-// IdToken is an oidc id_token
-type IdToken string
+// IDToken is an oidc id_token.
+// See https://openid.net/specs/openid-connect-core-1_0.html#IDToken.
+type IDToken string
 
-// RedactedIdToken is the redacted string or json for an oidc id_token
-const RedactedIdToken = "[REDACTED: id_token]"
+// RedactedIDToken is the redacted string or json for an oidc id_token.
+const RedactedIDToken = "[REDACTED: id_token]"
 
-// String will redact the token
-func (t IdToken) String() string {
-	return RedactedIdToken
+// String will redact the token.
+func (t IDToken) String() string {
+	return RedactedIDToken
 }
 
-// MarshalJSON will redact the token
-func (t IdToken) MarshalJSON() ([]byte, error) {
-	return json.Marshal(RedactedIdToken)
+// MarshalJSON will redact the token.
+func (t IDToken) MarshalJSON() ([]byte, error) {
+	return json.Marshal(RedactedIDToken)
 }
 
-// Claims retrieves the IdToken claims.
-func (t IdToken) Claims(claims interface{}) error {
-	const op = "IdToken.Claims"
+// Claims retrieves the IDToken claims.
+func (t IDToken) Claims(claims interface{}) error {
+	const op = "IDToken.Claims"
 	if len(t) == 0 {
 		return fmt.Errorf("%s: id_token is empty: %w", op, ErrInvalidParameter)
 	}
@@ -44,7 +45,7 @@ func (t IdToken) Claims(claims interface{}) error {
 // returns nil when the optional access_token hash is not present in the in
 // the id_token.
 // See https://openid.net/specs/openid-connect-core-1_0.html#CodeIDToken
-func (t IdToken) VerifyAccessToken(accessToken AccessToken) error {
+func (t IDToken) VerifyAccessToken(accessToken AccessToken) error {
 	const op = "VerifyAccessToken"
 	var claims map[string]interface{}
 	if err := t.Claims(&claims); err != nil {

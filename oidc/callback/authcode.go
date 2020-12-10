@@ -62,7 +62,7 @@ func AuthCode(ctx context.Context, p *oidc.Provider, rw StateReader, sFn Success
 			return
 		}
 
-		if reqState != state.Id() {
+		if reqState != state.ID() {
 			// the stateReadWriter didn't return the correct state for the key
 			// given... this is an internal sort of error on the part of the
 			// reader, but given this error, we probably shouldn't update the

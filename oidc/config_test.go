@@ -1,54 +1,16 @@
 package oidc
 
 import (
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"testing"
 	"time"
 
+	"github.com/coreos/go-oidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-const testCaPem = `
------BEGIN CERTIFICATE-----
-MIIGkDCCBXigAwIBAgIQAvNWnNS26r7th/gsZC85WDANBgkqhkiG9w0BAQsFADBw
-MQswCQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMRkwFwYDVQQLExB3
-d3cuZGlnaWNlcnQuY29tMS8wLQYDVQQDEyZEaWdpQ2VydCBTSEEyIEhpZ2ggQXNz
-dXJhbmNlIFNlcnZlciBDQTAeFw0xNzExMjkwMDAwMDBaFw0yMTAxMTQxMjAwMDBa
-MIGkMQswCQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEUMBIGA1UEBxML
-TG9zIEFuZ2VsZXMxPDA6BgNVBAoTM0ludGVybmV0IENvcnBvcmF0aW9uIGZvciBB
-c3NpZ25lZCBOYW1lcyBhbmQgTnVtYmVyczEWMBQGA1UECxMNSVQgT3BlcmF0aW9u
-czEUMBIGA1UEAwwLKi5pY2Fubi5vcmcwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAw
-ggIKAoICAQDHa33ZEtDn3USf6hfrSMx2hfpL+ji5q/g9JrnoSbuJG9Vrzw4sOAit
-uBrpN5e6/w1AAPEPKH+YJdJgVhTx/BKhQtgidkayYV4hNWN/AYpgkRcTN6raNtaU
-q4NwmC2tmClRPeRUzy1aiJ7vCKyLaoClneVrLS5hD47QYbfjbhvDCSrtu64hDFkS
-B1ZhplSCQpqxLXct6EuX/z7ArE3c676Ds1MxbbbmPUiQ1CsBMnMt5UfPhiTzqFm3
-zCFHv99c9Gg3YfxjfWUQSIe6emevC/YBbi3mwhmpC7d5TJjzokuksgn9d9jhdjG3
-wZ3pqSdtqSjRjgvLP5Wo3F7UPVLA+Js2It1N8tLCbcWM6/+Le810F+eLMkEGnB6K
-VGqmj3NXzkO0+mCA2LDebsgFgDBsOzmY2k4tH9zi1m7/LsByVvMTpGxuvZ6+Ypvu
-8vbu8JvQuZ6impR0WL/NTgYsmP0uW+uOXO8qwog1ZKyWwDbcN0greWwxIefyq50t
-4m9SzB6dmO8asp1+hu3aULHOsFL1bRuCP84nEca3bwCUae1C9AiHx3z03XpPdGIy
-mXxFHj7B9gs5Fu6bBfYF0eBfTF/4mMrJePDmfLChMGjp9qpqRFN7dX8bMgCJutKL
-H+huy3L11VQ7hWAV9CFN2UflZG1t6Nf/2z3c60uxhYZCQ5+pMDsOmQIDAQABo4IB
-7zCCAeswHwYDVR0jBBgwFoAUUWj/kK8CB3U8zNllZGKiErhZcjswHQYDVR0OBBYE
-FB+KEPVsfdhKkgVbiRlpHCzb4Cy9MCEGA1UdEQQaMBiCCyouaWNhbm4ub3Jngglp
-Y2Fubi5vcmcwDgYDVR0PAQH/BAQDAgWgMB0GA1UdJQQWMBQGCCsGAQUFBwMBBggr
-BgEFBQcDAjB1BgNVHR8EbjBsMDSgMqAwhi5odHRwOi8vY3JsMy5kaWdpY2VydC5j
-b20vc2hhMi1oYS1zZXJ2ZXItZzYuY3JsMDSgMqAwhi5odHRwOi8vY3JsNC5kaWdp
-Y2VydC5jb20vc2hhMi1oYS1zZXJ2ZXItZzYuY3JsMEwGA1UdIARFMEMwNwYJYIZI
-AYb9bAEBMCowKAYIKwYBBQUHAgEWHGh0dHBzOi8vd3d3LmRpZ2ljZXJ0LmNvbS9D
-UFMwCAYGZ4EMAQICMIGDBggrBgEFBQcBAQR3MHUwJAYIKwYBBQUHMAGGGGh0dHA6
-Ly9vY3NwLmRpZ2ljZXJ0LmNvbTBNBggrBgEFBQcwAoZBaHR0cDovL2NhY2VydHMu
-ZGlnaWNlcnQuY29tL0RpZ2lDZXJ0U0hBMkhpZ2hBc3N1cmFuY2VTZXJ2ZXJDQS5j
-cnQwDAYDVR0TAQH/BAIwADANBgkqhkiG9w0BAQsFAAOCAQEAMUUQhWco7YunHRnQ
-rm9KSLhCPozZlN9jdh553aRREDm6rizIdPfg8ISD1i3890u83iRYaHEVBpScecwR
-dtBodNV/pWZCq+QmT71bk/Pwd+ZHpS3ydWJ2bde2dGk3crmlIdUzDYuPhf9tDsnr
-jO6SVm8b6D+lpVU70p3InuHD2UB7IWiSIoH4U8nMJ+/sPp4+mK+00Thf+9rij6qe
-Jso1E9ZBQ5Ak+GSAlyEWTKMFvqQqw0wbkomkhDOSy/qTYboxkyK4ExpiQQ2mrzdY
-xP5W2sA5fUX2xkXBV7TY/UwrwVBoWiIrjygBQLy0OHOHEGE1hl6fGA7DcFO7mrw2
-S3IprA==
------END CERTIFICATE-----`
 
 func TestClientSecret_String(t *testing.T) {
 	t.Parallel()
@@ -74,15 +36,17 @@ func TestClientSecret_MarshalJSON(t *testing.T) {
 
 func TestNewConfig(t *testing.T) {
 	t.Parallel()
+	_, testCaPem := TestGenerateCA(t, []string{"localhost"})
 	testNow := func() time.Time {
 		return time.Now().Add(-1 * time.Minute)
 	}
+
 	type args struct {
 		issuer       string
-		clientId     string
+		clientID     string
 		clientSecret ClientSecret
 		supported    []Alg
-		redirectUrl  string
+		redirectURL  string
 		opt          []Option
 	}
 	tests := []struct {
@@ -96,10 +60,10 @@ func TestNewConfig(t *testing.T) {
 			name: "valid-with-all-valid-opts",
 			args: args{
 				issuer:       "http://YOUR_ISSUER/",
-				clientId:     "YOUR_CLIENT_ID",
+				clientID:     "YOUR_CLIENT_ID",
 				clientSecret: "YOUR_CLIENT_SECRET",
 				supported:    []Alg{RS512},
-				redirectUrl:  "http://YOUR_REDIRECT_URL",
+				redirectURL:  "http://YOUR_REDIRECT_URL",
 				opt: []Option{
 					WithAudiences("YOUR_AUD1", "YOUR_AUD2"),
 					WithScopes("email", "profile"),
@@ -109,12 +73,12 @@ func TestNewConfig(t *testing.T) {
 			},
 			want: &Config{
 				Issuer:               "http://YOUR_ISSUER/",
-				ClientId:             "YOUR_CLIENT_ID",
+				ClientID:             "YOUR_CLIENT_ID",
 				ClientSecret:         "YOUR_CLIENT_SECRET",
 				SupportedSigningAlgs: []Alg{RS512},
-				RedirectUrl:          "http://YOUR_REDIRECT_URL",
+				RedirectURL:          "http://YOUR_REDIRECT_URL",
 				Audiences:            []string{"YOUR_AUD1", "YOUR_AUD2"},
-				Scopes:               []string{"email", "profile"},
+				Scopes:               []string{oidc.ScopeOpenID, "email", "profile"},
 				ProviderCA:           testCaPem,
 				NowFunc:              testNow,
 			},
@@ -123,10 +87,10 @@ func TestNewConfig(t *testing.T) {
 			name: "empty-issuer",
 			args: args{
 				issuer:       "",
-				clientId:     "YOUR_CLIENT_ID",
+				clientID:     "YOUR_CLIENT_ID",
 				clientSecret: "YOUR_CLIENT_SECRET",
 				supported:    []Alg{RS512},
-				redirectUrl:  "http://YOUR_REDIRECT_URL",
+				redirectURL:  "http://YOUR_REDIRECT_URL",
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidParameter,
@@ -135,10 +99,10 @@ func TestNewConfig(t *testing.T) {
 			name: "bad-issuer-scheme",
 			args: args{
 				issuer:       "ldap://bad-scheme",
-				clientId:     "YOUR_CLIENT_ID",
+				clientID:     "YOUR_CLIENT_ID",
 				clientSecret: "YOUR_CLIENT_SECRET",
 				supported:    []Alg{RS512},
-				redirectUrl:  "http://YOUR_REDIRECT_URL",
+				redirectURL:  "http://YOUR_REDIRECT_URL",
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidIssuer,
@@ -147,10 +111,10 @@ func TestNewConfig(t *testing.T) {
 			name: "bad-issuer-url",
 			args: args{
 				issuer:       "http://bad-url\\",
-				clientId:     "YOUR_CLIENT_ID",
+				clientID:     "YOUR_CLIENT_ID",
 				clientSecret: "YOUR_CLIENT_SECRET",
 				supported:    []Alg{RS512},
-				redirectUrl:  "http://YOUR_REDIRECT_URL",
+				redirectURL:  "http://YOUR_REDIRECT_URL",
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidIssuer,
@@ -159,10 +123,10 @@ func TestNewConfig(t *testing.T) {
 			name: "empty-client-id",
 			args: args{
 				issuer:       "http://YOUR_ISSUER/",
-				clientId:     "",
+				clientID:     "",
 				clientSecret: "YOUR_CLIENT_SECRET",
 				supported:    []Alg{RS512},
-				redirectUrl:  "http://YOUR_REDIRECT_URL",
+				redirectURL:  "http://YOUR_REDIRECT_URL",
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidParameter,
@@ -171,10 +135,10 @@ func TestNewConfig(t *testing.T) {
 			name: "empty-client-secret",
 			args: args{
 				issuer:       "http://YOUR_ISSUER/",
-				clientId:     "YOUR_CLIENT_ID",
+				clientID:     "YOUR_CLIENT_ID",
 				clientSecret: "",
 				supported:    []Alg{RS512},
-				redirectUrl:  "http://YOUR_REDIRECT_URL",
+				redirectURL:  "http://YOUR_REDIRECT_URL",
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidParameter,
@@ -183,10 +147,10 @@ func TestNewConfig(t *testing.T) {
 			name: "empty-algs",
 			args: args{
 				issuer:       "http://YOUR_ISSUER/",
-				clientId:     "YOUR_CLIENT_ID",
+				clientID:     "YOUR_CLIENT_ID",
 				clientSecret: "YOUR_CLIENT_SECRET",
 				supported:    nil,
-				redirectUrl:  "http://YOUR_REDIRECT_URL",
+				redirectURL:  "http://YOUR_REDIRECT_URL",
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidParameter,
@@ -195,10 +159,10 @@ func TestNewConfig(t *testing.T) {
 			name: "empty-redirect",
 			args: args{
 				issuer:       "http://YOUR_ISSUER/",
-				clientId:     "YOUR_CLIENT_ID",
+				clientID:     "YOUR_CLIENT_ID",
 				clientSecret: "YOUR_CLIENT_SECRET",
 				supported:    []Alg{RS512},
-				redirectUrl:  "",
+				redirectURL:  "",
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidParameter,
@@ -207,10 +171,10 @@ func TestNewConfig(t *testing.T) {
 			name: "invalid-providerCA",
 			args: args{
 				issuer:       "http://YOUR_ISSUER/",
-				clientId:     "YOUR_CLIENT_ID",
+				clientID:     "YOUR_CLIENT_ID",
 				clientSecret: "YOUR_CLIENT_SECRET",
 				supported:    []Alg{RS512},
-				redirectUrl:  "http://YOUR_REDIRECT_URL",
+				redirectURL:  "http://YOUR_REDIRECT_URL",
 				opt: []Option{
 					WithProviderCA("bad certificate"),
 				},
@@ -222,10 +186,10 @@ func TestNewConfig(t *testing.T) {
 			name: "invalid-alg",
 			args: args{
 				issuer:       "http://YOUR_ISSUER/",
-				clientId:     "YOUR_CLIENT_ID",
+				clientID:     "YOUR_CLIENT_ID",
 				clientSecret: "YOUR_CLIENT_SECRET",
 				supported:    []Alg{"bad alg"},
-				redirectUrl:  "http://YOUR_REDIRECT_URL",
+				redirectURL:  "http://YOUR_REDIRECT_URL",
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidParameter,
@@ -234,19 +198,19 @@ func TestNewConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			got, err := NewConfig(tt.args.issuer, tt.args.clientId, tt.args.clientSecret, tt.args.supported, tt.args.redirectUrl, tt.args.opt...)
+			got, err := NewConfig(tt.args.issuer, tt.args.clientID, tt.args.clientSecret, tt.args.supported, tt.args.redirectURL, tt.args.opt...)
 			if tt.wantErr {
 				require.Error(err)
 				assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)
 				return
 			}
 			require.NoError(err)
-			assert.Equalf(tt.want.ClientId, got.ClientId, "NewConfig() = %v, want %v", got.ClientId, tt.want.ClientId)
+			assert.Equalf(tt.want.ClientID, got.ClientID, "NewConfig() = %v, want %v", got.ClientID, tt.want.ClientID)
 			assert.Equalf(tt.want.ClientSecret, got.ClientSecret, "NewConfig() = %v, want %v", got.ClientSecret, tt.want.ClientSecret)
 			assert.Equalf(tt.want.Scopes, got.Scopes, "NewConfig() = %v, want %v", got.Scopes, tt.want.Scopes)
 			assert.Equalf(tt.want.Issuer, got.Issuer, "NewConfig() = %v, want %v", got.Issuer, tt.want.Issuer)
 			assert.Equalf(tt.want.SupportedSigningAlgs, got.SupportedSigningAlgs, "NewConfig() = %v, want %v", got.SupportedSigningAlgs, tt.want.SupportedSigningAlgs)
-			assert.Equalf(tt.want.RedirectUrl, got.RedirectUrl, "NewConfig() = %v, want %v", got.RedirectUrl, tt.want.RedirectUrl)
+			assert.Equalf(tt.want.RedirectURL, got.RedirectURL, "NewConfig() = %v, want %v", got.RedirectURL, tt.want.RedirectURL)
 			assert.Equalf(tt.want.Audiences, got.Audiences, "NewConfig() = %v, want %v", got.Audiences, tt.want.Audiences)
 			assert.Equalf(tt.want.ProviderCA, got.ProviderCA, "NewConfig() = %v, want %v", got.ProviderCA, tt.want.ProviderCA)
 			testAssertEqualFunc(t, tt.want.NowFunc, got.NowFunc, "now = %p,want %p", tt.want.NowFunc, got.NowFunc)
@@ -271,7 +235,7 @@ func Test_WithScopes(t *testing.T) {
 	assert := assert.New(t)
 	opts := getConfigOpts(WithScopes("alice", "bob"))
 	testOpts := configDefaults()
-	testOpts.withScopes = []string{"alice", "bob"}
+	testOpts.withScopes = []string{oidc.ScopeOpenID, "alice", "bob"}
 	assert.Equal(opts, testOpts)
 }
 
@@ -286,6 +250,7 @@ func Test_WithAudiences(t *testing.T) {
 
 func Test_WithProviderCA(t *testing.T) {
 	t.Parallel()
+	_, testCaPem := TestGenerateCA(t, []string{"localhost"})
 	assert := assert.New(t)
 	opts := getConfigOpts(WithProviderCA(testCaPem))
 	testOpts := configDefaults()
@@ -325,6 +290,49 @@ func TestConfig_Now(t *testing.T) {
 			c := &Config{NowFunc: tt.nowFunc}
 			assert.True(c.Now().Before(tt.want()))
 			assert.True(c.Now().Add(tt.skew).After(tt.want()))
+		})
+	}
+}
+
+func TestEncodeCertificates(t *testing.T) {
+	testCert, testPem := TestGenerateCA(t, []string{"localhost"})
+
+	tests := []struct {
+		name      string
+		certs     []*x509.Certificate
+		want      string
+		wantErr   bool
+		wantIsErr error
+	}{
+		{
+			name:  "valid",
+			certs: []*x509.Certificate{testCert, testCert},
+			want:  testPem + testPem,
+		},
+		{
+			name:      "no-certs",
+			wantErr:   true,
+			wantIsErr: ErrInvalidParameter,
+		},
+		{
+			name:      "nil-cert",
+			certs:     []*x509.Certificate{testCert, nil},
+			wantErr:   true,
+			wantIsErr: ErrNilParameter,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert, require := assert.New(t), require.New(t)
+			got, err := EncodeCertificates(tt.certs...)
+			if tt.wantErr {
+				require.Error(err)
+				assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("EncodeCertificates() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }

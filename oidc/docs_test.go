@@ -36,12 +36,12 @@ func Example() {
 	// callback from successful oidc authentication response for a verified
 	// Token.
 	t, _ := p.Exchange(context.Background(), s, "RECEIVED_STATE", "RECEIVED_CODE")
-	fmt.Printf("id_token: %v\n", string(t.IdToken()))
+	fmt.Printf("id_token: %v\n", string(t.IDToken()))
 
 	// Create an auth code callback
 	successFn := func(stateId string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		printableToken := fmt.Sprintf("id_token: %s", string(t.IdToken()))
+		printableToken := fmt.Sprintf("id_token: %s", string(t.IDToken()))
 		_, _ = w.Write([]byte(printableToken))
 	}
 	errorFn := func(stateId string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
@@ -74,7 +74,7 @@ func ExampleNewConfig() {
 	fmt.Println(pc)
 
 	// Output:
-	// &{YOUR_CLIENT_ID [REDACTED: client secret] [] http://YOUR_ISSUER/ [RS256] http://YOUR_REDIRECT_URL []  <nil>}
+	// &{YOUR_CLIENT_ID [REDACTED: client secret] [openid] http://YOUR_ISSUER/ [RS256] http://YOUR_REDIRECT_URL []  <nil>}
 }
 
 func ExampleNewProvider() {
@@ -141,7 +141,7 @@ func ExampleProvider_Exchange() {
 	// callback from successful oidc authentication response for a verified
 	// Token.
 	t, _ := p.Exchange(context.Background(), s, "RECEIVED_STATE", "RECEIVED_CODE")
-	fmt.Printf("id_token: %v\n", string(t.IdToken()))
+	fmt.Printf("id_token: %v\n", string(t.IDToken()))
 }
 
 func ExampleProvider_UserInfo() {

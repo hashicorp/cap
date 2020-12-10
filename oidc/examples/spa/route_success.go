@@ -54,7 +54,7 @@ type respToken struct {
 // AccessToken and RefreshToken
 func printableToken(t oidc.Token) respToken {
 	return respToken{
-		IdToken:      string(t.IdToken()),
+		IdToken:      string(t.IDToken()),
 		AccessToken:  string(t.AccessToken()),
 		RefreshToken: string(t.RefreshToken()),
 		Expiry:       t.Expiry(),

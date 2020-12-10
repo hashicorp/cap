@@ -59,12 +59,12 @@ func Implicit(ctx context.Context, p *oidc.Provider, rw StateReader, sFn Success
 			return
 		}
 
-		if reqState != state.Id() {
+		if reqState != state.ID() {
 			// the stateReadWriter didn't return the correct state for the key
 			// given... this is an internal sort of error on the part of the
 			// reader, but given this error, we probably shouldn't update the
 			// state
-			responseErr := fmt.Errorf("%s: authen state (%s) and response state (%s) are not equal: %w", op, state.Id(), reqState, oidc.ErrResponseStateInvalid)
+			responseErr := fmt.Errorf("%s: authen state (%s) and response state (%s) are not equal: %w", op, state.ID(), reqState, oidc.ErrResponseStateInvalid)
 			eFn(reqState, nil, responseErr, w, req)
 			return
 		}
@@ -78,13 +78,13 @@ func Implicit(ctx context.Context, p *oidc.Provider, rw StateReader, sFn Success
 		}
 
 		reqIdToken := req.FormValue("id_token")
-		responseToken, err := oidc.NewToken(oidc.IdToken(reqIdToken), oath2Token)
+		responseToken, err := oidc.NewToken(oidc.IDToken(reqIdToken), oath2Token)
 		if err != nil {
 			responseErr := fmt.Errorf("%s: unable to create id_token: %w", op, err)
 			eFn(reqState, nil, responseErr, w, req)
 			return
 		}
-		if err := p.VerifyIDToken(ctx, responseToken.IdToken(), state.Nonce()); err != nil {
+		if err := p.VerifyIDToken(ctx, responseToken.IDToken(), state.Nonce()); err != nil {
 			responseErr := fmt.Errorf("%s: unable to verify id_token: %w", op, err)
 			eFn(reqState, nil, responseErr, w, req)
 			return

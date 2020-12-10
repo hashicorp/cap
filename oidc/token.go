@@ -10,37 +10,33 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// DefaultTokenExpirySkew defines a default time skew when checking a Token's
-// expiration.
-const DefaultTokenExpirySkew = 10 * time.Second
-
 // Token interface represents an OIDC id_token, as well as an Oauth2
-// access_token and refresh_token (including the the access_token expiry)
+// access_token and refresh_token (including the the access_token expiry).
 type Token interface {
-	// RefreshToken returns the Token's refresh_token
+	// RefreshToken returns the Token's refresh_token.
 	RefreshToken() RefreshToken
 
-	// AccessToken returns the Token's access_token
+	// AccessToken returns the Token's access_token.
 	AccessToken() AccessToken
 
-	// IdToken returns the Token's id_token
-	IdToken() IdToken
+	// IDToken returns the Token's id_token.
+	IDToken() IDToken
 
-	// Expiry returns the expiration of the access_token
+	// Expiry returns the expiration of the access_token.
 	Expiry() time.Time
 
 	// Valid will ensure that the access_token is not empty or expired.
 	Valid() bool
 
-	// Expired will return true if the token is expired.  Implementations may
-	// want to support the WithExpirySkew option.
-	Expired(opt ...Option) bool
+	// IsExpired returns true if the token has expired. Implementations should
+	// support a time skew (perhaps TokenExpirySkew) when checking expiration.
+	IsExpired() bool
 }
 
 // StaticTokenSource is a single function interface that defines a method to
 // create a oauth2.TokenSource that always returns the same token. Because the
 // token is never refreshed.  A TokenSource can be used to when calling a
-// provider's UserInfo(), among other things
+// provider's UserInfo(), among other things.
 type StaticTokenSource interface {
 	StaticTokenSource() oauth2.TokenSource
 }
@@ -49,7 +45,7 @@ type StaticTokenSource interface {
 // refresh_token (including the the access_token expiry), as well as an OIDC
 // id_token.  The access_token and refresh_token may be empty.
 type Tk struct {
-	idToken    IdToken
+	idToken    IDToken
 	underlying *oauth2.Token
 
 	// nowFunc is an optional function that returns the current time
@@ -62,13 +58,12 @@ var _ Token = (*Tk)(nil)
 // NewToken creates a new Token (*Tk).  The IdToken is required and the
 // *oauth2.Token may be nil.  Supports the WithNow option (with a default to
 // time.Now).
-func NewToken(i IdToken, t *oauth2.Token, opt ...Option) (*Tk, error) {
+func NewToken(i IDToken, t *oauth2.Token, opt ...Option) (*Tk, error) {
 	// since oauth2 is part of stdlib we're not going to worry about it leaking
 	// into our abstraction in this factory
 	const op = "NewToken"
 	if i == "" {
 		return nil, fmt.Errorf("%s: id_token is empty: %w", op, ErrInvalidParameter)
-
 	}
 	opts := getTokenOpts(opt...)
 	return &Tk{
@@ -88,7 +83,7 @@ func (t *Tk) AccessToken() AccessToken {
 }
 
 // RefreshToken implements the Token.RefreshToken() interface function and may
-// return an empty RefreshToken
+// return an empty RefreshToken.
 func (t *Tk) RefreshToken() RefreshToken {
 	if t.underlying == nil {
 		return ""
@@ -96,11 +91,14 @@ func (t *Tk) RefreshToken() RefreshToken {
 	return RefreshToken(t.underlying.RefreshToken)
 }
 
-// IdToken implements the IdToken.IdToken() interface function
-func (t *Tk) IdToken() IdToken { return IdToken(t.idToken) }
+// IDToken implements the IDToken.IDToken() interface function.
+func (t *Tk) IDToken() IDToken { return IDToken(t.idToken) }
+
+// TokenExpirySkew defines a time skew when checking a Token's expiration.
+const TokenExpirySkew = 10 * time.Second
 
 // Expiry implements the Token.Expiry() interface function and may return a
-// "zero" time if the token's AccessToken is empty
+// "zero" time if the token's AccessToken is empty.
 func (t *Tk) Expiry() time.Time {
 	if t.underlying == nil {
 		return time.Time{}
@@ -118,22 +116,19 @@ func (t *Tk) StaticTokenSource() oauth2.TokenSource {
 	return oauth2.StaticTokenSource(t.underlying)
 }
 
-// Expired will return true if the token's access token is expired or empty.
-// Supports the WithExpirySkew option and if none is provided it will use the
-// DefaultTokenExpirySkew.
-func (t *Tk) Expired(opt ...Option) bool {
+// IsExpired will return true if the token's access token is expired or empty.
+func (t *Tk) IsExpired() bool {
 	if t.underlying == nil {
 		return true
 	}
 	if t.underlying.Expiry.IsZero() {
 		return false
 	}
-	opts := getTokenOpts(opt...)
-	return t.underlying.Expiry.Round(0).Before(t.now().Add(opts.withExpirySkew))
+	return t.underlying.Expiry.Round(0).Before(time.Now().Add(TokenExpirySkew))
 }
 
 // Valid will ensure that the access_token is not empty or expired. It will
-// return false if t.AccessToken() is empty
+// return false if t.AccessToken() is empty.
 func (t *Tk) Valid() bool {
 	if t == nil || t.underlying == nil {
 		return false
@@ -141,10 +136,10 @@ func (t *Tk) Valid() bool {
 	if t.underlying.AccessToken == "" {
 		return false
 	}
-	return !t.Expired()
+	return !t.IsExpired()
 }
 
-// now returns the current time using the optional nowFunc
+// now returns the current time using the optional nowFunc.
 func (t *Tk) now() time.Time {
 	if t.nowFunc != nil {
 		return t.nowFunc()
@@ -154,16 +149,13 @@ func (t *Tk) now() time.Time {
 
 // tokenOptions is the set of available options for Token functions
 type tokenOptions struct {
-	withExpirySkew time.Duration
-	withNowFunc    func() time.Time
+	withNowFunc func() time.Time
 }
 
 // tokenDefaults is a handy way to get the defaults at runtime and during unit
 // tests.
 func tokenDefaults() tokenOptions {
-	return tokenOptions{
-		withExpirySkew: DefaultTokenExpirySkew,
-	}
+	return tokenOptions{}
 }
 
 // getTokenOpts gets the token defaults and applies the opt overrides passed
@@ -176,7 +168,7 @@ func getTokenOpts(opt ...Option) tokenOptions {
 
 // UnmarshalClaims will retrieve the claims from the provided raw JWT token.
 func UnmarshalClaims(rawToken string, claims interface{}) error {
-	const op = "JwtClaims"
+	const op = "UnmarshalClaims"
 	parts := strings.Split(string(rawToken), ".")
 	if len(parts) != 3 {
 		return fmt.Errorf("%s: malformed jwt, expected 3 parts got %d: %w", op, len(parts), ErrInvalidParameter)

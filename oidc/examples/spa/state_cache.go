@@ -41,7 +41,7 @@ func (sc *stateCache) Read(ctx context.Context, stateId string) (oidc.State, err
 
 func (sc *stateCache) Add(s oidc.State) {
 	extended := extendedState{State: s}
-	sc.c.SetDefault(s.Id(), &extended)
+	sc.c.SetDefault(s.ID(), &extended)
 }
 
 func (sc *stateCache) SetToken(id string, t oidc.Token) error {

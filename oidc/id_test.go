@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewId(t *testing.T) {
+func TestNewID(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name       string
@@ -30,16 +30,16 @@ func TestNewId(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			got, err := NewId(tt.opt...)
+			got, err := NewID(tt.opt...)
 			if tt.wantErr {
 				require.Error(err)
 				return
 			}
 			require.NoError(err)
 			if tt.wantPrefix != "" {
-				assert.Containsf(got, tt.wantPrefix, "NewId() = %v and wanted prefix %s", got, tt.wantPrefix)
+				assert.Containsf(got, tt.wantPrefix, "NewID() = %v and wanted prefix %s", got, tt.wantPrefix)
 			}
-			assert.Equalf(tt.wantLen, len(got), "NewId() = %v, with len of %d and wanted len of %v", got, len(got), tt.wantLen)
+			assert.Equalf(tt.wantLen, len(got), "NewID() = %v, with len of %d and wanted len of %v", got, len(got), tt.wantLen)
 		})
 	}
 }
@@ -47,7 +47,7 @@ func TestNewId(t *testing.T) {
 func Test_WithPrefix(t *testing.T) {
 	t.Parallel()
 	assert := assert.New(t)
-	opts := getIdOpts(WithPrefix("alice"))
+	opts := getIDOpts(WithPrefix("alice"))
 	testOpts := idDefaults()
 	testOpts.withPrefix = "alice"
 	assert.Equal(opts, testOpts)

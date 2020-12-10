@@ -26,7 +26,7 @@ func successFn(ctx context.Context, sc *stateCache) callback.SuccessResponseFunc
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if err := sc.SetToken(s.Id(), t); err != nil {
+		if err := sc.SetToken(s.ID(), t); err != nil {
 			fmt.Fprintf(os.Stderr, "error updating state during successful response: %s\n", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

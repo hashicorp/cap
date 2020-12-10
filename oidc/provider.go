@@ -120,24 +120,27 @@ func (p *Provider) Done() {
 func (p *Provider) AuthURL(ctx context.Context, s State, opt ...Option) (url string, e error) {
 	const op = "Provider.AuthURL"
 	opts := getProviderOpts(opt...)
-	if s.Id() == "" {
+	if s.ID() == "" {
 		return "", fmt.Errorf("%s: state id is empty: %w", op, ErrInvalidParameter)
 	}
 	if s.Nonce() == "" {
 		return "", fmt.Errorf("%s: state nonce is empty: %w", op, ErrInvalidParameter)
 	}
-	if s.Id() == s.Nonce() {
+	if s.ID() == s.Nonce() {
 		return "", fmt.Errorf("%s: state id and nonce cannot be equal: %w", op, ErrInvalidParameter)
 	}
 
 	// Add the "openid" scope, which is a required scope for oidc flows
-	scopes := append([]string{oidc.ScopeOpenID}, p.config.Scopes...)
+	scopes := p.config.Scopes
+	if !strutils.StrListContains(scopes, oidc.ScopeOpenID) {
+		scopes = append([]string{oidc.ScopeOpenID}, p.config.Scopes...)
+	}
 
 	// Configure an OpenID Connect aware OAuth2 client
 	oauth2Config := oauth2.Config{
-		ClientID:     p.config.ClientId,
+		ClientID:     p.config.ClientID,
 		ClientSecret: string(p.config.ClientSecret),
-		RedirectURL:  p.config.RedirectUrl,
+		RedirectURL:  p.config.RedirectURL,
 		Endpoint:     p.provider.Endpoint(),
 		Scopes:       scopes,
 	}
@@ -151,7 +154,7 @@ func (p *Provider) AuthURL(ctx context.Context, s State, opt ...Option) (url str
 		}
 		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("response_mode", "form_post"), oauth2.SetAuthURLParam("response_type", strings.Join(reqTokens, " ")))
 	}
-	return oauth2Config.AuthCodeURL(s.Id(), authCodeOpts...), nil
+	return oauth2Config.AuthCodeURL(s.ID(), authCodeOpts...), nil
 }
 
 // Exchange will request a token from the oidc token endpoint, using the
@@ -168,7 +171,7 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 	if p.config == nil {
 		return nil, fmt.Errorf("%s: provider config is nil: %w", op, ErrNilParameter)
 	}
-	if s.Id() != authorizationState {
+	if s.ID() != authorizationState {
 		return nil, fmt.Errorf("%s: authentication state and authorization state are not equal: %w", op, ErrInvalidParameter)
 	}
 	if s.IsExpired() {
@@ -185,9 +188,9 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 	scopes := append([]string{oidc.ScopeOpenID}, p.config.Scopes...)
 
 	var oauth2Config = oauth2.Config{
-		ClientID:     p.config.ClientId,
+		ClientID:     p.config.ClientID,
 		ClientSecret: string(p.config.ClientSecret),
-		RedirectURL:  p.config.RedirectUrl,
+		RedirectURL:  p.config.RedirectURL,
 		Endpoint:     p.provider.Endpoint(),
 		Scopes:       scopes,
 	}
@@ -201,15 +204,15 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 	if !ok {
 		return nil, fmt.Errorf("%s: id_token is missing from auth code exchange: %w", op, ErrMissingIdToken)
 	}
-	t, err := NewToken(IdToken(idToken), oauth2Token, WithNow(p.config.NowFunc))
+	t, err := NewToken(IDToken(idToken), oauth2Token, WithNow(p.config.NowFunc))
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to create new id_token: %w", op, err)
 	}
-	if err := p.VerifyIDToken(ctx, t.IdToken(), s.Nonce()); err != nil {
+	if err := p.VerifyIDToken(ctx, t.IDToken(), s.Nonce()); err != nil {
 		return nil, fmt.Errorf("%s: id_token failed verification: %w", op, err)
 	}
 	if t.AccessToken() != "" {
-		if err := t.IdToken().VerifyAccessToken(t.AccessToken()); err != nil {
+		if err := t.IDToken().VerifyAccessToken(t.AccessToken()); err != nil {
 			return nil, fmt.Errorf("%s: access_token failed verification: %w", op, err)
 		}
 	}
@@ -262,7 +265,7 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource,
 //   * authorized party (azp) claim (if it's present) must match client id
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
-func (p *Provider) VerifyIDToken(ctx context.Context, t IdToken, nonce string) error {
+func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, nonce string) error {
 	const op = "Provider.VerifyIdToken"
 	if t == "" {
 		return fmt.Errorf("%s: id_token is empty: %w", op, ErrInvalidParameter)
@@ -276,7 +279,7 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IdToken, nonce string) e
 	}
 	oidcConfig := &oidc.Config{
 		SupportedSigningAlgs: algs,
-		ClientID:             p.config.ClientId,
+		ClientID:             p.config.ClientID,
 		Now:                  p.config.Now,
 	}
 	verifier := p.provider.Verifier(oidcConfig)
@@ -318,12 +321,12 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IdToken, nonce string) e
 
 	azp, foundAzp := claims["azp"]
 	if foundAzp {
-		if azp != p.config.ClientId {
-			return fmt.Errorf("%s: invalid id_token: authorized party (%s) is not equal client_id (%s): %w", op, azp, p.config.ClientId, ErrInvalidAuthorizedParty)
+		if azp != p.config.ClientID {
+			return fmt.Errorf("%s: invalid id_token: authorized party (%s) is not equal client_id (%s): %w", op, azp, p.config.ClientID, ErrInvalidAuthorizedParty)
 		}
 	}
-	if len(oidcIDToken.Audience) > 1 && azp != p.config.ClientId {
-		return fmt.Errorf("%s: invalid id_token: multiple audiences and authorized party (%s) is not equal client_id (%s): %w", op, azp, p.config.ClientId, ErrInvalidAuthorizedParty)
+	if len(oidcIDToken.Audience) > 1 && azp != p.config.ClientID {
+		return fmt.Errorf("%s: invalid id_token: multiple audiences and authorized party (%s) is not equal client_id (%s): %w", op, azp, p.config.ClientID, ErrInvalidAuthorizedParty)
 	}
 
 	return nil

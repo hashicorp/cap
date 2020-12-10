@@ -148,7 +148,7 @@ func main() {
 			return
 		}
 		printToken(resp.Token)
-		printClaims(resp.Token.IdToken())
+		printClaims(resp.Token.IDToken())
 		printUserInfo(p, resp.Token)
 		return
 	case err := <-failedCh:
@@ -260,7 +260,7 @@ type respToken struct {
 	Expiry       time.Time
 }
 
-func printClaims(t oidc.IdToken) {
+func printClaims(t oidc.IDToken) {
 	const op = "printClaims"
 	var tokenClaims map[string]interface{}
 	if err := t.Claims(&tokenClaims); err != nil {
@@ -313,7 +313,7 @@ func printToken(t oidc.Token) {
 // AccessToken and RefreshToken
 func printableToken(t oidc.Token) respToken {
 	return respToken{
-		IdToken:      string(t.IdToken()),
+		IdToken:      string(t.IDToken()),
 		AccessToken:  string(t.AccessToken()),
 		RefreshToken: string(t.RefreshToken()),
 		Expiry:       t.Expiry(),

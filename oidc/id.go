@@ -7,13 +7,13 @@ import (
 )
 
 // DefaultIdLength is the default length for generated IDs
-const DefaultIdLength = 10
+const defaultIDLength = 10
 
 // NewId generates a ID with an optional prefix.   The ID generated is suitable
 // for a State's Id or Nonce
-func NewId(opt ...Option) (string, error) {
+func NewID(opt ...Option) (string, error) {
 	const op = "NewId"
-	opts := getIdOpts(opt...)
+	opts := getIDOpts(opt...)
 	id, err := base62.Random(opts.withLen)
 	if err != nil {
 		return "", fmt.Errorf("%s: unable to generate id: %w", op, err)
@@ -26,7 +26,7 @@ func NewId(opt ...Option) (string, error) {
 	}
 }
 
-// idOptions is the set of available options
+// idOptions is the set of available options.
 type idOptions struct {
 	withPrefix string
 	withLen    int
@@ -36,19 +36,21 @@ type idOptions struct {
 // during unit tests.
 func idDefaults() idOptions {
 	return idOptions{
-		withLen: DefaultIdLength,
+		withLen: defaultIDLength,
 	}
 }
 
 // getConfigOpts gets the defaults and applies the opt overrides passed
 // in.
-func getIdOpts(opt ...Option) idOptions {
+func getIDOpts(opt ...Option) idOptions {
 	opts := idDefaults()
 	ApplyOpts(&opts, opt...)
 	return opts
 }
 
-// WithPrefix provides an optional prefix for an new ID
+// WithPrefix provides an optional prefix for an new ID.  When this options is
+// provided, NewID will prepend the prefix and an underscore to the new
+// identifier.
 func WithPrefix(prefix string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*idOptions); ok {
