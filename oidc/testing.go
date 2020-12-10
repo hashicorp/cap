@@ -98,8 +98,9 @@ func testDefaultJWT(t *testing.T, ecdsaPrivKeyPEM string, expireIn time.Duration
 	return testJWT
 }
 
-// TestGenerateCA will generate a test x509 CA cert encoded in a PEM format.
-func TestGenerateCA(t *testing.T, hosts []string) string {
+// TestGenerateCA will generate a test x509 CA cert, along with it encoded in a
+// PEM format.
+func TestGenerateCA(t *testing.T, hosts []string) (*x509.Certificate, string) {
 	t.Helper()
 	require := require.New(t)
 
@@ -145,5 +146,8 @@ func TestGenerateCA(t *testing.T, hosts []string) string {
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
 	require.NoError(err)
 
-	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes}))
+	c, err := x509.ParseCertificate(derBytes)
+	require.NoError(err)
+
+	return c, string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes}))
 }
