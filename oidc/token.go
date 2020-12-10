@@ -10,10 +10,6 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// DefaultTokenExpirySkew defines a default time skew when checking a Token's
-// expiration.
-const DefaultTokenExpirySkew = 10 * time.Second
-
 // Token interface represents an OIDC id_token, as well as an Oauth2
 // access_token and refresh_token (including the the access_token expiry).
 type Token interface {
@@ -32,9 +28,9 @@ type Token interface {
 	// Valid will ensure that the access_token is not empty or expired.
 	Valid() bool
 
-	// IsExpired will return true if the token is expired.  Implementations may
-	// want to support the WithExpirySkew option.
-	IsExpired(opt ...Option) bool
+	// IsExpired returns true if the token has expired. Implementations should
+	// support a time skew (perhaps TokenExpirySkew) when checking expiration.
+	IsExpired() bool
 }
 
 // StaticTokenSource is a single function interface that defines a method to
@@ -94,6 +90,9 @@ func (t *Tk) RefreshToken() RefreshToken {
 // IDToken implements the IDToken.IDToken() interface function.
 func (t *Tk) IDToken() IDToken { return IDToken(t.idToken) }
 
+// TokenExpirySkew defines a time skew when checking a Token's expiration.
+const TokenExpirySkew = 10 * time.Second
+
 // Expiry implements the Token.Expiry() interface function and may return a
 // "zero" time if the token's AccessToken is empty.
 func (t *Tk) Expiry() time.Time {
@@ -114,17 +113,14 @@ func (t *Tk) StaticTokenSource() oauth2.TokenSource {
 }
 
 // IsExpired will return true if the token's access token is expired or empty.
-// Supports the WithExpirySkew option and if none is provided it will use the
-// DefaultTokenExpirySkew.
-func (t *Tk) IsExpired(opt ...Option) bool {
+func (t *Tk) IsExpired() bool {
 	if t.underlying == nil {
 		return true
 	}
 	if t.underlying.Expiry.IsZero() {
 		return false
 	}
-	opts := getTokenOpts(opt...)
-	return t.underlying.Expiry.Round(0).Before(time.Now().Add(opts.withExpirySkew))
+	return t.underlying.Expiry.Round(0).Before(time.Now().Add(TokenExpirySkew))
 }
 
 // Valid will ensure that the access_token is not empty or expired. It will
@@ -137,27 +133,6 @@ func (t *Tk) Valid() bool {
 		return false
 	}
 	return !t.IsExpired()
-}
-
-// tokenOptions is the set of available options for Token functions.
-type tokenOptions struct {
-	withExpirySkew time.Duration
-}
-
-// tokenDefaults is a handy way to get the defaults at runtime and during unit
-// tests.
-func tokenDefaults() tokenOptions {
-	return tokenOptions{
-		withExpirySkew: DefaultTokenExpirySkew,
-	}
-}
-
-// getTokenOpts gets the token defaults and applies the opt overrides passed
-// in.
-func getTokenOpts(opt ...Option) tokenOptions {
-	opts := tokenDefaults()
-	ApplyOpts(&opts, opt...)
-	return opts
 }
 
 // UnmarshalClaims will retrieve the claims from the provided raw JWT token.

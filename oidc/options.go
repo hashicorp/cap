@@ -1,7 +1,5 @@
 package oidc
 
-import "time"
-
 // Option defines a common functional options type which can be used in a
 // variadic parameter pattern.
 type Option func(interface{})
@@ -14,18 +12,5 @@ func ApplyOpts(opts interface{}, opt ...Option) {
 			continue
 		}
 		o(opts)
-	}
-}
-
-// WithExpirySkew provides an optional expiry skew duration for: Token,
-// State.
-func WithExpirySkew(d time.Duration) Option {
-	return func(o interface{}) {
-		switch v := o.(type) {
-		case *tokenOptions:
-			v.withExpirySkew = d
-		case *stOptions:
-			v.withExpirySkew = d
-		}
 	}
 }
