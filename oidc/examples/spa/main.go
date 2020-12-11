@@ -15,7 +15,7 @@ import (
 
 // List of required configuration environment variables
 const (
-	clientId     = "OIDC_CLIENT_ID"
+	clientID     = "OIDC_CLIENT_ID"
 	clientSecret = "OIDC_CLIENT_SECRET"
 	issuer       = "OIDC_ISSUER"
 	port         = "OIDC_PORT"
@@ -26,7 +26,7 @@ const attemptExp = "attemptExp"
 func envConfig() (map[string]interface{}, error) {
 	const op = "envConfig"
 	env := map[string]interface{}{
-		clientId:     os.Getenv("OIDC_CLIENT_ID"),
+		clientID:     os.Getenv("OIDC_CLIENT_ID"),
 		clientSecret: os.Getenv("OIDC_CLIENT_SECRET"),
 		issuer:       os.Getenv("OIDC_ISSUER"),
 		port:         os.Getenv("OIDC_PORT"),
@@ -65,14 +65,14 @@ func main() {
 	defer signal.Stop(sigintCh)
 
 	issuer := env[issuer].(string)
-	clientId := env[clientId].(string)
+	clientID := env[clientID].(string)
 	clientSecret := oidc.ClientSecret(env[clientSecret].(string))
-	redirectUrl := fmt.Sprintf("http://localhost:%s/callback", env[port].(string))
+	redirectURL := fmt.Sprintf("http://localhost:%s/callback", env[port].(string))
 	timeout := env[attemptExp].(time.Duration)
 
 	sc := newStateCache(env[attemptExp].(time.Duration), timeout)
 
-	pc, err := oidc.NewConfig(issuer, clientId, clientSecret, []oidc.Alg{oidc.RS256}, redirectUrl)
+	pc, err := oidc.NewConfig(issuer, clientID, clientSecret, []oidc.Alg{oidc.RS256}, redirectURL)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return

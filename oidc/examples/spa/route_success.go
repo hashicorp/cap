@@ -14,14 +14,14 @@ import (
 func SuccessHandler(ctx context.Context, sc *stateCache) http.HandlerFunc {
 	const op = "SuccessHandler"
 	return func(w http.ResponseWriter, r *http.Request) {
-		stateId := r.FormValue("state")
-		s, err := sc.Read(ctx, stateId)
+		stateID := r.FormValue("state")
+		s, err := sc.Read(ctx, stateID)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error reading state during successful response: %s", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		defer sc.Delete(stateId)
+		defer sc.Delete(stateID)
 		extended, ok := s.(*extendedState)
 		if !ok {
 			err := fmt.Errorf("%s: not an extended state", op)
@@ -44,17 +44,17 @@ func SuccessHandler(ctx context.Context, sc *stateCache) http.HandlerFunc {
 }
 
 type respToken struct {
-	IdToken      string
+	IDToken      string
 	AccessToken  string
 	RefreshToken string
 	Expiry       time.Time
 }
 
-// printableToken is needed because the oidc.Token redacts the IdToken,
+// printableToken is needed because the oidc.Token redacts the IDToken,
 // AccessToken and RefreshToken
 func printableToken(t oidc.Token) respToken {
 	return respToken{
-		IdToken:      string(t.IDToken()),
+		IDToken:      string(t.IDToken()),
 		AccessToken:  string(t.AccessToken()),
 		RefreshToken: string(t.RefreshToken()),
 		Expiry:       t.Expiry(),

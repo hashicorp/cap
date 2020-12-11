@@ -256,10 +256,10 @@ func (p *TestProvider) SetOmitAuthTimeClaim(omitAuthTime bool) {
 // SetOmitIDTokens turn on/off the omitting of id_tokens from the /token
 // endpoint.  If set to true, the test provider will not omit (issue) id_tokens
 // from the /token endpoint.
-func (p *TestProvider) SetOmitIDTokens(omitIdTokens bool) {
+func (p *TestProvider) SetOmitIDTokens(omitIDTokens bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.omitIDToken = omitIdTokens
+	p.omitIDToken = omitIDTokens
 }
 
 // OmitAccessTokens turn on/off the omitting of access_tokens from the /token

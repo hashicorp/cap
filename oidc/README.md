@@ -14,13 +14,12 @@ Primary types provided by the package:
   refresh_token (including the the access_token expiry)
 
 * `Config`: provides the configuration for a typical 3-legged OIDC
-  authorization code flow (for example: client Id/Secret, redirectUrl, supported
+  authorization code flow (for example: client ID/Secret, redirectURL, supported
   signing algorithms, additional scopes requested, etc)
 
-* `Provider`: provides integration with a provider using the typical
-  3-legged OIDC authorization code flow. The provider provides capabilities
-  like: generating an auth URL, exchanging codes for tokens, verifying tokens,
-  making user info requests, etc.
+* `Provider`: provides integration with an OIDC provider. 
+  The provider provides capabilities like: generating an auth URL, exchanging
+  codes for tokens, verifying tokens, making user info requests, etc.
 
 * `Alg`: represents asymmetric signing algorithms
 
@@ -63,22 +62,22 @@ ttl := 2 * time.Minute
 s, _ := oidc.NewState(ttl)
 
 // Create an auth URL from the provider using the user's auth attempt state
-authUrl, _ := p.AuthURL(context.Background(), s)
-fmt.Println("open url to kick-off authentication: ", authUrl)
+authURL, _ := p.AuthURL(context.Background(), s)
+fmt.Println("open url to kick-off authentication: ", authURL)
 
 // Exchange an authorizationCode and authorizationState received via a
 // callback from successful oidc authentication response for a verified
 // Token.
 t, _ := p.Exchange(context.Background(), s, "RECEIVED_STATE", "RECEIVED_CODE")
-fmt.Printf("id_token: %v\n", string(t.IdToken()))
+fmt.Printf("id_token: %v\n", string(t.IDToken()))
 
 // Create an auth code callback
-successFn := func(stateId string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
+successFn := func(stateID string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
 w.WriteHeader(http.StatusOK)
-printableToken := fmt.Sprintf("id_token: %s", string(t.IdToken()))
+printableToken := fmt.Sprintf("id_token: %s", string(t.IDToken()))
 _, _ = w.Write([]byte(printableToken))
 }
-errorFn := func(stateId string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
+errorFn := func(stateID string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
 if e != nil {
 	w.WriteHeader(http.StatusInternalServerError)
 	_, _ = w.Write([]byte(e.Error()))

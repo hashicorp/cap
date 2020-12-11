@@ -12,13 +12,12 @@ States contain an expiration for the user's OIDC flow.
 refresh_token (including the the access_token expiry)
 
 * Config: provides the configuration for a typical 3-legged OIDC
-authorization code flow (for example: client Id/Secret, redirectUrl, supported
+authorization code flow (for example: client ID/Secret, redirectURL, supported
 signing algorithms, additional scopes requested, etc)
 
-* Provider: provides integration with a provider using the typical
-3-legged OIDC authorization code flow. The provider provides capabilities
-like: generating an auth URL, exchanging codes for tokens, verifying tokens,
-making user info requests, etc.
+* Provider: provides integration with a provider. The provider provides
+capabilities like: generating an auth URL, exchanging codes for tokens,
+verifying tokens, making user info requests, etc.
 
 * Alg: represents asymmetric signing algorithms
 

@@ -75,7 +75,7 @@ func testHashAccessToken(t *testing.T, idSigTokenAlg Alg, token AccessToken) str
 	return actual
 }
 
-// testDefaultJwt is internally helpful, but for now we won't export it.
+// testDefaultJWT is internally helpful, but for now we won't export it.
 func testDefaultJWT(t *testing.T, privKey crypto.PrivateKey, expireIn time.Duration, nonce string, additionalClaims map[string]interface{}) string {
 	t.Helper()
 	now := jwt.NewNumericDate(time.Now())
@@ -93,44 +93,45 @@ func testDefaultJWT(t *testing.T, privKey crypto.PrivateKey, expireIn time.Durat
 	for k, v := range additionalClaims {
 		privateClaims[k] = v
 	}
-	testJwt := TestSignJWT(t, privKey, ES256, claims, privateClaims)
-	return testJwt
+	testJWT := TestSignJWT(t, privKey, ES256, claims, privateClaims)
+	return testJWT
 }
 
 // testNewConfig creates a new config from the TestProvider.
 // This is helpful internally, but intentionally not exported.
-func testNewConfig(t *testing.T, clientId, clientSecret, redirectUrl string, tp *TestProvider) *Config {
+func testNewConfig(t *testing.T, clientID, clientSecret, redirectURL string, tp *TestProvider) *Config {
 	const op = "testNewConfig"
 	t.Helper()
 	require := require.New(t)
 
-	require.NotEmptyf(clientId, "%s: client id is empty", op)
+	require.NotEmptyf(clientID, "%s: client id is empty", op)
 	require.NotEmptyf(clientSecret, "%s: client secret is empty", op)
-	require.NotEmptyf(redirectUrl, "%s: redirect URL is empty", op)
+	require.NotEmptyf(redirectURL, "%s: redirect URL is empty", op)
 
-	tp.SetClientCreds(clientId, clientSecret)
+	tp.SetClientCreds(clientID, clientSecret)
 
 	c, err := NewConfig(
 		tp.Addr(),
-		clientId,
+		clientID,
 		ClientSecret(clientSecret),
 		[]Alg{tp.SigningAlgorithm()},
-		redirectUrl,
+		redirectURL,
+		nil,
 		WithProviderCA(tp.CACert()),
 	)
 	require.NoError(err)
 	return c
 }
 
-func testNewProvider(t *testing.T, clientId, clientSecret, redirectUrl string, tp *TestProvider) *Provider {
+func testNewProvider(t *testing.T, clientID, clientSecret, redirectURL string, tp *TestProvider) *Provider {
 	const op = "testNewProvider"
 	t.Helper()
 	require := require.New(t)
-	require.NotEmptyf(clientId, "%s: client id is empty", op)
+	require.NotEmptyf(clientID, "%s: client id is empty", op)
 	require.NotEmptyf(clientSecret, "%s: client secret is empty", op)
-	require.NotEmptyf(redirectUrl, "%s: redirect URL is empty", op)
+	require.NotEmptyf(redirectURL, "%s: redirect URL is empty", op)
 
-	tc := testNewConfig(t, clientId, clientSecret, redirectUrl, tp)
+	tc := testNewConfig(t, clientID, clientSecret, redirectURL, tp)
 	p, err := NewProvider(tc)
 	require.NoError(err)
 	return p

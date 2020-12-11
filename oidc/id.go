@@ -6,13 +6,13 @@ import (
 	"github.com/hashicorp/cap/oidc/internal/base62"
 )
 
-// DefaultIdLength is the default length for generated IDs
+// defaultIDLength is the default length for generated IDs
 const defaultIDLength = 10
 
-// NewId generates a ID with an optional prefix.   The ID generated is suitable
-// for a State's Id or Nonce
+// NewID generates a ID with an optional prefix.   The ID generated is suitable
+// for a State's ID or Nonce
 func NewID(opt ...Option) (string, error) {
-	const op = "NewId"
+	const op = "NewID"
 	opts := getIDOpts(opt...)
 	id, err := base62.Random(opts.withLen)
 	if err != nil {

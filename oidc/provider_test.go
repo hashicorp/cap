@@ -34,7 +34,7 @@ func TestWithImplicitFlow(t *testing.T) {
 func TestNewProvider(t *testing.T) {
 	t.Parallel()
 	tp := StartTestProvider(t)
-	clientId := "test-client-id"
+	clientID := "test-client-id"
 	clientSecret := "test-client-secret"
 	redirect := "test-redirect"
 	tests := []struct {
@@ -45,7 +45,7 @@ func TestNewProvider(t *testing.T) {
 	}{
 		{
 			name:   "valid",
-			config: testNewConfig(t, clientId, clientSecret, redirect, tp),
+			config: testNewConfig(t, clientID, clientSecret, redirect, tp),
 		},
 		{
 			name:      "nil-config",
@@ -56,7 +56,7 @@ func TestNewProvider(t *testing.T) {
 		{
 			name: "invalid-config",
 			config: func() *Config {
-				c := testNewConfig(t, clientId, clientSecret, redirect, tp)
+				c := testNewConfig(t, clientID, clientSecret, redirect, tp)
 				c.Issuer = ""
 				return c
 			}(),
@@ -150,11 +150,11 @@ func TestProvider_Done(t *testing.T) {
 
 func TestProvider_AuthURL(t *testing.T) {
 	ctx := context.Background()
-	clientId := "test-client-id"
+	clientID := "test-client-id"
 	clientSecret := "test-client-secret"
 	redirect := "test-redirect"
 	tp := StartTestProvider(t)
-	p := testNewProvider(t, clientId, clientSecret, redirect, tp)
+	p := testNewProvider(t, clientID, clientSecret, redirect, tp)
 	validState, err := NewState(1 * time.Second)
 	require.NoError(t, err)
 
@@ -167,7 +167,7 @@ func TestProvider_AuthURL(t *testing.T) {
 		name      string
 		p         *Provider
 		args      args
-		wantUrl   string
+		wantURL   string
 		wantErr   bool
 		wantIsErr error
 	}{
@@ -178,11 +178,11 @@ func TestProvider_AuthURL(t *testing.T) {
 				ctx: ctx,
 				s:   validState,
 			},
-			wantUrl: func() string {
+			wantURL: func() string {
 				return fmt.Sprintf(
 					"%s/authorize?client_id=%s&nonce=%s&redirect_uri=%s&response_type=code&scope=openid&state=%s",
 					tp.Addr(),
-					clientId,
+					clientID,
 					validState.Nonce(),
 					redirect,
 					validState.ID(),
@@ -197,11 +197,11 @@ func TestProvider_AuthURL(t *testing.T) {
 				s:   validState,
 				opt: []Option{WithImplicitFlow()},
 			},
-			wantUrl: func() string {
+			wantURL: func() string {
 				return fmt.Sprintf(
 					"%s/authorize?client_id=%s&nonce=%s&redirect_uri=%s&response_mode=form_post&response_type=id_token+token&scope=openid&state=%s",
 					tp.Addr(),
-					clientId,
+					clientID,
 					validState.Nonce(),
 					redirect,
 					validState.ID(),
@@ -216,11 +216,11 @@ func TestProvider_AuthURL(t *testing.T) {
 				s:   validState,
 				opt: []Option{WithImplicitFlow(true)},
 			},
-			wantUrl: func() string {
+			wantURL: func() string {
 				return fmt.Sprintf(
 					"%s/authorize?client_id=%s&nonce=%s&redirect_uri=%s&response_mode=form_post&response_type=id_token&scope=openid&state=%s",
 					tp.Addr(),
-					clientId,
+					clientID,
 					validState.Nonce(),
 					redirect,
 					validState.ID(),
@@ -268,13 +268,13 @@ func TestProvider_AuthURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			gotUrl, err := tt.p.AuthURL(tt.args.ctx, tt.args.s, tt.args.opt...)
+			gotURL, err := tt.p.AuthURL(tt.args.ctx, tt.args.s, tt.args.opt...)
 			if tt.wantErr {
 				require.Error(err)
 				assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)
 				return
 			}
-			require.Equalf(tt.wantUrl, gotUrl, "Provider.AuthURL() = %v, want %v", gotUrl, tt.wantUrl)
+			require.Equalf(tt.wantURL, gotURL, "Provider.AuthURL() = %v, want %v", gotURL, tt.wantURL)
 		})
 	}
 }
@@ -282,13 +282,13 @@ func TestProvider_AuthURL(t *testing.T) {
 func TestProvider_Exchange(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	clientId := "test-client-id"
+	clientID := "test-client-id"
 	clientSecret := "test-client-secret"
 	redirect := "test-redirect"
 
 	tp := StartTestProvider(t)
 	tp.SetAllowedRedirectURIs([]string{redirect})
-	p := testNewProvider(t, clientId, clientSecret, redirect, tp)
+	p := testNewProvider(t, clientID, clientSecret, redirect, tp)
 
 	validState, err := NewState(10 * time.Second)
 	require.NoError(t, err)
@@ -371,7 +371,7 @@ func TestProvider_Exchange(t *testing.T) {
 			}
 			require.NoError(err)
 			require.NotEmptyf(gotTk, "Provider.Exchange() = %v, wanted not nil", gotTk)
-			assert.NotEmptyf(gotTk.IDToken(), "gotTk.IdToken() = %v, wanted not empty", gotTk.IDToken())
+			assert.NotEmptyf(gotTk.IDToken(), "gotTk.IDToken() = %v, wanted not empty", gotTk.IDToken())
 			assert.NotEmptyf(gotTk.AccessToken(), "gotTk.AccessToken() = %v, wanted not empty", gotTk.AccessToken())
 			assert.Truef(gotTk.Valid(), "gotTk.Valid() = %v, wanted true", gotTk.Valid())
 			assert.Truef(!gotTk.IsExpired(), "gotTk.Expired() = %v, wanted false", gotTk.IsExpired())
@@ -393,7 +393,7 @@ func TestProvider_Exchange(t *testing.T) {
 		tp.SetExpectedAuthCode("valid-code")
 		gotTk, err := p.Exchange(ctx, validState, validState.ID(), "valid-code")
 		require.Error(err)
-		assert.Truef(errors.Is(err, ErrMissingIdToken), "wanted \"%s\" but got \"%s\"", ErrMissingIdToken, err)
+		assert.Truef(errors.Is(err, ErrMissingIDToken), "wanted \"%s\" but got \"%s\"", ErrMissingIDToken, err)
 		assert.Empty(gotTk)
 	})
 	t.Run("expired-token", func(t *testing.T) {
@@ -434,13 +434,13 @@ func TestHttpClient(t *testing.T) {
 
 func TestProvider_UserInfo(t *testing.T) {
 	ctx := context.Background()
-	clientId := "test-client-id"
+	clientID := "test-client-id"
 	clientSecret := "test-client-secret"
 	redirect := "test-redirect"
 
 	tp := StartTestProvider(t)
 	tp.SetAllowedRedirectURIs([]string{redirect})
-	p := testNewProvider(t, clientId, clientSecret, redirect, tp)
+	p := testNewProvider(t, clientID, clientSecret, redirect, tp)
 
 	type args struct {
 		tokenSource oauth2.TokenSource

@@ -55,7 +55,7 @@ type Tk struct {
 // ensure that Tk implements the Token interface
 var _ Token = (*Tk)(nil)
 
-// NewToken creates a new Token (*Tk).  The IdToken is required and the
+// NewToken creates a new Token (*Tk).  The IDToken is required and the
 // *oauth2.Token may be nil.  Supports the WithNow option (with a default to
 // time.Now).
 func NewToken(i IDToken, t *oauth2.Token, opt ...Option) (*Tk, error) {

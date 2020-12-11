@@ -10,10 +10,10 @@ import (
 // Implementations must be concurrently safe, since the reader will likely be
 // used within a concurrent http.Handler
 type StateReader interface {
-	// Read an existing AuthCodeState entry.  The returned state's Id()
-	// must match the stateId used to look it up. Implementations must be
+	// Read an existing AuthCodeState entry.  The returned state's ID()
+	// must match the stateID used to look it up. Implementations must be
 	// concurrently safe, which likely means returning a deep copy
-	Read(ctx context.Context, stateId string) (oidc.State, error)
+	Read(ctx context.Context, stateID string) (oidc.State, error)
 }
 
 // SingleStateReader implements the StateReader interface for a single state.
@@ -25,6 +25,6 @@ type SingleStateReader struct {
 
 // Read() will always return the same state and satisfies the StateReader
 // interface.  Read() is concurrently safe.
-func (s *SingleStateReader) Read(ctx context.Context, stateId string) (oidc.State, error) {
+func (s *SingleStateReader) Read(ctx context.Context, stateID string) (oidc.State, error) {
 	return s.State, nil
 }

@@ -23,11 +23,11 @@ func LoginHandler(ctx context.Context, p *oidc.Provider, sc *stateCache, timeout
 		}
 		sc.Add(s)
 
-		authUrl, err := p.AuthURL(context.Background(), s, urlOption)
+		authURL, err := p.AuthURL(context.Background(), s, urlOption)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error getting auth url: %s", err)
 			return
 		}
-		http.Redirect(w, r, authUrl, http.StatusTemporaryRedirect)
+		http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
 	}
 }

@@ -19,8 +19,8 @@ func CallbackHandler(ctx context.Context, p *oidc.Provider, sc *stateCache, with
 }
 
 func successFn(ctx context.Context, sc *stateCache) callback.SuccessResponseFunc {
-	return func(stateId string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
-		s, err := sc.Read(ctx, stateId)
+	return func(stateID string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
+		s, err := sc.Read(ctx, stateID)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error reading state during successful response: %s\n", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -32,13 +32,13 @@ func successFn(ctx context.Context, sc *stateCache) callback.SuccessResponseFunc
 			return
 		}
 		// Redirect to logged in page
-		http.Redirect(w, req, fmt.Sprintf("/success?state=%s", stateId), http.StatusSeeOther)
+		http.Redirect(w, req, fmt.Sprintf("/success?state=%s", stateID), http.StatusSeeOther)
 	}
 }
 
 func failedFn(ctx context.Context, sc *stateCache) callback.ErrorResponseFunc {
 	const op = "failedFn"
-	return func(stateId string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
+	return func(stateID string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
 		var responseErr error
 		defer func() {
 			if _, err := w.Write([]byte(responseErr.Error())); err != nil {

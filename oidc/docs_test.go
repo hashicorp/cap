@@ -29,8 +29,8 @@ func Example() {
 	s, _ := oidc.NewState(ttl)
 
 	// Create an auth URL from the provider using the user's auth attempt state
-	authUrl, _ := p.AuthURL(context.Background(), s)
-	fmt.Println("open url to kick-off authentication: ", authUrl)
+	authURL, _ := p.AuthURL(context.Background(), s)
+	fmt.Println("open url to kick-off authentication: ", authURL)
 
 	// Exchange an authorizationCode and authorizationState received via a
 	// callback from successful oidc authentication response for a verified
@@ -39,12 +39,12 @@ func Example() {
 	fmt.Printf("id_token: %v\n", string(t.IDToken()))
 
 	// Create an auth code callback
-	successFn := func(stateId string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
+	successFn := func(stateID string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		printableToken := fmt.Sprintf("id_token: %s", string(t.IDToken()))
 		_, _ = w.Write([]byte(printableToken))
 	}
-	errorFn := func(stateId string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
+	errorFn := func(stateID string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
 		if e != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(e.Error()))
@@ -74,7 +74,7 @@ func ExampleNewConfig() {
 	fmt.Println(pc)
 
 	// Output:
-	// &{YOUR_CLIENT_ID [REDACTED: client secret] [openid] http://YOUR_ISSUER/ [RS256] http://YOUR_REDIRECT_URL []  <nil>}
+	// &{YOUR_CLIENT_ID [REDACTED: client secret] [openid] http://YOUR_ISSUER/ [RS256] http://YOUR_REDIRECT_URL [http://YOUR_REDIRECT_URL] []  <nil>}
 }
 
 func ExampleNewProvider() {
@@ -111,8 +111,8 @@ func ExampleProvider_AuthURL() {
 	s, _ := oidc.NewState(ttl)
 
 	// Create an auth URL from the provider using the user's auth attempt state
-	authUrl, _ := p.AuthURL(context.Background(), s)
-	fmt.Println("open url to kick-off authentication: ", authUrl)
+	authURL, _ := p.AuthURL(context.Background(), s)
+	fmt.Println("open url to kick-off authentication: ", authURL)
 }
 
 func ExampleProvider_Exchange() {
@@ -134,8 +134,8 @@ func ExampleProvider_Exchange() {
 	s, _ := oidc.NewState(ttl)
 
 	// Create an auth URL from the provider using the user's auth attempt state
-	authUrl, _ := p.AuthURL(context.Background(), s)
-	fmt.Println("open url to kick-off authentication: ", authUrl)
+	authURL, _ := p.AuthURL(context.Background(), s)
+	fmt.Println("open url to kick-off authentication: ", authURL)
 
 	// Exchange an authorizationCode and authorizationState received via a
 	// callback from successful oidc authentication response for a verified

@@ -22,7 +22,7 @@ import (
 
 // List of required configuration environment variables
 const (
-	clientId     = "OIDC_CLIENT_ID"
+	clientID     = "OIDC_CLIENT_ID"
 	clientSecret = "OIDC_CLIENT_SECRET"
 	issuer       = "OIDC_ISSUER"
 	port         = "OIDC_PORT"
@@ -33,7 +33,7 @@ const attemptExp = "attemptExp"
 func envConfig() (map[string]interface{}, error) {
 	const op = "envConfig"
 	env := map[string]interface{}{
-		clientId:     os.Getenv("OIDC_CLIENT_ID"),
+		clientID:     os.Getenv("OIDC_CLIENT_ID"),
 		clientSecret: os.Getenv("OIDC_CLIENT_SECRET"),
 		issuer:       os.Getenv("OIDC_ISSUER"),
 		port:         os.Getenv("OIDC_PORT"),
@@ -72,10 +72,10 @@ func main() {
 	defer signal.Stop(sigintCh)
 
 	issuer := env[issuer].(string)
-	clientId := env[clientId].(string)
+	clientID := env[clientID].(string)
 	clientSecret := oidc.ClientSecret(env[clientSecret].(string))
-	redirectUrl := fmt.Sprintf("http://localhost:%s/callback", env[port].(string))
-	pc, err := oidc.NewConfig(issuer, clientId, clientSecret, []oidc.Alg{oidc.RS256}, redirectUrl)
+	redirectURL := fmt.Sprintf("http://localhost:%s/callback", env[port].(string))
+	pc, err := oidc.NewConfig(issuer, clientID, clientSecret, []oidc.Alg{oidc.RS256}, redirectURL)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return
@@ -106,7 +106,7 @@ func main() {
 		handler = callback.AuthCode(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
 	}
 
-	authUrl, err := p.AuthURL(context.Background(), s, urlOption)
+	authURL, err := p.AuthURL(context.Background(), s, urlOption)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error getting auth url: %s", err)
 		return
@@ -123,8 +123,8 @@ func main() {
 	defer listener.Close()
 
 	// Open the default browser to the callback URL.
-	fmt.Fprintf(os.Stderr, "Complete the login via your OIDC provider. Launching browser to:\n\n    %s\n\n\n", authUrl)
-	if err := openURL(authUrl); err != nil {
+	fmt.Fprintf(os.Stderr, "Complete the login via your OIDC provider. Launching browser to:\n\n    %s\n\n\n", authURL)
+	if err := openURL(authURL); err != nil {
 		fmt.Fprintf(os.Stderr, "Error attempting to automatically open browser: '%s'.\nPlease visit the authorization URL manually.", err)
 	}
 
@@ -175,7 +175,7 @@ type successResp struct {
 func success() (callback.SuccessResponseFunc, <-chan successResp) {
 	const op = "success"
 	doneCh := make(chan successResp)
-	return func(stateId string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
+	return func(stateID string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
 		var responseErr error
 		defer func() {
 			doneCh <- successResp{t, responseErr}
@@ -192,7 +192,7 @@ func success() (callback.SuccessResponseFunc, <-chan successResp) {
 func failed() (callback.ErrorResponseFunc, <-chan error) {
 	const op = "failed"
 	doneCh := make(chan error)
-	return func(stateId string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
+	return func(stateID string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
 		var responseErr error
 		defer func() {
 			if _, err := w.Write([]byte(responseErr.Error())); err != nil {
@@ -254,7 +254,7 @@ func isWSL() bool {
 }
 
 type respToken struct {
-	IdToken      string
+	IDToken      string
 	AccessToken  string
 	RefreshToken string
 	Expiry       time.Time
@@ -264,12 +264,12 @@ func printClaims(t oidc.IDToken) {
 	const op = "printClaims"
 	var tokenClaims map[string]interface{}
 	if err := t.Claims(&tokenClaims); err != nil {
-		fmt.Fprintf(os.Stderr, "IdToken claims: error parsing: %s", err)
+		fmt.Fprintf(os.Stderr, "IDToken claims: error parsing: %s", err)
 	} else {
 		if idData, err := json.MarshalIndent(tokenClaims, "", "    "); err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %s", op, err)
 		} else {
-			fmt.Fprintf(os.Stderr, "IdToken claims:%s\n", idData)
+			fmt.Fprintf(os.Stderr, "IDToken claims:%s\n", idData)
 		}
 	}
 }
@@ -309,11 +309,11 @@ func printToken(t oidc.Token) {
 	fmt.Fprintf(os.Stderr, "channel received success.\nToken:%s\n", tokenData)
 }
 
-// printableToken is needed because the oidc.Token redacts the IdToken,
+// printableToken is needed because the oidc.Token redacts the IDToken,
 // AccessToken and RefreshToken
 func printableToken(t oidc.Token) respToken {
 	return respToken{
-		IdToken:      string(t.IDToken()),
+		IDToken:      string(t.IDToken()),
 		AccessToken:  string(t.AccessToken()),
 		RefreshToken: string(t.RefreshToken()),
 		Expiry:       t.Expiry(),
