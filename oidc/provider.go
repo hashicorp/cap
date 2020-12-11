@@ -25,7 +25,7 @@ import (
 //   * The authorization code flow by exchanging an auth code for tokens in
 //     p.Exchange(...)
 //
-//   * Verifying an id_token issued by a provider with p.VerifyIdToken(...)
+//   * Verifying an id_token issued by a provider with p.VerifyIDToken(...)
 //
 //   * Retrieving a user's OAuth claims with p.UserInfo(...)
 type Provider struct {
@@ -113,7 +113,7 @@ func (p *Provider) Done() {
 // WithImplicitFlow() option overrides the default authorization code default
 // flow.
 //
-// See NewState() to create an oidc flow State with a valid Id and Nonce that
+// See NewState() to create an oidc flow State with a valid ID and Nonce that
 // will uniquely identify the user's authentication attempt throughout the flow.
 func (p *Provider) AuthURL(ctx context.Context, s State, opt ...Option) (url string, e error) {
 	const op = "Provider.AuthURL"
@@ -128,17 +128,30 @@ func (p *Provider) AuthURL(ctx context.Context, s State, opt ...Option) (url str
 		return "", fmt.Errorf("%s: state id and nonce cannot be equal: %w", op, ErrInvalidParameter)
 	}
 
+	var redirect string
+	switch {
+	case s.RedirectURL() != "":
+		redirect = s.RedirectURL()
+	default:
+		redirect = p.config.DefaultRedirectURL
+	}
+	var scopes []string
+	switch {
+	case len(s.Scopes()) > 0:
+		scopes = s.Scopes()
+	default:
+		scopes = p.config.Scopes
+	}
 	// Add the "openid" scope, which is a required scope for oidc flows
-	scopes := p.config.Scopes
 	if !strutils.StrListContains(scopes, oidc.ScopeOpenID) {
-		scopes = append([]string{oidc.ScopeOpenID}, p.config.Scopes...)
+		scopes = append([]string{oidc.ScopeOpenID}, scopes...)
 	}
 
 	// Configure an OpenID Connect aware OAuth2 client
 	oauth2Config := oauth2.Config{
 		ClientID:     p.config.ClientID,
 		ClientSecret: string(p.config.ClientSecret),
-		RedirectURL:  p.config.RedirectURL,
+		RedirectURL:  redirect,
 		Endpoint:     p.provider.Endpoint(),
 		Scopes:       scopes,
 	}
@@ -181,14 +194,27 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 		return nil, fmt.Errorf("%s: unable to create http client: %w", op, err)
 	}
 
+	var redirect string
+	switch {
+	case s.RedirectURL() != "":
+		redirect = s.RedirectURL()
+	default:
+		redirect = p.config.DefaultRedirectURL
+	}
+	var scopes []string
+	switch {
+	case len(s.Scopes()) > 0:
+		scopes = s.Scopes()
+	default:
+		scopes = p.config.Scopes
+	}
 	// Add the "openid" scope, which is a required scope for oidc flows
-	// * TODO (jimlambrt 11/2020): make sure these additional scopes work as intended.
-	scopes := append([]string{oidc.ScopeOpenID}, p.config.Scopes...)
+	scopes = append([]string{oidc.ScopeOpenID}, scopes...)
 
 	var oauth2Config = oauth2.Config{
 		ClientID:     p.config.ClientID,
 		ClientSecret: string(p.config.ClientSecret),
-		RedirectURL:  p.config.RedirectURL,
+		RedirectURL:  redirect,
 		Endpoint:     p.provider.Endpoint(),
 		Scopes:       scopes,
 	}
@@ -200,13 +226,13 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 
 	idToken, ok := oauth2Token.Extra("id_token").(string)
 	if !ok {
-		return nil, fmt.Errorf("%s: id_token is missing from auth code exchange: %w", op, ErrMissingIdToken)
+		return nil, fmt.Errorf("%s: id_token is missing from auth code exchange: %w", op, ErrMissingIDToken)
 	}
 	t, err := NewToken(IDToken(idToken), oauth2Token, WithNow(p.config.NowFunc))
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to create new id_token: %w", op, err)
 	}
-	if err := p.VerifyIDToken(ctx, t.IDToken(), s.Nonce()); err != nil {
+	if err := p.VerifyIDToken(ctx, t.IDToken(), s.Nonce(), WithAudiences(s.Audiences()...)); err != nil {
 		return nil, fmt.Errorf("%s: id_token failed verification: %w", op, err)
 	}
 	if t.AccessToken() != "" {
@@ -248,7 +274,8 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource,
 	return nil
 }
 
-// VerifyIDToken will verify the inbound IdToken.
+// VerifyIDToken will verify the inbound IDToken.  Supports the WithAudiences
+// option which will override the config's audiences.
 //  It verifies:
 //   * signature (including if a supported signing algorithm was used)
 //   * issuer (iss)
@@ -266,8 +293,8 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource,
 //     id, then the authorized party (azp) must equal the client id
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
-func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, nonce string) error {
-	const op = "Provider.VerifyIdToken"
+func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, nonce string, opt ...Option) error {
+	const op = "Provider.VerifyIDToken"
 	if t == "" {
 		return fmt.Errorf("%s: id_token is empty: %w", op, ErrInvalidParameter)
 	}
@@ -301,9 +328,17 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, nonce string) e
 		return fmt.Errorf("%s: invalid id_token current time %v before the iat (issued at) time %v: %w", op, nowTime, oidcIDToken.IssuedAt, ErrInvalidIssuedAt)
 	}
 
+	opts := getProviderOpts(opt...)
+	var audiences []string
+	switch {
+	case len(opts.withAudiences) > 0:
+		audiences = opts.withAudiences
+	default:
+		audiences = p.config.Audiences
+	}
 	if err := func() error {
-		if len(p.config.Audiences) > 0 {
-			for _, v := range p.config.Audiences {
+		if len(audiences) > 0 {
+			for _, v := range audiences {
 				if strutils.StrListContains(oidcIDToken.Audience, v) {
 					return nil
 				}
@@ -404,6 +439,7 @@ type implicitFlow struct {
 // providerOptions is the set of available options
 type providerOptions struct {
 	withImplicitFlow *implicitFlow
+	withAudiences    []string
 }
 
 // getProviderDefaults is a handy way to get the defaults at runtime and
