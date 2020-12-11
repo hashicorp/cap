@@ -251,18 +251,21 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource,
 }
 
 // VerifyIDToken will verify the inbound IdToken.
-//  It verifies (see: https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation):
-//	 * signature (including if a supported signing algorithm was used)
-//   * issuer (iss) claim
-//   * expiration (exp) claim
-//   * issued at (iat) claim (with a leeway of 1 min)
-//   * not before (nbf) claim (with a leeway of 1 min)
-//   * nonce (nonce) claim
-//   * audience (aud) contains the configured client_id and additional audiences from the provider
-//   * if there's more than one audience (aud) then the authorized party (azp) must equal the client id
-//
-//  Optional verifications
-//   * authorized party (azp) claim (if it's present) must match client id
+//  It verifies:
+//   * signature (including if a supported signing algorithm was used)
+//   * issuer (iss)
+//   * expiration (exp)
+//   * issued at (iat) (with a leeway of 1 min)
+//   * not before (nbf) (with a leeway of 1 min)
+//   * nonce (nonce)
+//   * audience (aud) contains all audiences required from the provider's config
+//   * when there are multiple audiences (aud), then one of them must equal
+//     the client_id
+//   * when present, the authorized party (azp) must equal the client id
+//   * when there are multiple audiences (aud), then the authorized party (azp)
+//     must equal the client id
+//   * when there is a single audience (aud) and it is not equal to the client
+//     id, then the authorized party (azp) must equal the client id
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
 func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, nonce string) error {
@@ -313,6 +316,9 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, nonce string) e
 	}(); err != nil {
 		return fmt.Errorf("%s: invalid id_token audiences: %w", op, err)
 	}
+	if len(oidcIDToken.Audience) > 1 && strutils.StrListContains(oidcIDToken.Audience, p.config.ClientID) {
+		return fmt.Errorf("%s: invalid id_token: multiple audiences (%s) and one of them is not equal client_id (%s): %w", op, oidcIDToken.Audience, p.config.ClientID, ErrInvalidAudience)
+	}
 
 	var claims map[string]interface{}
 	if err := t.Claims(&claims); err != nil {
@@ -327,6 +333,16 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, nonce string) e
 	}
 	if len(oidcIDToken.Audience) > 1 && azp != p.config.ClientID {
 		return fmt.Errorf("%s: invalid id_token: multiple audiences and authorized party (%s) is not equal client_id (%s): %w", op, azp, p.config.ClientID, ErrInvalidAuthorizedParty)
+	}
+	if (len(oidcIDToken.Audience) == 1 && oidcIDToken.Audience[0] != p.config.ClientID) && azp != p.config.ClientID {
+		return fmt.Errorf(
+			"%s: invalid id_token: one audience (%s) which is not the client_id (%s) and authorized party (%s) is not equal client_id (%s): %w",
+			op,
+			oidcIDToken.Audience[0],
+			p.config.ClientID,
+			azp,
+			p.config.ClientID,
+			ErrInvalidAuthorizedParty)
 	}
 
 	return nil
