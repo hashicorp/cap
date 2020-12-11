@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coreos/go-oidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,18 +18,29 @@ func TestNewState(t *testing.T) {
 		return time.Now().Add(-1 * time.Minute)
 	}
 	tests := []struct {
-		name        string
-		expireIn    time.Duration
-		opts        []Option
-		wantNowFunc func() time.Time
-		wantErr     bool
-		wantIsErr   error
+		name            string
+		expireIn        time.Duration
+		opts            []Option
+		wantNowFunc     func() time.Time
+		wantRedirectURL string
+		wantAudiences   []string
+		wantScopes      []string
+		wantErr         bool
+		wantIsErr       error
 	}{
 		{
-			name:        "valid-WithNow",
-			expireIn:    defaultExpireIn,
-			opts:        []Option{WithNow(testNow)},
-			wantNowFunc: testNow,
+			name:     "valid-with-all-options",
+			expireIn: defaultExpireIn,
+			opts: []Option{
+				WithNow(testNow),
+				WithRedirectURL("https://bobs.com"),
+				WithAudiences("bob", "alice"),
+				WithScopes("email", "profile"),
+			},
+			wantNowFunc:     testNow,
+			wantRedirectURL: "https://bobs.com",
+			wantAudiences:   []string{"bob", "alice"},
+			wantScopes:      []string{oidc.ScopeOpenID, "email", "profile"},
 		},
 		{
 			name:     "valid-no-opt",
@@ -58,6 +70,9 @@ func TestNewState(t *testing.T) {
 			assert.NotEmpty(got.ID())
 			assert.NotEmpty(got.Nonce())
 			testAssertEqualFunc(t, tt.wantNowFunc, got.nowFunc, "now = %p,want %p", tt.wantNowFunc, got.nowFunc)
+			assert.Equalf(got.RedirectURL(), tt.wantRedirectURL, "wanted \"%s\" but got \"%s\"", tt.wantRedirectURL, got.RedirectURL())
+			assert.Equalf(got.Audiences(), tt.wantAudiences, "wanted \"%s\" but got \"%s\"", tt.wantAudiences, got.Audiences())
+			assert.Equalf(got.Scopes(), tt.wantScopes, "wanted \"%s\" but got \"%s\"", tt.wantScopes, got.Scopes())
 		})
 	}
 }
