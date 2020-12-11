@@ -19,7 +19,8 @@ import (
 
 // Provider provides integration with an OIDC provider.
 //  It's primary capabilities include:
-//   * Kicking off a user authentication with p.AuthURL(...)
+//   * Kicking off a user authentication (authorization code flow and implicit
+//     flow) with p.AuthURL(...)
 //
 //   * The authorization code flow by exchanging an auth code for tokens in
 //     p.Exchange(...)
@@ -31,10 +32,9 @@ type Provider struct {
 	config   *Config
 	provider *oidc.Provider
 
-	// client uses a pooled transport that uses the provider's config CA
-	// certificate PEM if provided, otherwise it will use the installed system
-	// CA chain.  This client's resources idle connections are closed in
-	// Provider.Done()
+	// client uses a pooled transport that uses the config's ProviderCA if
+	// provided, otherwise it will use the installed system CA chain.  This
+	// client's resources idle connections are closed in Provider.Done()
 	client *http.Client
 
 	mu sync.Mutex
@@ -48,9 +48,8 @@ type Provider struct {
 	backgroundCtxCancel context.CancelFunc
 }
 
-// NewProvider creates and initializes a Provider for the OIDC
-// authorization code flow.  Intializing the the provider, includes making an
-// http request to the provider's issuer.
+// NewProvider creates and initializes a Provider. Intializing the the provider,
+// includes making an http request to the provider's issuer.
 //
 // See Provider.Stop() which must be called to release provider resources.
 func NewProvider(c *Config) (*Provider, error) {
@@ -110,12 +109,11 @@ func (p *Provider) Done() {
 }
 
 // AuthURL will generate a URL the caller can use to kick off an OIDC
-// authorization code (or an implicit flow) with an IdP.  The redirectURL is the
-// URL the IdP should use as a redirect after the authentication/authorization
-// is completed by the user.  Providing a WithImplicitFlow() option overrides
-// the default authorization code default flow.
+// authorization code or an implicit flow with an IdP.  Providing a
+// WithImplicitFlow() option overrides the default authorization code default
+// flow.
 //
-//  See NewState() to create an oidc flow State with a valid Id and Nonce that
+// See NewState() to create an oidc flow State with a valid Id and Nonce that
 // will uniquely identify the user's authentication attempt throughout the flow.
 func (p *Provider) AuthURL(ctx context.Context, s State, opt ...Option) (url string, e error) {
 	const op = "Provider.AuthURL"
