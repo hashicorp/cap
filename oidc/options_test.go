@@ -92,7 +92,7 @@ func Test_WithScopes(t *testing.T) {
 
 		opts = getStOpts(WithScopes())
 		testOpts = stDefaults()
-		testOpts.withScopes = []string{oidc.ScopeOpenID}
+		testOpts.withScopes = nil
 		assert.Equal(opts, testOpts)
 	})
 }

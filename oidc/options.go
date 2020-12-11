@@ -3,6 +3,7 @@ package oidc
 import (
 	"time"
 
+	"github.com/coreos/go-oidc"
 	"github.com/hashicorp/cap/oidc/internal/strutils"
 )
 
@@ -42,14 +43,18 @@ func WithNow(now func() time.Time) Option {
 // WithScopes provides an optional list of scopes for: Config and St
 func WithScopes(scopes ...string) Option {
 	return func(o interface{}) {
-		if scopes == nil {
+		if len(scopes) == 0 {
 			return
 		}
-		scopes := strutils.RemoveDuplicatesStable(scopes, false)
 		switch v := o.(type) {
 		case *configOptions:
+			// configOptions already has the oidc.ScopeOpenID in its defaults.
+			scopes = strutils.RemoveDuplicatesStable(scopes, false)
 			v.withScopes = append(v.withScopes, scopes...)
 		case *stOptions:
+			// need to prepend the oidc.ScopeOpenID
+			ts := append([]string{oidc.ScopeOpenID}, scopes...)
+			scopes = strutils.RemoveDuplicatesStable(ts, false)
 			v.withScopes = append(v.withScopes, scopes...)
 		}
 	}
@@ -58,7 +63,7 @@ func WithScopes(scopes ...string) Option {
 // WithAudiences provides an optional list of audiences for: Config and St
 func WithAudiences(auds ...string) Option {
 	return func(o interface{}) {
-		if auds == nil {
+		if len(auds) == 0 {
 			return
 		}
 		auds := strutils.RemoveDuplicatesStable(auds, false)
