@@ -77,14 +77,14 @@ func Implicit(ctx context.Context, p *oidc.Provider, rw StateReader, sFn Success
 			}
 		}
 
-		reqIdToken := req.FormValue("id_token")
-		responseToken, err := oidc.NewToken(oidc.IDToken(reqIdToken), oath2Token)
+		reqIDToken := req.FormValue("id_token")
+		responseToken, err := oidc.NewToken(oidc.IDToken(reqIDToken), oath2Token)
 		if err != nil {
 			responseErr := fmt.Errorf("%s: unable to create id_token: %w", op, err)
 			eFn(reqState, nil, responseErr, w, req)
 			return
 		}
-		if err := p.VerifyIDToken(ctx, responseToken.IDToken(), state.Nonce()); err != nil {
+		if err := p.VerifyIDToken(ctx, responseToken.IDToken(), state.Nonce(), oidc.WithAudiences(state.Audiences()...)); err != nil {
 			responseErr := fmt.Errorf("%s: unable to verify id_token: %w", op, err)
 			eFn(reqState, nil, responseErr, w, req)
 			return
