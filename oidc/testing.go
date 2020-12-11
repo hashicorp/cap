@@ -34,8 +34,7 @@ func TestGenerateKeys(t *testing.T) (crypto.PublicKey, crypto.PrivateKey) {
 	return priv.PublicKey, priv
 }
 
-// TestSignJWT will bundle the provided claims into a test signed JWT. The provided key
-// must be ECDSA.
+// TestSignJWT will bundle the provided claims into a test signed JWT.
 func TestSignJWT(t *testing.T, key crypto.PrivateKey, alg Alg, claims jwt.Claims, privateClaims interface{}) string {
 	t.Helper()
 	require := require.New(t)
