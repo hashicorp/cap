@@ -22,8 +22,8 @@ func ApplyOpts(opts interface{}, opt ...Option) {
 	}
 }
 
-// WithNow provides an optional func for determining what the current time it is
-// for: Config, Tk and St
+// WithNow provides an optional func for determining what the current time it
+// is. Valid for: Config, Tk and St
 func WithNow(now func() time.Time) Option {
 	return func(o interface{}) {
 		if now == nil {
@@ -40,7 +40,7 @@ func WithNow(now func() time.Time) Option {
 	}
 }
 
-// WithScopes provides an optional list of scopes for: Config and St
+// WithScopes provides an optional list of scopes. Valid for: Config and St
 func WithScopes(scopes ...string) Option {
 	return func(o interface{}) {
 		if len(scopes) == 0 {
@@ -60,7 +60,7 @@ func WithScopes(scopes ...string) Option {
 	}
 }
 
-// WithAudiences provides an optional list of audiences for: Config and St
+// WithAudiences provides an optional list of audiences.  Valid for: Config and St
 func WithAudiences(auds ...string) Option {
 	return func(o interface{}) {
 		if len(auds) == 0 {

@@ -458,8 +458,8 @@ func getProviderOpts(opt ...Option) providerOptions {
 
 // WithImplicitFlow provides an option to use an implicit flow for the auth URL
 // being requested. Getting an id_token and access_token is the default, and
-// optionally passing a true bool that will prevent an access_token from being
-// requested during the flow
+// optionally passing a true bool will prevent an access_token from being
+// requested during the flow.  Valid for: Provider
 func WithImplicitFlow(args ...interface{}) Option {
 	withoutAccessToken := false
 	for _, arg := range args {

@@ -13,11 +13,11 @@ import (
 func Example() {
 	// Create a new Config
 	pc, _ := oidc.NewConfig(
-		"http://YOUR_ISSUER/",
-		"YOUR_CLIENT_ID",
-		"YOUR_CLIENT_SECRET",
+		"http://your-issuer.com/",
+		"your_client_id",
+		"your_client_secret",
 		[]oidc.Alg{oidc.RS256},
-		"http://YOUR_REDIRECT_URL",
+		"http://your_redirect_url",
 	)
 
 	// Create a provider
@@ -28,17 +28,16 @@ func Example() {
 	ttl := 2 * time.Minute
 	s, _ := oidc.NewState(ttl)
 
-	// Create an auth URL from the provider using the user's auth attempt state
+	// Create an auth URL
 	authURL, _ := p.AuthURL(context.Background(), s)
 	fmt.Println("open url to kick-off authentication: ", authURL)
 
-	// Exchange an authorizationCode and authorizationState received via a
-	// callback from successful oidc authentication response for a verified
-	// Token.
-	t, _ := p.Exchange(context.Background(), s, "RECEIVED_STATE", "RECEIVED_CODE")
+	// Exchange a successful authentication's authorization code and
+	// authorization state (received in a callback) for a verified Token.
+	t, _ := p.Exchange(context.Background(), s, "authorization-state", "authorization-code")
 	fmt.Printf("id_token: %v\n", string(t.IDToken()))
 
-	// Create an auth code callback
+	// Create an authorization code flow callback
 	successFn := func(stateID string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		printableToken := fmt.Sprintf("id_token: %s", string(t.IDToken()))
@@ -55,7 +54,7 @@ func Example() {
 	callback := callback.AuthCode(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
 	http.HandleFunc("/callback", callback)
 
-	// Get the user's claims via the UserInfo endpoint
+	// Get the user's claims via the provider's UserInfo endpoint
 	var infoClaims map[string]interface{}
 	_ = p.UserInfo(context.Background(), t.StaticTokenSource(), &infoClaims)
 	fmt.Println("UserInfo claims: ", infoClaims)
@@ -65,26 +64,26 @@ func Example() {
 func ExampleNewConfig() {
 	// Create a new Config
 	pc, _ := oidc.NewConfig(
-		"http://YOUR_ISSUER/",
-		"YOUR_CLIENT_ID",
-		"YOUR_CLIENT_SECRET",
+		"http://your_issuer/",
+		"your_client_id",
+		"your_client_secret",
 		[]oidc.Alg{oidc.RS256},
-		"http://YOUR_REDIRECT_URL",
+		"http://your_redirect_url",
 	)
 	fmt.Println(pc)
 
 	// Output:
-	// &{YOUR_CLIENT_ID [REDACTED: client secret] [openid] http://YOUR_ISSUER/ [RS256] http://YOUR_REDIRECT_URL [http://YOUR_REDIRECT_URL] []  <nil>}
+	// &{your_client_id [REDACTED: client secret] [openid] http://your_issuer/ [RS256] http://your_redirect_url [http://your_redirect_url] []  <nil>}
 }
 
 func ExampleNewProvider() {
 	// Create a new Config
 	pc, _ := oidc.NewConfig(
-		"http://YOUR_ISSUER/",
-		"YOUR_CLIENT_ID",
-		"YOUR_CLIENT_SECRET",
+		"http://your_issuer/",
+		"your_client_id",
+		"your_client_secret",
 		[]oidc.Alg{oidc.RS256},
-		"http://YOUR_REDIRECT_URL",
+		"http://your_redirect_url",
 	)
 
 	// Create a provider
@@ -95,11 +94,11 @@ func ExampleNewProvider() {
 func ExampleProvider_AuthURL() {
 	// Create a new Config
 	pc, _ := oidc.NewConfig(
-		"YOUR_ISSUER",
-		"YOUR_CLIENT_ID",
-		"YOUR_CLIENT_SECRET",
+		"http://your_issuer/",
+		"your_client_id",
+		"your_client_secret",
 		[]oidc.Alg{oidc.RS256},
-		"YOUR_REDIRECT_URL",
+		"http://your_redirect_url",
 	)
 
 	// Create a provider
@@ -110,7 +109,7 @@ func ExampleProvider_AuthURL() {
 	ttl := 2 * time.Minute
 	s, _ := oidc.NewState(ttl)
 
-	// Create an auth URL from the provider using the user's auth attempt state
+	// Create an auth URL
 	authURL, _ := p.AuthURL(context.Background(), s)
 	fmt.Println("open url to kick-off authentication: ", authURL)
 }
@@ -118,11 +117,11 @@ func ExampleProvider_AuthURL() {
 func ExampleProvider_Exchange() {
 	// Create a new Config
 	pc, _ := oidc.NewConfig(
-		"http://YOUR_ISSUER/",
-		"YOUR_CLIENT_ID",
-		"YOUR_CLIENT_SECRET",
+		"http://your_issuer/",
+		"your_client_id",
+		"your_client_secret",
 		[]oidc.Alg{oidc.RS256},
-		"http://YOUR_REDIRECT_URL",
+		"http://your_redirect_url",
 	)
 
 	// Create a provider
@@ -133,7 +132,7 @@ func ExampleProvider_Exchange() {
 	ttl := 2 * time.Minute
 	s, _ := oidc.NewState(ttl)
 
-	// Create an auth URL from the provider using the user's auth attempt state
+	// Create an auth URL
 	authURL, _ := p.AuthURL(context.Background(), s)
 	fmt.Println("open url to kick-off authentication: ", authURL)
 
@@ -147,11 +146,11 @@ func ExampleProvider_Exchange() {
 func ExampleProvider_UserInfo() {
 	// Create a new Config
 	pc, _ := oidc.NewConfig(
-		"http://YOUR_ISSUER/",
-		"YOUR_CLIENT_ID",
-		"YOUR_CLIENT_SECRET",
+		"http://your_issuer/",
+		"your_client_id",
+		"your_client_secret",
 		[]oidc.Alg{oidc.RS256},
-		"http://YOUR_REDIRECT_URL",
+		"http://your_redirect_url",
 	)
 
 	// Create a provider
@@ -162,11 +161,11 @@ func ExampleProvider_UserInfo() {
 	ttl := 2 * time.Minute
 	s, _ := oidc.NewState(ttl)
 
-	// Exchange an authorizationCode and authorizationState received via a
-	// callback from successful oidc authentication response for a verified
-	// Token.
-	t, _ := p.Exchange(context.Background(), s, "RECEIVED_STATE", "RECEIVED_CODE")
+	// Exchange a successful authentication's authorization code and
+	// authorization state (received in a callback) for a verified Token.
+	t, _ := p.Exchange(context.Background(), s, "authorization-state", "authorization-code")
 
+	// Get the UserInfo claims
 	var infoClaims map[string]interface{}
 	_ = p.UserInfo(context.Background(), t.StaticTokenSource(), &infoClaims)
 	fmt.Println("UserInfo claims: ", infoClaims)
