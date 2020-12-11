@@ -98,9 +98,7 @@ func testDefaultJWT(t *testing.T, privKey crypto.PrivateKey, expireIn time.Durat
 	return testJwt
 }
 
-// testNewConfig creates a new config from the TestProvider.  The TestProvider
-// must have already set it's client id and secret via
-// tp.SetClientCreds("TEST-CLIENT-ID", "TEST-CLIENT-SECRET")
+// testNewConfig creates a new config from the TestProvider.
 // This is helpful internally, but intentionally not exported.
 func testNewConfig(t *testing.T, clientId, clientSecret, redirectUrl string, tp *TestProvider) *Config {
 	const op = "testNewConfig"
