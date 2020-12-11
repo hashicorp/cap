@@ -2,6 +2,7 @@ package oidc
 
 import (
 	"context"
+	"crypto"
 	"errors"
 	"fmt"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 func TestWithImplicitFlow(t *testing.T) {
@@ -579,4 +581,68 @@ func TestProvider_UserInfo(t *testing.T) {
 		require.Error(err)
 		assert.Empty(claims)
 	})
+}
+
+func TestProvider_VerifyIDToken(t *testing.T) {
+	ctx := context.Background()
+	clientID := "test-client-id"
+	clientSecret := "test-client-secret"
+	redirect := "test-redirect"
+	tp := StartTestProvider(t)
+	tp.SetAllowedRedirectURIs([]string{redirect})
+	p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+
+	type args struct {
+		key     crypto.PrivateKey
+		alg     Alg
+		claims  jwt.Claims
+		pClaims interface{}
+		nonce   string
+		opt     []Option
+	}
+	tests := []struct {
+		name      string
+		p         *Provider
+		args      args
+		wantErr   bool
+		wantIsErr error
+	}{
+		{
+			name: "valid",
+			p:    p,
+			args: args{
+				key: func() crypto.PrivateKey {
+					pKey, _ := tp.SigningKeys()
+					return pKey
+				}(),
+				alg: ES256,
+				claims: jwt.Claims{
+					Issuer:    p.config.Issuer,
+					Subject:   "alice@bob.com",
+					Audience:  jwt.Audience{clientID},
+					NotBefore: jwt.NewNumericDate(time.Now()),
+					IssuedAt:  jwt.NewNumericDate(time.Now()),
+					Expiry:    jwt.NewNumericDate(time.Now().Add(10 * time.Second)),
+					ID:        "1",
+				},
+				pClaims: map[string]interface{}{
+					"nonce": "valid",
+				},
+				nonce: "valid",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert, require := assert.New(t), require.New(t)
+			idToken := IDToken(TestSignJWT(t, tt.args.key, tt.args.alg, tt.args.claims, tt.args.pClaims))
+			err := tt.p.VerifyIDToken(ctx, idToken, tt.args.nonce, tt.args.opt...)
+			if tt.wantErr {
+				require.Error(err)
+				assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)
+				return
+			}
+			require.NoError(err)
+		})
+	}
 }
