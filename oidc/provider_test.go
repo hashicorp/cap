@@ -158,6 +158,14 @@ func TestProvider_AuthURL(t *testing.T) {
 	validState, err := NewState(1 * time.Second)
 	require.NoError(t, err)
 
+	allOptsState, err := NewState(
+		1*time.Second,
+		WithRedirectURL("https://state-override"),
+		WithAudiences("state-override"),
+		WithScopes("email", "profile"),
+	)
+	require.NoError(t, err)
+
 	type args struct {
 		ctx context.Context
 		s   State
@@ -205,6 +213,24 @@ func TestProvider_AuthURL(t *testing.T) {
 					validState.Nonce(),
 					redirect,
 					validState.ID(),
+				)
+			}(),
+		},
+		{
+			name: "valid-with-all-options-state",
+			p:    p,
+			args: args{
+				ctx: ctx,
+				s:   allOptsState,
+			},
+			wantURL: func() string {
+				return fmt.Sprintf(
+					"%s/authorize?client_id=%s&nonce=%s&redirect_uri=%s&response_type=code&scope=openid+email+profile&state=%s",
+					tp.Addr(),
+					clientID,
+					allOptsState.Nonce(),
+					"https%3A%2F%2Fstate-override",
+					allOptsState.ID(),
 				)
 			}(),
 		},
@@ -284,16 +310,24 @@ func TestProvider_Exchange(t *testing.T) {
 	ctx := context.Background()
 	clientID := "test-client-id"
 	clientSecret := "test-client-secret"
-	redirect := "test-redirect"
+	redirect := "https://test-redirect"
 
 	tp := StartTestProvider(t)
-	tp.SetAllowedRedirectURIs([]string{redirect})
+	tp.SetAllowedRedirectURIs([]string{redirect, "https://state-override"})
 	p := testNewProvider(t, clientID, clientSecret, redirect, tp)
 
 	validState, err := NewState(10 * time.Second)
 	require.NoError(t, err)
 
 	expiredState, err := NewState(1 * time.Nanosecond)
+	require.NoError(t, err)
+
+	allOptsState, err := NewState(
+		10*time.Second,
+		WithRedirectURL("https://state-override"),
+		WithAudiences("state-override"),
+		WithScopes("email", "profile"),
+	)
 	require.NoError(t, err)
 
 	type args struct {
@@ -317,6 +351,16 @@ func TestProvider_Exchange(t *testing.T) {
 				ctx:       ctx,
 				s:         validState,
 				authState: validState.ID(),
+				authCode:  "test-code",
+			},
+		},
+		{
+			name: "valid-all-opts-state",
+			p:    p,
+			args: args{
+				ctx:       ctx,
+				s:         allOptsState,
+				authState: allOptsState.ID(),
 				authCode:  "test-code",
 			},
 		},
