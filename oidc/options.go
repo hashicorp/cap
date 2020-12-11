@@ -1,6 +1,10 @@
 package oidc
 
-import "time"
+import (
+	"time"
+
+	"github.com/hashicorp/cap/oidc/internal/strutils"
+)
 
 // Option defines a common functional options type which can be used in a
 // variadic parameter pattern.
@@ -31,6 +35,38 @@ func WithNow(now func() time.Time) Option {
 			v.withNowFunc = now
 		case *stOptions:
 			v.withNowFunc = now
+		}
+	}
+}
+
+// WithScopes provides an optional list of scopes for: Config and St
+func WithScopes(scopes ...string) Option {
+	return func(o interface{}) {
+		if scopes == nil {
+			return
+		}
+		scopes := strutils.RemoveDuplicatesStable(scopes, false)
+		switch v := o.(type) {
+		case *configOptions:
+			v.withScopes = append(v.withScopes, scopes...)
+		case *stOptions:
+			v.withScopes = append(v.withScopes, scopes...)
+		}
+	}
+}
+
+// WithAudiences provides an optional list of audiences for: Config and St
+func WithAudiences(auds ...string) Option {
+	return func(o interface{}) {
+		if auds == nil {
+			return
+		}
+		auds := strutils.RemoveDuplicatesStable(auds, false)
+		switch v := o.(type) {
+		case *configOptions:
+			v.withAudiences = append(v.withAudiences, auds...)
+		case *stOptions:
+			v.withAudiences = append(v.withAudiences, auds...)
 		}
 	}
 }
