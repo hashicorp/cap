@@ -716,6 +716,32 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			wantErrContains: "signed with unsupported algorithm",
 		},
 		{
+			name: "bad-nbf",
+			p: func() *Provider {
+				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+				p.config.SupportedSigningAlgs = []Alg{ES384}
+				return p
+			}(),
+			args: args{
+				keys: func() keys {
+					k, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+					require.NoError(t, err)
+					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
+				}(),
+				claims: func() jwt.Claims {
+					c := defaultClaims
+					c.NotBefore = jwt.NewNumericDate(time.Now().Add(10 * time.Minute))
+					return c
+				}(),
+				pClaims: map[string]interface{}{
+					"nonce": "valid",
+				},
+				nonce: "valid",
+			},
+			wantErr:         true,
+			wantErrContains: "before the nbf (not before) time",
+		},
+		{
 			name: "valid-ES384",
 			p: func() *Provider {
 				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
