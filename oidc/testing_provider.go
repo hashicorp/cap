@@ -236,10 +236,10 @@ func (p *TestProvider) SetCustomAudience(customAudiences ...string) {
 
 // SetNowFunc configures how the test provider will determine the current time.  The
 // default is time.Now()
-func (p *TestProvider) SetNowFunc(now func() time.Time) {
+func (p *TestProvider) SetNowFunc(n func() time.Time) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.nowFunc = now
+	p.nowFunc = n
 }
 
 // SetOmitAuthTimeClaim turn on/off the omitting of an auth_time claim from
