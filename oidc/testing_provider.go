@@ -21,7 +21,6 @@ import (
 	"github.com/hashicorp/cap/oidc/internal/strutils"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 // TestProvider is a local http server that supports test provider capabilities
@@ -360,21 +359,23 @@ func (p *TestProvider) writeImplicitResponse(w http.ResponseWriter) error {
 }
 
 func (p *TestProvider) issueSignedJWT() string {
-	stdClaims := jwt.Claims{
-		Subject:   p.replySubject,
-		Issuer:    p.Addr(),
-		NotBefore: jwt.NewNumericDate(p.nowFunc().Add(-p.replyExpiry)),
-		Expiry:    jwt.NewNumericDate(p.nowFunc().Add(p.replyExpiry)),
-		Audience:  jwt.Audience{p.clientID},
+	claims := map[string]interface{}{
+		"sub": p.replySubject,
+		"iss": p.Addr(),
+		"nbf": float64(p.nowFunc().Add(-p.replyExpiry).Unix()),
+		"exp": float64(p.nowFunc().Add(p.replyExpiry).Unix()),
+		"aud": []string{p.clientID},
 	}
 	if len(p.customAudiences) != 0 {
-		stdClaims.Audience = append(stdClaims.Audience, p.customAudiences...)
+		claims["aud"] = append(claims["aud"].([]string), p.customAudiences...)
 	}
-
 	if p.expectedAuthNonce != "" {
 		p.customClaims["nonce"] = p.expectedAuthNonce
 	}
-	return TestSignJWT(p.t, p.privKey, p.alg, stdClaims, p.customClaims, nil)
+	for k, v := range p.customClaims {
+		claims[k] = v
+	}
+	return TestSignJWT(p.t, p.privKey, p.alg, claims, nil)
 }
 
 // writeAuthErrorResponse writes a standard OIDC authentication error response.

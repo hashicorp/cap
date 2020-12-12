@@ -13,7 +13,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 func TestIDToken_String(t *testing.T) {
@@ -44,17 +43,17 @@ type testSubClaims struct {
 
 func TestIDToken_Claims(t *testing.T) {
 	_, priv := TestGenerateKeys(t)
-	testIat := jwt.NewNumericDate(time.Now())
-	testExp := jwt.NewNumericDate(time.Now().Add(10 * time.Minute))
+	testIat := float64(time.Now().Unix())
+	testExp := float64(time.Now().Add(10 * time.Minute).Unix())
 
-	claims := jwt.Claims{
-		Issuer:   "https://example.com/",
-		IssuedAt: testIat,
-		Expiry:   testExp,
-		Audience: []string{"www.example.com"},
-		Subject:  "alice@example.com",
+	claims := map[string]interface{}{
+		"iss": "https://example.com/",
+		"iat": testIat,
+		"exp": testExp,
+		"aud": []string{"www.example.com"},
+		"sub": "alice@example.com",
 	}
-	testJWT := TestSignJWT(t, priv, ES256, claims, map[string]interface{}{}, nil)
+	testJWT := TestSignJWT(t, priv, ES256, claims, nil)
 	t.Parallel()
 	t.Run("all-claim", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
@@ -63,8 +62,8 @@ func TestIDToken_Claims(t *testing.T) {
 		err := tk.Claims(&claims)
 		require.NoError(err)
 		assert.Equal(map[string]interface{}{
-			"iat": float64(testIat.Time().Unix()),
-			"exp": float64(testExp.Time().Unix()),
+			"iat": testIat,
+			"exp": testExp,
 			"iss": "https://example.com/",
 			"sub": "alice@example.com",
 			"aud": []interface{}{"www.example.com"},
@@ -97,14 +96,14 @@ func TestIDToken_Claims(t *testing.T) {
 
 func TestIDToken_VerifyAccessToken(t *testing.T) {
 	t.Parallel()
-	testIat := jwt.NewNumericDate(time.Now())
-	testExp := jwt.NewNumericDate(time.Now().Add(10 * time.Minute))
-	stdClaims := jwt.Claims{
-		Issuer:   "https://example.com/",
-		IssuedAt: testIat,
-		Expiry:   testExp,
-		Audience: []string{"www.example.com"},
-		Subject:  "alice@example.com",
+	testIat := float64(time.Now().Unix())
+	testExp := float64(time.Now().Add(10 * time.Minute).Unix())
+	claims := map[string]interface{}{
+		"iss": "https://example.com/",
+		"iat": testIat,
+		"exp": testExp,
+		"aud": []string{"www.example.com"},
+		"sub": "alice@example.com",
 	}
 	tests := []struct {
 		name        string
@@ -209,10 +208,8 @@ func TestIDToken_VerifyAccessToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			additionalClaims := map[string]interface{}{
-				"at_hash": testHashAccessToken(t, tt.alg, tt.accessToken),
-			}
-			testJWT := TestSignJWT(t, tt.priKey, tt.alg, stdClaims, additionalClaims, nil)
+			claims["at_hash"] = testHashAccessToken(t, tt.alg, tt.accessToken)
+			testJWT := TestSignJWT(t, tt.priKey, tt.alg, claims, nil)
 			tk := IDToken(testJWT)
 			err := tk.VerifyAccessToken(tt.accessToken)
 			require.NoError(err)

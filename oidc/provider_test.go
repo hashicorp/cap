@@ -17,7 +17,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
-	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 func TestWithImplicitFlow(t *testing.T) {
@@ -618,21 +617,23 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 	k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	defaultKeys := keys{priv: k, pub: &k.PublicKey, alg: ES256, keyID: "valid-ES256"}
+	defaultValidNonce := "valid"
 	defaultClaims :=
-		jwt.Claims{
-			Subject:   "alice@bob.com",
-			Audience:  jwt.Audience{clientID},
-			NotBefore: jwt.NewNumericDate(time.Now()),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Expiry:    jwt.NewNumericDate(time.Now().Add(1 * time.Minute)),
-			ID:        "1",
+		map[string]interface{}{
+			"sub":   "alice@bob.com",
+			"aud":   []string{clientID},
+			"nbf":   float64(time.Now().Unix()),
+			"iat":   float64(time.Now().Unix()),
+			"exp":   float64(time.Now().Add(1 * time.Minute).Unix()),
+			"id":    "1",
+			"nonce": defaultValidNonce,
 		}
 	type args struct {
-		keys    keys
-		claims  jwt.Claims
-		pClaims interface{}
-		nonce   string
-		opt     []Option
+		keys           keys
+		claims         map[string]interface{}
+		nonce          string
+		overrideIssuer string
+		opt            []Option
 	}
 	tests := []struct {
 		name            string
@@ -652,10 +653,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			args: args{
 				keys:   defaultKeys,
 				claims: defaultClaims,
-				pClaims: map[string]interface{}{
-					"nonce": "valid",
-				},
-				nonce: "valid",
+				nonce:  defaultValidNonce,
 			},
 		},
 		{
@@ -668,10 +666,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			args: args{
 				keys:   defaultKeys,
 				claims: defaultClaims,
-				pClaims: map[string]interface{}{
-					"nonce": "valid",
-				},
-				nonce: "not-valid",
+				nonce:  "not-valid",
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidNonce,
@@ -686,11 +681,8 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			args: args{
 				keys:   defaultKeys,
 				claims: defaultClaims,
-				pClaims: map[string]interface{}{
-					"nonce": "valid",
-				},
-				nonce: "valid",
-				opt:   []Option{WithAudiences(clientID, "second-aud")},
+				nonce:  defaultValidNonce,
+				opt:    []Option{WithAudiences(clientID, "second-aud")},
 			},
 		},
 		{
@@ -707,13 +699,30 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
 				}(),
 				claims: defaultClaims,
-				pClaims: map[string]interface{}{
-					"nonce": "valid",
-				},
-				nonce: "valid",
+				nonce:  defaultValidNonce,
 			},
 			wantErr:         true,
 			wantErrContains: "signed with unsupported algorithm",
+		},
+		{
+			name: "bad-issuer",
+			p: func() *Provider {
+				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+				p.config.SupportedSigningAlgs = []Alg{ES384}
+				return p
+			}(),
+			args: args{
+				overrideIssuer: "bad-issuer",
+				keys: func() keys {
+					k, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+					require.NoError(t, err)
+					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
+				}(),
+				claims: defaultClaims,
+				nonce:  defaultValidNonce,
+			},
+			wantErr:         true,
+			wantErrContains: "id token issued by a different provider",
 		},
 		{
 			name: "bad-nbf",
@@ -728,15 +737,19 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					require.NoError(t, err)
 					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
 				}(),
-				claims: func() jwt.Claims {
-					c := defaultClaims
-					c.NotBefore = jwt.NewNumericDate(time.Now().Add(10 * time.Minute))
+				claims: func() map[string]interface{} {
+					c := map[string]interface{}{
+						"sub":   "alice@bob.com",
+						"aud":   []string{clientID},
+						"nbf":   float64(time.Now().Add(10 * time.Minute).Unix()),
+						"iat":   float64(time.Now().Unix()),
+						"exp":   float64(time.Now().Add(1 * time.Minute).Unix()),
+						"id":    "1",
+						"nonce": defaultValidNonce,
+					}
 					return c
 				}(),
-				pClaims: map[string]interface{}{
-					"nonce": "valid",
-				},
-				nonce: "valid",
+				nonce: defaultValidNonce,
 			},
 			wantErr:         true,
 			wantErrContains: "before the nbf (not before) time",
@@ -755,10 +768,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
 				}(),
 				claims: defaultClaims,
-				pClaims: map[string]interface{}{
-					"nonce": "valid",
-				},
-				nonce: "valid",
+				nonce:  defaultValidNonce,
 			},
 		},
 	}
@@ -770,8 +780,13 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			require.Equalf(tt.args.keys.priv, priv, "TestProvider priv key is invalid")
 			require.Equalf(tt.args.keys.pub, pub, "TestProvider pub key is invalid")
 			require.Equalf(tt.args.keys.alg, alg, "TestProvider alg key is invalid")
-			tt.args.claims.Issuer = tt.p.config.Issuer
-			idToken := IDToken(TestSignJWT(t, tt.args.keys.priv, tt.args.keys.alg, tt.args.claims, tt.args.pClaims, []byte(tt.args.keys.keyID)))
+			switch {
+			case tt.args.overrideIssuer != "":
+				tt.args.claims["iss"] = tt.args.overrideIssuer
+			default:
+				tt.args.claims["iss"] = tt.p.config.Issuer
+			}
+			idToken := IDToken(TestSignJWT(t, tt.args.keys.priv, tt.args.keys.alg, tt.args.claims, []byte(tt.args.keys.keyID)))
 			err := tt.p.VerifyIDToken(ctx, idToken, tt.args.nonce, tt.args.opt...)
 			if tt.wantErr {
 				require.Error(err)
@@ -807,10 +822,17 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		p := testNewProvider(t, clientID, clientSecret, redirect, tp)
 		p.config.SupportedSigningAlgs = []Alg{defaultKeys.alg}
 		tp.SetSigningKeys(defaultKeys.priv, defaultKeys.pub, defaultKeys.alg, defaultKeys.keyID)
-		claims := defaultClaims
-		claims.Issuer = p.config.Issuer
-		pClaims := map[string]interface{}{"nonce": "valid"}
-		idToken := IDToken(TestSignJWT(t, defaultKeys.priv, defaultKeys.alg, claims, pClaims, []byte(defaultKeys.keyID)))
+		claims := map[string]interface{}{
+			"sub":   "alice@bob.com",
+			"aud":   []string{clientID},
+			"nbf":   float64(time.Now().Unix()),
+			"iat":   float64(time.Now().Unix()),
+			"exp":   float64(time.Now().Add(1 * time.Minute).Unix()),
+			"id":    "1",
+			"nonce": defaultValidNonce,
+			"iss":   p.config.Issuer,
+		}
+		idToken := IDToken(TestSignJWT(t, defaultKeys.priv, defaultKeys.alg, claims, []byte(defaultKeys.keyID)))
 		func() {
 			tp.SetDisableJWKs(true)
 			defer tp.SetDisableJWKs(false)
@@ -818,7 +840,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			require.Error(err)
 			assert.Contains(err.Error(), "get keys failed: 404 Not Found")
 		}()
-		idToken = IDToken(TestSignJWT(t, defaultKeys.priv, defaultKeys.alg, claims, pClaims, []byte(defaultKeys.keyID)))
+		idToken = IDToken(TestSignJWT(t, defaultKeys.priv, defaultKeys.alg, claims, []byte(defaultKeys.keyID)))
 		func() {
 			tp.SetInvalidJWKS(true)
 			defer tp.SetInvalidJWKS(false)

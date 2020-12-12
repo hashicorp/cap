@@ -306,6 +306,7 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, nonce string, o
 		algs = append(algs, string(a))
 	}
 	oidcConfig := &oidc.Config{
+		SkipClientIDCheck:    true,
 		SupportedSigningAlgs: algs,
 		ClientID:             p.config.ClientID,
 		Now:                  p.config.Now,
@@ -314,7 +315,8 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, nonce string, o
 	nowTime := p.config.Now() // intialized right after the Verifier so there idea of nowTime sort of coresponds.
 	leeway := 1 * time.Minute
 
-	// verifier.Verify will check the supported algs, signature, iss, exp, nbf, the aud includes the client_id
+	// verifier.Verify will check the supported algs, signature, iss, exp, nbf.
+	// aud will be checked later in this function.
 	oidcIDToken, err := verifier.Verify(ctx, string(t))
 	if err != nil {
 		return fmt.Errorf("%s: invalid id_token: %w", op, err)

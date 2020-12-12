@@ -35,7 +35,7 @@ func TestGenerateKeys(t *testing.T) (crypto.PublicKey, crypto.PrivateKey) {
 }
 
 // TestSignJWT will bundle the provided claims into a test signed JWT.
-func TestSignJWT(t *testing.T, key crypto.PrivateKey, alg Alg, claims jwt.Claims, privateClaims interface{}, keyID []byte) string {
+func TestSignJWT(t *testing.T, key crypto.PrivateKey, alg Alg, claims interface{}, keyID []byte) string {
 	t.Helper()
 	require := require.New(t)
 
@@ -52,7 +52,6 @@ func TestSignJWT(t *testing.T, key crypto.PrivateKey, alg Alg, claims jwt.Claims
 
 	raw, err := jwt.Signed(sig).
 		Claims(claims).
-		Claims(privateClaims).
 		CompactSerialize()
 	require.NoError(err)
 	return raw
@@ -82,22 +81,20 @@ func testHashAccessToken(t *testing.T, idSigTokenAlg Alg, token AccessToken) str
 // testDefaultJWT is internally helpful, but for now we won't export it.
 func testDefaultJWT(t *testing.T, privKey crypto.PrivateKey, expireIn time.Duration, nonce string, additionalClaims map[string]interface{}) string {
 	t.Helper()
-	now := jwt.NewNumericDate(time.Now())
-	claims := jwt.Claims{
-		Issuer:    "https://example.com/",
-		IssuedAt:  now,
-		NotBefore: now,
-		Expiry:    jwt.NewNumericDate(time.Now()),
-		Audience:  []string{"www.example.com"},
-		Subject:   "alice@example.com",
-	}
-	privateClaims := map[string]interface{}{
-		nonce: nonce,
+	now := float64(time.Now().Unix())
+	claims := map[string]interface{}{
+		"iss":   "https://example.com/",
+		"iat":   now,
+		"nbf":   now,
+		"exp":   float64(time.Now().Unix()),
+		"aud":   []string{"www.example.com"},
+		"sub":   "alice@example.com",
+		"nonce": nonce,
 	}
 	for k, v := range additionalClaims {
-		privateClaims[k] = v
+		claims[k] = v
 	}
-	testJWT := TestSignJWT(t, privKey, ES256, claims, privateClaims, nil)
+	testJWT := TestSignJWT(t, privKey, ES256, claims, nil)
 	return testJWT
 }
 
