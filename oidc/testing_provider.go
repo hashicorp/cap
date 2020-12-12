@@ -177,7 +177,7 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 	cert := p.httpServer.Certificate()
 
 	var buf bytes.Buffer
-	err := pem.Encode(&buf, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+	err = pem.Encode(&buf, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
 	require.NoError(err)
 	p.caCert = buf.String()
 
