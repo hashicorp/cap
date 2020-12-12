@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -58,6 +57,6 @@ func failedFn(ctx context.Context, sc *stateCache) callback.ErrorResponseFunc {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		responseErr = errors.New("Unknown error from callback")
+		responseErr = fmt.Errorf("%s: unknown error from callback", op)
 	}
 }
