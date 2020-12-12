@@ -110,12 +110,12 @@ func testNewConfig(t *testing.T, clientID, clientSecret, redirectURL string, tp 
 	require.NotEmptyf(redirectURL, "%s: redirect URL is empty", op)
 
 	tp.SetClientCreds(clientID, clientSecret)
-
+	_, _, alg := tp.SigningKeys()
 	c, err := NewConfig(
 		tp.Addr(),
 		clientID,
 		ClientSecret(clientSecret),
-		[]Alg{tp.SigningAlgorithm()},
+		[]Alg{alg},
 		redirectURL,
 		nil,
 		WithProviderCA(tp.CACert()),

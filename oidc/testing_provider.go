@@ -31,8 +31,8 @@ import (
 // It's important to remember that the TestProvider is stateful (see any of it's
 // receiver functions that begin with Set*).
 //
-//  Once you've started a TestProvider http server with StartTestProvider(),
-//  the following test endpoints are supported:
+// Once you've started a TestProvider http server with StartTestProvider(...),
+// the following test endpoints are supported:
 //
 //    * GET /.well-known/openid-configuration    OIDC Discovery
 //
@@ -45,8 +45,50 @@ import (
 //    * GET /userinfo                            OAuth UserInfo
 //
 //    * GET /.well-known/jwks.json               JWKs used to verify issued JWT tokens
-//    * GET /.well-known/invalid-jwks.json       Invalid JWKs
-//    * GET /.well-known/missing-jwks.json       Missing JWKs
+//
+//
+// Runtime Configuration:
+//  * Issuer: Addr() returns the the current base URL for the test provider's
+//  running webserver, which can be used as an OIDC Issuer for discovery and
+//  is also used for the iss claim when issuing JWTs.
+//
+//  * Relying Party ClientID/ClientSecret: SetClientCreds(...) updates the
+//  creds and they are empty by default.
+//
+//  * Now: SetNowFunc(...) updates the provider's "now" function and time.Now
+//  is the default.
+//
+//  * Expiry: SetExpectedExpiry( exp time.Duration) updates the expiry and
+//    now + 5 * time.Second is the default.
+//
+//  * Signing keys: SetSigningKeys(...) updates the keys and a ECDSA P-256 pair
+//  of priv/pub keys are the default with a signing algorithm of ES256
+//
+//  * Authorization Code: SetExpectedAuthCode(...) updates the auth code
+//  required by the /authorize endpoint and the code is empty by default.
+//
+//  * Authorization Nonce: SetExpectedAuthNonce(...) updates the nonce required
+//  by the /authorize endpont and the nonce is empty by default.
+//
+//  * Allowed RedirectURIs: SetAllowedRedirectURIs(...) updates the allowed
+//  redirect URIs and "https://example.com" is the default.
+//
+//  * Custom Claims: SetCustomClaims(...) updates custom claims added to JWTs issued
+//  and the custom claims are empty by default.
+//
+//  * Audiences: SetCustomAudience(...) updates the audience claim of JWTs issued
+//  and the ClientID is the default.
+//
+//  * Authentication Time (auth_time): SetOmitAuthTimeClaim(...) allows you to
+//  turn off/on the inclusion of an auth_time claim in issued JWTs and the claim
+//  is included by default.
+//
+//  * Issuing id_tokens: SetOmitIDTokens(...) allows you to turn off/on the issuing of
+//  id_tokens from the /token endpoint.  id_tokens are issued by default.
+//
+//  * Issuing access_tokens: SetOmitAccessTokens(...) allows you to turn off/on
+//  the issuing of access_tokens from the /token endpoint. access_tokens are issued
+//  by default.
 type TestProvider struct {
 	httpServer *httptest.Server
 	caCert     string
@@ -85,7 +127,10 @@ func (p *TestProvider) Stop() {
 	p.httpServer.Close()
 }
 
-// StartTestProvider creates and starts a running TestProvider http server.
+// StartTestProvider creates and starts a running TestProvider http server.  The
+// WithPort option is supported.  The TestProvider will be shutdown when the
+// test and all it's subtests complete via a registered function with
+// t.Cleanup(...).
 func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 	t.Helper()
 	require := require.New(t)
@@ -171,8 +216,8 @@ func (p *TestProvider) SetExpectedExpiry(exp time.Duration) {
 	p.replyExpiry = exp
 }
 
-// SetClientCreds is for configuring the client information required for the
-// OIDC workflows.
+// SetClientCreds is for configuring the relying party client ID and client
+// secret information required for the OIDC workflows.
 func (p *TestProvider) SetClientCreds(clientID, clientSecret string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -180,17 +225,12 @@ func (p *TestProvider) SetClientCreds(clientID, clientSecret string) {
 	p.clientSecret = clientSecret
 }
 
-// ClientCreds returns the client information required for the
+// ClientCreds returns the relying party client information required for the
 // OIDC workflows.
 func (p *TestProvider) ClientCreds() (clientID, clientSecret string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.clientID, p.clientSecret
-}
-
-// SigningAlgorithm returns the algorithm used to sign JWTs for the test provider.
-func (p *TestProvider) SigningAlgorithm() Alg {
-	return ES256
 }
 
 // SetExpectedAuthCode configures the auth code to return from /auth and the
@@ -291,7 +331,8 @@ func (p *TestProvider) SetInvalidJWKS(invalid bool) {
 }
 
 // Addr returns the current base URL for the test provider's running webserver,
-// which can be used as an OIDC issuer for discovery.
+// which can be used as an OIDC issuer for discovery and is also used for the
+// iss claim when issuing JWTs.
 func (p *TestProvider) Addr() string { return p.httpServer.URL }
 
 // CACert returns the pem-encoded CA certificate used by the test provider's
@@ -360,11 +401,13 @@ func (p *TestProvider) writeImplicitResponse(w http.ResponseWriter) error {
 
 func (p *TestProvider) issueSignedJWT() string {
 	claims := map[string]interface{}{
-		"sub": p.replySubject,
-		"iss": p.Addr(),
-		"nbf": float64(p.nowFunc().Add(-p.replyExpiry).Unix()),
-		"exp": float64(p.nowFunc().Add(p.replyExpiry).Unix()),
-		"aud": []string{p.clientID},
+		"sub":       p.replySubject,
+		"iss":       p.Addr(),
+		"nbf":       float64(p.nowFunc().Add(-p.replyExpiry).Unix()),
+		"exp":       float64(p.nowFunc().Add(p.replyExpiry).Unix()),
+		"auth_time": float64(p.nowFunc().Unix()),
+		"iat":       float64(p.nowFunc().Unix()),
+		"aud":       []string{p.clientID},
 	}
 	if len(p.customAudiences) != 0 {
 		claims["aud"] = append(claims["aud"].([]string), p.customAudiences...)
