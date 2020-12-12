@@ -69,6 +69,8 @@ type TestProvider struct {
 	omitIDToken       bool
 	omitAccessToken   bool
 	disableUserInfo   bool
+	disableJWKs       bool
+	invalidJWKs       bool
 	nowFunc           func() time.Time
 
 	// privKey *ecdsa.PrivateKey
@@ -264,7 +266,7 @@ func (p *TestProvider) SetOmitIDTokens(omitIDTokens bool) {
 func (p *TestProvider) SetOmitAccessTokens(omitAccessTokens bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.omitAccessToken = true
+	p.omitAccessToken = omitAccessTokens
 }
 
 // DisableUserInfo makes the userinfo endpoint return 404 and omits it from the
@@ -273,6 +275,20 @@ func (p *TestProvider) DisableUserInfo() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.disableUserInfo = true
+}
+
+// SetDisableJWKs makes the JWKs endpoint return 404
+func (p *TestProvider) SetDisableJWKs(disable bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.disableJWKs = disable
+}
+
+// SetInvalidJWKS makes the JWKs endpoint return an invalid response
+func (p *TestProvider) SetInvalidJWKS(invalid bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.invalidJWKs = true
 }
 
 // Addr returns the current base URL for the test provider's running webserver,
@@ -506,19 +522,21 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 
 	case wellKnownJwks:
+		if p.disableJWKs {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if p.invalidJWKs {
+			_, err := w.Write([]byte("It's not a keyset!"))
+			require.NoErrorf(err, "%s: internal error: %w", invalidJwks, err)
+			return
+		}
 		if req.Method != "GET" {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
 		err := p.writeJSON(w, p.jwks)
 		require.NoErrorf(err, "%s: internal error: %w", wellKnownJwks, err)
-		return
-	case missingJwks:
-		w.WriteHeader(http.StatusNotFound)
-		return
-	case invalidJwks:
-		_, err := w.Write([]byte("It's not a keyset!"))
-		require.NoErrorf(err, "%s: internal error: %w", invalidJwks, err)
 		return
 	case token:
 		if req.Method != "POST" {
