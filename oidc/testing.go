@@ -31,17 +31,22 @@ func TestGenerateKeys(t *testing.T) (crypto.PublicKey, crypto.PrivateKey) {
 	require := require.New(t)
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(err)
-	return priv.PublicKey, priv
+	return &priv.PublicKey, priv
 }
 
 // TestSignJWT will bundle the provided claims into a test signed JWT.
-func TestSignJWT(t *testing.T, key crypto.PrivateKey, alg Alg, claims jwt.Claims, privateClaims interface{}) string {
+func TestSignJWT(t *testing.T, key crypto.PrivateKey, alg Alg, claims jwt.Claims, privateClaims interface{}, keyID []byte) string {
 	t.Helper()
 	require := require.New(t)
 
+	hdr := map[jose.HeaderKey]interface{}{}
+	if keyID != nil {
+		hdr["key_id"] = string(keyID)
+	}
+
 	sig, err := jose.NewSigner(
 		jose.SigningKey{Algorithm: jose.SignatureAlgorithm(alg), Key: key},
-		(&jose.SignerOptions{}).WithType("JWT"),
+		(&jose.SignerOptions{ExtraHeaders: hdr}).WithType("JWT"),
 	)
 	require.NoError(err)
 
@@ -50,7 +55,6 @@ func TestSignJWT(t *testing.T, key crypto.PrivateKey, alg Alg, claims jwt.Claims
 		Claims(privateClaims).
 		CompactSerialize()
 	require.NoError(err)
-
 	return raw
 }
 
@@ -93,7 +97,7 @@ func testDefaultJWT(t *testing.T, privKey crypto.PrivateKey, expireIn time.Durat
 	for k, v := range additionalClaims {
 		privateClaims[k] = v
 	}
-	testJWT := TestSignJWT(t, privKey, ES256, claims, privateClaims)
+	testJWT := TestSignJWT(t, privKey, ES256, claims, privateClaims, nil)
 	return testJWT
 }
 
