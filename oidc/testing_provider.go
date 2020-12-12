@@ -3,8 +3,6 @@ package oidc
 import (
 	"bytes"
 	"crypto"
-	"crypto/ecdsa"
-	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -73,7 +71,10 @@ type TestProvider struct {
 	disableUserInfo   bool
 	nowFunc           func() time.Time
 
-	privKey *ecdsa.PrivateKey
+	// privKey *ecdsa.PrivateKey
+	privKey crypto.PrivateKey
+	pubKey  crypto.PublicKey
+	alg     Alg
 
 	t *testing.T
 }
@@ -108,20 +109,15 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 		},
 	}
 
-	_, privKey := TestGenerateKeys(t)
-	p.privKey = privKey.(*ecdsa.PrivateKey)
-
-	derBytes, err := x509.MarshalPKIXPublicKey(p.privKey.Public())
-	require.NoError(err)
-
-	pemBlock := &pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: derBytes,
+	p.pubKey, p.privKey = TestGenerateKeys(t)
+	p.alg = ES256
+	p.jwks = &jose.JSONWebKeySet{
+		Keys: []jose.JSONWebKey{
+			{
+				Key: p.pubKey,
+			},
+		},
 	}
-	pub := string(pem.EncodeToMemory(pemBlock))
-
-	p.jwks = testJWKS(t, pub)
-
 	p.httpServer = httptestNewUnstartedServerWithPort(t, p, opts.withPort)
 	p.httpServer.Config.ErrorLog = log.New(ioutil.Discard, "", 0)
 	p.httpServer.StartTLS()
@@ -130,7 +126,7 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 	cert := p.httpServer.Certificate()
 
 	var buf bytes.Buffer
-	err = pem.Encode(&buf, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+	err := pem.Encode(&buf, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
 	require.NoError(err)
 	p.caCert = buf.String()
 
@@ -287,11 +283,28 @@ func (p *TestProvider) Addr() string { return p.httpServer.URL }
 // HTTPS server.
 func (p *TestProvider) CACert() string { return p.caCert }
 
-// SigningKeys returns the test provider's pem-encoded keys used to sign JWTs.
-func (p *TestProvider) SigningKeys() (crypto.PrivateKey, crypto.PublicKey) {
+// SigningKeys returns the test provider's keys used to sign JWTs and its Alg.
+func (p *TestProvider) SigningKeys() (crypto.PrivateKey, crypto.PublicKey, Alg) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return p.privKey, p.privKey.Public
+	return p.privKey, p.pubKey, p.alg
+}
+
+// SetSigningKeys sets the test provider's keys and alg used to sign JWTs.
+func (p *TestProvider) SetSigningKeys(privKey crypto.PrivateKey, pubKey crypto.PublicKey, alg Alg, KeyID string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.privKey = privKey
+	p.pubKey = pubKey
+	p.alg = alg
+	p.jwks = &jose.JSONWebKeySet{
+		Keys: []jose.JSONWebKey{
+			{
+				Key:   p.pubKey,
+				KeyID: KeyID,
+			},
+		},
+	}
 }
 
 func (p *TestProvider) writeJSON(w http.ResponseWriter, out interface{}) error {
@@ -345,7 +358,7 @@ func (p *TestProvider) issueSignedJWT() string {
 	if p.expectedAuthNonce != "" {
 		p.customClaims["nonce"] = p.expectedAuthNonce
 	}
-	return TestSignJWT(p.t, p.privKey, ES256, stdClaims, p.customClaims)
+	return TestSignJWT(p.t, p.privKey, p.alg, stdClaims, p.customClaims, nil)
 }
 
 // writeAuthErrorResponse writes a standard OIDC authentication error response.
@@ -564,29 +577,6 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	default:
 		w.WriteHeader(http.StatusNotFound)
 		return
-	}
-}
-
-// testJWKS converts a pem-encoded public key into JWKS data suitable for a
-// verification endpoint response
-func testJWKS(t *testing.T, pubKey string) *jose.JSONWebKeySet {
-	t.Helper()
-	require := require.New(t)
-
-	block, _ := pem.Decode([]byte(pubKey))
-	require.NotNil(block)
-
-	input := block.Bytes
-
-	pub, err := x509.ParsePKIXPublicKey(input)
-	require.NoError(err)
-
-	return &jose.JSONWebKeySet{
-		Keys: []jose.JSONWebKey{
-			{
-				Key: pub,
-			},
-		},
 	}
 }
 
