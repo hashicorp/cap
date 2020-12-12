@@ -221,7 +221,7 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 
 	oauth2Token, err := oauth2Config.Exchange(oidcCtx, authorizationCode)
 	if err != nil {
-		return nil, fmt.Errorf("%s: unable to exchange auth code with provider: %w", op, err)
+		return nil, fmt.Errorf("%s: unable to exchange auth code with provider: %w", op, p.convertError(err))
 	}
 
 	idToken, ok := oauth2Token.Extra("id_token").(string)
@@ -319,7 +319,7 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, nonce string, o
 	// aud will be checked later in this function.
 	oidcIDToken, err := verifier.Verify(ctx, string(t))
 	if err != nil {
-		return fmt.Errorf("%s: invalid id_token: %w", op, err)
+		return fmt.Errorf("%s: invalid id_token: %w", op, p.convertError(err))
 	}
 	// so.. we still need to check: nonce, iat, auth_time, azp, the aud includes
 	// additional audiences configured.
@@ -381,6 +381,31 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, nonce string, o
 	}
 
 	return nil
+}
+
+func (p *Provider) convertError(e error) error {
+	switch {
+	case strings.Contains(e.Error(), "id token issued by a different provider"):
+		return fmt.Errorf("%s: %w", e.Error(), ErrInvalidIssuer)
+	case strings.Contains(e.Error(), "signed with unsupported algorithm"):
+		return fmt.Errorf("%s: %w", e.Error(), ErrUnsupportedAlg)
+	case strings.Contains(e.Error(), "before the nbf (not before) time"):
+		return fmt.Errorf("%s: %w", e.Error(), ErrInvalidNotBefore)
+	case strings.Contains(e.Error(), "before the iat (issued at) time"):
+		return fmt.Errorf("%s: %w", e.Error(), ErrInvalidIssuedAt)
+	case strings.Contains(e.Error(), "token is expired"):
+		return fmt.Errorf("%s: %w", e.Error(), ErrExpiredToken)
+	case strings.Contains(e.Error(), "failed to verify id token signature"):
+		return fmt.Errorf("%s: %w", e.Error(), ErrInvalidSignature)
+	case strings.Contains(e.Error(), "failed to decode keys"):
+		return fmt.Errorf("%s: %w", e.Error(), ErrInvalidJWKs)
+	case strings.Contains(e.Error(), "get keys failed"):
+		return fmt.Errorf("%s: %w", e.Error(), ErrInvalidJWKs)
+	case strings.Contains(e.Error(), "server response missing access_token"):
+		return fmt.Errorf("%s: %w", e.Error(), ErrMissingAccessToken)
+	default:
+		return e
+	}
 }
 
 // HttpClient returns an http.Client for the provider. The returned client uses

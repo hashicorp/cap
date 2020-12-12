@@ -458,7 +458,7 @@ func TestProvider_Exchange(t *testing.T) {
 		gotTk, err := p.Exchange(ctx, validState, validState.ID(), "valid-code")
 		require.Error(err)
 		assert.Nil(gotTk)
-		assert.Contains(err.Error(), "oauth2: server response missing access_token")
+		assert.Truef(errors.Is(err, ErrMissingAccessToken), "wanted \"%s\" but got \"%s\"", ErrMissingAccessToken, err)
 	})
 	t.Run("expired-token", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
@@ -467,7 +467,7 @@ func TestProvider_Exchange(t *testing.T) {
 		tp.SetExpectedExpiry(-1 * time.Minute)
 		gotTk, err := p.Exchange(ctx, validState, validState.ID(), "valid-code")
 		require.Error(err)
-		assert.Truef(strings.Contains(err.Error(), "token is expired"), "wanted strings.Contains \"%s\" but got \"%s\"", "token is expired", err)
+		assert.Truef(errors.Is(err, ErrExpiredToken), "wanted \"%s\" but got \"%s\"", ErrExpiredToken, err)
 		assert.Empty(gotTk)
 	})
 }
@@ -636,12 +636,11 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		opt            []Option
 	}
 	tests := []struct {
-		name            string
-		p               *Provider
-		args            args
-		wantErr         bool
-		wantIsErr       error
-		wantErrContains string
+		name      string
+		p         *Provider
+		args      args
+		wantErr   bool
+		wantIsErr error
 	}{
 		{
 			name: "valid-ES256",
@@ -701,8 +700,8 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 				claims: defaultClaims,
 				nonce:  defaultValidNonce,
 			},
-			wantErr:         true,
-			wantErrContains: "signed with unsupported algorithm",
+			wantErr:   true,
+			wantIsErr: ErrUnsupportedAlg,
 		},
 		{
 			name: "bad-issuer",
@@ -721,8 +720,8 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 				claims: defaultClaims,
 				nonce:  defaultValidNonce,
 			},
-			wantErr:         true,
-			wantErrContains: "id token issued by a different provider",
+			wantErr:   true,
+			wantIsErr: ErrInvalidIssuer,
 		},
 		{
 			name: "bad-nbf",
@@ -751,8 +750,8 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 				}(),
 				nonce: defaultValidNonce,
 			},
-			wantErr:         true,
-			wantErrContains: "before the nbf (not before) time",
+			wantErr:   true,
+			wantIsErr: ErrInvalidNotBefore,
 		},
 		{
 			name: "bad-exp",
@@ -781,8 +780,38 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 				}(),
 				nonce: defaultValidNonce,
 			},
-			wantErr:         true,
-			wantErrContains: "token is expired ",
+			wantErr:   true,
+			wantIsErr: ErrExpiredToken,
+		},
+		{
+			name: "bad-iat",
+			p: func() *Provider {
+				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+				p.config.SupportedSigningAlgs = []Alg{ES384}
+				return p
+			}(),
+			args: args{
+				keys: func() keys {
+					k, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+					require.NoError(t, err)
+					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
+				}(),
+				claims: func() map[string]interface{} {
+					c := map[string]interface{}{
+						"sub":   "alice@bob.com",
+						"aud":   []string{clientID},
+						"nbf":   float64(time.Now().Unix()),
+						"iat":   float64(time.Now().Add(10 * time.Minute).Unix()),
+						"exp":   float64(time.Now().Add(1 * time.Minute).Unix()),
+						"id":    "1",
+						"nonce": defaultValidNonce,
+					}
+					return c
+				}(),
+				nonce: defaultValidNonce,
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidIssuedAt,
 		},
 		{
 			name: "valid-ES384",
@@ -823,9 +852,6 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 				if tt.wantIsErr != nil {
 					assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)
 				}
-				if tt.wantErrContains != "" {
-					assert.Containsf(err.Error(), tt.wantErrContains, "wanted \"%s\" but got \"%s\"", tt.wantErrContains, err)
-				}
 				return
 			}
 			require.NoError(err)
@@ -842,7 +868,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		idToken := IDToken(TestSignJWT(t, k, ES256, defaultClaims, []byte(defaultKeys.keyID)))
 		err = p.VerifyIDToken(ctx, idToken, "valid")
 		require.Error(err)
-		assert.Contains(err.Error(), "failed to verify id token signature")
+		assert.Truef(errors.Is(err, ErrInvalidSignature), "wanted \"%s\" but got \"%s\"", ErrInvalidSignature, err)
 	})
 	t.Run("empty-token", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
@@ -881,7 +907,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			defer tp.SetDisableJWKs(false)
 			err := p.VerifyIDToken(ctx, idToken, "valid")
 			require.Error(err)
-			assert.Contains(err.Error(), "get keys failed: 404 Not Found")
+			assert.Truef(errors.Is(err, ErrInvalidJWKs), "wanted \"%s\" but got \"%s\"", ErrInvalidJWKs, err)
 		}()
 		idToken = IDToken(TestSignJWT(t, defaultKeys.priv, defaultKeys.alg, claims, []byte(defaultKeys.keyID)))
 		func() {
@@ -889,7 +915,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			defer tp.SetInvalidJWKS(false)
 			err = p.VerifyIDToken(ctx, idToken, "valid")
 			require.Error(err)
-			assert.Contains(err.Error(), "failed to decode keys")
+			assert.Truef(errors.Is(err, ErrInvalidJWKs), "wanted \"%s\" but got \"%s\"", ErrInvalidJWKs, err)
 		}()
 	})
 }
