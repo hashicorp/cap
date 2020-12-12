@@ -72,6 +72,8 @@ func WithAudiences(auds ...string) Option {
 			v.withAudiences = append(v.withAudiences, auds...)
 		case *stOptions:
 			v.withAudiences = append(v.withAudiences, auds...)
+		case *providerOptions:
+			v.withAudiences = append(v.withAudiences, auds...)
 		}
 	}
 }
