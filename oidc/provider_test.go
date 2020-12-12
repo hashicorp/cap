@@ -759,11 +759,111 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		},
 		{
 			name: "invalid-aud",
+			p: func() *Provider {
+				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+				p.config.SupportedSigningAlgs = []Alg{ES256}
+				p.config.Audiences = []string{"eve"}
+				return p
+			}(),
+			args: args{
+				keys: defaultKeys,
+				claims: func() map[string]interface{} {
+					c := defaultClaims()
+					c["aud"] = []string{"alice", "bob"}
+					return c
+				}(),
+				nonce: defaultValidNonce,
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidAudience,
+		},
+		{
+			name: "multiple-aud-does-not-inc-client-id",
 			p:    defaultProvider,
 			args: args{
-				keys:   defaultKeys,
-				claims: defaultClaims(),
-				nonce:  defaultValidNonce,
+				keys: defaultKeys,
+				claims: func() map[string]interface{} {
+					c := defaultClaims()
+					c["aud"] = []string{"alice", "bob"}
+					return c
+				}(),
+				nonce: defaultValidNonce,
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidAudience,
+		},
+		{
+			name: "missing-azp-multi-aud",
+			p:    defaultProvider,
+			args: args{
+				keys: defaultKeys,
+				claims: func() map[string]interface{} {
+					c := defaultClaims()
+					c["aud"] = []string{"alice", "bob", defaultProvider.config.ClientID}
+					return c
+				}(),
+				nonce: defaultValidNonce,
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidAuthorizedParty,
+		},
+		{
+			name: "invalid-azp-multi-aud",
+			p:    defaultProvider,
+			args: args{
+				keys: defaultKeys,
+				claims: func() map[string]interface{} {
+					c := defaultClaims()
+					c["aud"] = []string{"alice", "bob", defaultProvider.config.ClientID}
+					c["azp"] = "bob"
+					return c
+				}(),
+				nonce: defaultValidNonce,
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidAuthorizedParty,
+		},
+		{
+			name: "valid-azp-multi-aud",
+			p:    defaultProvider,
+			args: args{
+				keys: defaultKeys,
+				claims: func() map[string]interface{} {
+					c := defaultClaims()
+					c["aud"] = []string{"alice", "bob", defaultProvider.config.ClientID}
+					c["azp"] = defaultProvider.config.ClientID
+					return c
+				}(),
+				nonce: defaultValidNonce,
+			},
+		},
+		{
+			name: "single-aud-missing-azp",
+			p:    defaultProvider,
+			args: args{
+				keys: defaultKeys,
+				claims: func() map[string]interface{} {
+					c := defaultClaims()
+					c["aud"] = []string{"alice"}
+					return c
+				}(),
+				nonce: defaultValidNonce,
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidAuthorizedParty,
+		},
+		{
+			name: "single-aud-valid-azp",
+			p:    defaultProvider,
+			args: args{
+				keys: defaultKeys,
+				claims: func() map[string]interface{} {
+					c := defaultClaims()
+					c["aud"] = []string{"alice"}
+					c["azp"] = defaultProvider.config.ClientID
+					return c
+				}(),
+				nonce: defaultValidNonce,
 			},
 		},
 		{
