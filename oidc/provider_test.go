@@ -602,6 +602,7 @@ func TestProvider_UserInfo(t *testing.T) {
 }
 
 func TestProvider_VerifyIDToken(t *testing.T) {
+	t.Parallel()
 	type keys struct {
 		priv  crypto.PrivateKey
 		pub   crypto.PublicKey
@@ -618,8 +619,8 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 	require.NoError(t, err)
 	defaultKeys := keys{priv: k, pub: &k.PublicKey, alg: ES256, keyID: "valid-ES256"}
 	defaultValidNonce := "valid"
-	defaultClaims :=
-		map[string]interface{}{
+	defaultClaims := func() map[string]interface{} {
+		return map[string]interface{}{
 			"sub":   "alice@bob.com",
 			"aud":   []string{clientID},
 			"nbf":   float64(time.Now().Unix()),
@@ -628,6 +629,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			"id":    "1",
 			"nonce": defaultValidNonce,
 		}
+	}
 	type args struct {
 		keys           keys
 		claims         map[string]interface{}
@@ -651,7 +653,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			}(),
 			args: args{
 				keys:   defaultKeys,
-				claims: defaultClaims,
+				claims: defaultClaims(),
 				nonce:  defaultValidNonce,
 			},
 		},
@@ -664,7 +666,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			}(),
 			args: args{
 				keys:   defaultKeys,
-				claims: defaultClaims,
+				claims: defaultClaims(),
 				nonce:  "not-valid",
 			},
 			wantErr:   true,
@@ -679,7 +681,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			}(),
 			args: args{
 				keys:   defaultKeys,
-				claims: defaultClaims,
+				claims: defaultClaims(),
 				nonce:  defaultValidNonce,
 				opt:    []Option{WithAudiences(clientID, "second-aud")},
 			},
@@ -697,7 +699,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					require.NoError(t, err)
 					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
 				}(),
-				claims: defaultClaims,
+				claims: defaultClaims(),
 				nonce:  defaultValidNonce,
 			},
 			wantErr:   true,
@@ -717,7 +719,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					require.NoError(t, err)
 					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
 				}(),
-				claims: defaultClaims,
+				claims: defaultClaims(),
 				nonce:  defaultValidNonce,
 			},
 			wantErr:   true,
@@ -737,15 +739,8 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
 				}(),
 				claims: func() map[string]interface{} {
-					c := map[string]interface{}{
-						"sub":   "alice@bob.com",
-						"aud":   []string{clientID},
-						"nbf":   float64(time.Now().Add(10 * time.Minute).Unix()),
-						"iat":   float64(time.Now().Unix()),
-						"exp":   float64(time.Now().Add(1 * time.Minute).Unix()),
-						"id":    "1",
-						"nonce": defaultValidNonce,
-					}
+					c := defaultClaims()
+					c["nbf"] = float64(time.Now().Add(10 * time.Minute).Unix())
 					return c
 				}(),
 				nonce: defaultValidNonce,
@@ -767,15 +762,8 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
 				}(),
 				claims: func() map[string]interface{} {
-					c := map[string]interface{}{
-						"sub":   "alice@bob.com",
-						"aud":   []string{clientID},
-						"nbf":   float64(time.Now().Unix()),
-						"iat":   float64(time.Now().Unix()),
-						"exp":   float64(time.Now().Add(-10 * time.Minute).Unix()),
-						"id":    "1",
-						"nonce": defaultValidNonce,
-					}
+					c := defaultClaims()
+					c["exp"] = float64(time.Now().Add(-10 * time.Minute).Unix())
 					return c
 				}(),
 				nonce: defaultValidNonce,
@@ -797,15 +785,8 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
 				}(),
 				claims: func() map[string]interface{} {
-					c := map[string]interface{}{
-						"sub":   "alice@bob.com",
-						"aud":   []string{clientID},
-						"nbf":   float64(time.Now().Unix()),
-						"iat":   float64(time.Now().Add(10 * time.Minute).Unix()),
-						"exp":   float64(time.Now().Add(1 * time.Minute).Unix()),
-						"id":    "1",
-						"nonce": defaultValidNonce,
-					}
+					c := defaultClaims()
+					c["iat"] = float64(time.Now().Add(10 * time.Minute).Unix())
 					return c
 				}(),
 				nonce: defaultValidNonce,
@@ -826,7 +807,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					require.NoError(t, err)
 					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
 				}(),
-				claims: defaultClaims,
+				claims: defaultClaims(),
 				nonce:  defaultValidNonce,
 			},
 		},
@@ -864,8 +845,9 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		tp.SetSigningKeys(defaultKeys.priv, defaultKeys.pub, defaultKeys.alg, defaultKeys.keyID)
 		k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		require.NoError(err)
-		defaultClaims["iss"] = p.config.Issuer
-		idToken := IDToken(TestSignJWT(t, k, ES256, defaultClaims, []byte(defaultKeys.keyID)))
+		c := defaultClaims()
+		c["iss"] = p.config.Issuer
+		idToken := IDToken(TestSignJWT(t, k, ES256, c, []byte(defaultKeys.keyID)))
 		err = p.VerifyIDToken(ctx, idToken, "valid")
 		require.Error(err)
 		assert.Truef(errors.Is(err, ErrInvalidSignature), "wanted \"%s\" but got \"%s\"", ErrInvalidSignature, err)
@@ -891,16 +873,8 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		p := testNewProvider(t, clientID, clientSecret, redirect, tp)
 		p.config.SupportedSigningAlgs = []Alg{defaultKeys.alg}
 		tp.SetSigningKeys(defaultKeys.priv, defaultKeys.pub, defaultKeys.alg, defaultKeys.keyID)
-		claims := map[string]interface{}{
-			"sub":   "alice@bob.com",
-			"aud":   []string{clientID},
-			"nbf":   float64(time.Now().Unix()),
-			"iat":   float64(time.Now().Unix()),
-			"exp":   float64(time.Now().Add(1 * time.Minute).Unix()),
-			"id":    "1",
-			"nonce": defaultValidNonce,
-			"iss":   p.config.Issuer,
-		}
+		claims := defaultClaims()
+		claims["iss"] = p.config.Issuer
 		idToken := IDToken(TestSignJWT(t, defaultKeys.priv, defaultKeys.alg, claims, []byte(defaultKeys.keyID)))
 		func() {
 			tp.SetDisableJWKs(true)
