@@ -613,13 +613,20 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 	clientID := "test-client-id"
 	clientSecret := "test-client-secret"
 	redirect := "test-redirect"
+
 	tp := StartTestProvider(t)
 	tp.SetAllowedRedirectURIs([]string{redirect})
+
+	defaultProvider := testNewProvider(t, clientID, clientSecret, redirect, tp)
+	defaultProvider.config.SupportedSigningAlgs = []Alg{ES256}
+
 	k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	defaultKeys := keys{priv: k, pub: &k.PublicKey, alg: ES256, keyID: "valid-ES256"}
+
 	defaultValidNonce := "valid"
 	defaultClaims := func() map[string]interface{} {
+
 		return map[string]interface{}{
 			"sub":   "alice@bob.com",
 			"aud":   []string{clientID},
@@ -646,11 +653,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 	}{
 		{
 			name: "valid-ES256",
-			p: func() *Provider {
-				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
-				p.config.SupportedSigningAlgs = []Alg{ES256}
-				return p
-			}(),
+			p:    defaultProvider,
 			args: args{
 				keys:   defaultKeys,
 				claims: defaultClaims(),
@@ -659,11 +662,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		},
 		{
 			name: "nonces-not-equal",
-			p: func() *Provider {
-				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
-				p.config.SupportedSigningAlgs = []Alg{ES256}
-				return p
-			}(),
+			p:    defaultProvider,
 			args: args{
 				keys:   defaultKeys,
 				claims: defaultClaims(),
@@ -674,11 +673,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		},
 		{
 			name: "valid-with-audiences-option",
-			p: func() *Provider {
-				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
-				p.config.SupportedSigningAlgs = []Alg{ES256}
-				return p
-			}(),
+			p:    defaultProvider,
 			args: args{
 				keys:   defaultKeys,
 				claims: defaultClaims(),
@@ -707,37 +702,21 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		},
 		{
 			name: "bad-issuer",
-			p: func() *Provider {
-				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
-				p.config.SupportedSigningAlgs = []Alg{ES384}
-				return p
-			}(),
+			p:    defaultProvider,
 			args: args{
 				overrideIssuer: "bad-issuer",
-				keys: func() keys {
-					k, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
-					require.NoError(t, err)
-					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
-				}(),
-				claims: defaultClaims(),
-				nonce:  defaultValidNonce,
+				keys:           defaultKeys,
+				claims:         defaultClaims(),
+				nonce:          defaultValidNonce,
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidIssuer,
 		},
 		{
 			name: "bad-nbf",
-			p: func() *Provider {
-				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
-				p.config.SupportedSigningAlgs = []Alg{ES384}
-				return p
-			}(),
+			p:    defaultProvider,
 			args: args{
-				keys: func() keys {
-					k, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
-					require.NoError(t, err)
-					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
-				}(),
+				keys: defaultKeys,
 				claims: func() map[string]interface{} {
 					c := defaultClaims()
 					c["nbf"] = float64(time.Now().Add(10 * time.Minute).Unix())
@@ -750,17 +729,9 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		},
 		{
 			name: "bad-exp",
-			p: func() *Provider {
-				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
-				p.config.SupportedSigningAlgs = []Alg{ES384}
-				return p
-			}(),
+			p:    defaultProvider,
 			args: args{
-				keys: func() keys {
-					k, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
-					require.NoError(t, err)
-					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
-				}(),
+				keys: defaultKeys,
 				claims: func() map[string]interface{} {
 					c := defaultClaims()
 					c["exp"] = float64(time.Now().Add(-10 * time.Minute).Unix())
@@ -773,17 +744,9 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		},
 		{
 			name: "bad-iat",
-			p: func() *Provider {
-				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
-				p.config.SupportedSigningAlgs = []Alg{ES384}
-				return p
-			}(),
+			p:    defaultProvider,
 			args: args{
-				keys: func() keys {
-					k, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
-					require.NoError(t, err)
-					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
-				}(),
+				keys: defaultKeys,
 				claims: func() map[string]interface{} {
 					c := defaultClaims()
 					c["iat"] = float64(time.Now().Add(10 * time.Minute).Unix())
@@ -793,6 +756,15 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidIssuedAt,
+		},
+		{
+			name: "invalid-aud",
+			p:    defaultProvider,
+			args: args{
+				keys:   defaultKeys,
+				claims: defaultClaims(),
+				nonce:  defaultValidNonce,
+			},
 		},
 		{
 			name: "valid-ES384",
@@ -840,46 +812,36 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 	}
 	t.Run("bad-sig", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		p := testNewProvider(t, clientID, clientSecret, redirect, tp)
-		p.config.SupportedSigningAlgs = []Alg{defaultKeys.alg}
-		tp.SetSigningKeys(defaultKeys.priv, defaultKeys.pub, defaultKeys.alg, defaultKeys.keyID)
 		k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		require.NoError(err)
 		c := defaultClaims()
-		c["iss"] = p.config.Issuer
+		c["iss"] = defaultProvider.config.Issuer
 		idToken := IDToken(TestSignJWT(t, k, ES256, c, []byte(defaultKeys.keyID)))
-		err = p.VerifyIDToken(ctx, idToken, "valid")
+		err = defaultProvider.VerifyIDToken(ctx, idToken, "valid")
 		require.Error(err)
 		assert.Truef(errors.Is(err, ErrInvalidSignature), "wanted \"%s\" but got \"%s\"", ErrInvalidSignature, err)
 	})
 	t.Run("empty-token", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		p := testNewProvider(t, clientID, clientSecret, redirect, tp)
-		p.config.SupportedSigningAlgs = []Alg{ES256}
-		err := p.VerifyIDToken(ctx, "", "nonce")
+		err := defaultProvider.VerifyIDToken(ctx, "", "nonce")
 		require.Error(err)
 		assert.Truef(errors.Is(err, ErrInvalidParameter), "wanted \"%s\" but got \"%s\"", ErrInvalidParameter, err)
 	})
 	t.Run("empty-nonce", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		p := testNewProvider(t, clientID, clientSecret, redirect, tp)
-		p.config.SupportedSigningAlgs = []Alg{ES256}
-		err := p.VerifyIDToken(ctx, "token", "")
+		err := defaultProvider.VerifyIDToken(ctx, "token", "")
 		require.Error(err)
 		assert.Truef(errors.Is(err, ErrInvalidParameter), "wanted \"%s\" but got \"%s\"", ErrInvalidParameter, err)
 	})
 	t.Run("missing-and-disabled-jwks", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		p := testNewProvider(t, clientID, clientSecret, redirect, tp)
-		p.config.SupportedSigningAlgs = []Alg{defaultKeys.alg}
-		tp.SetSigningKeys(defaultKeys.priv, defaultKeys.pub, defaultKeys.alg, defaultKeys.keyID)
 		claims := defaultClaims()
-		claims["iss"] = p.config.Issuer
+		claims["iss"] = defaultProvider.config.Issuer
 		idToken := IDToken(TestSignJWT(t, defaultKeys.priv, defaultKeys.alg, claims, []byte(defaultKeys.keyID)))
 		func() {
 			tp.SetDisableJWKs(true)
 			defer tp.SetDisableJWKs(false)
-			err := p.VerifyIDToken(ctx, idToken, "valid")
+			err := defaultProvider.VerifyIDToken(ctx, idToken, "valid")
 			require.Error(err)
 			assert.Truef(errors.Is(err, ErrInvalidJWKs), "wanted \"%s\" but got \"%s\"", ErrInvalidJWKs, err)
 		}()
@@ -887,7 +849,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		func() {
 			tp.SetInvalidJWKS(true)
 			defer tp.SetInvalidJWKS(false)
-			err = p.VerifyIDToken(ctx, idToken, "valid")
+			err = defaultProvider.VerifyIDToken(ctx, idToken, "valid")
 			require.Error(err)
 			assert.Truef(errors.Is(err, ErrInvalidJWKs), "wanted \"%s\" but got \"%s\"", ErrInvalidJWKs, err)
 		}()
