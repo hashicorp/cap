@@ -349,7 +349,7 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, nonce string, o
 	}(); err != nil {
 		return fmt.Errorf("%s: invalid id_token audiences: %w", op, err)
 	}
-	if len(oidcIDToken.Audience) > 1 && strutils.StrListContains(oidcIDToken.Audience, p.config.ClientID) {
+	if len(oidcIDToken.Audience) > 1 && !strutils.StrListContains(oidcIDToken.Audience, p.config.ClientID) {
 		return fmt.Errorf("%s: invalid id_token: multiple audiences (%s) and one of them is not equal client_id (%s): %w", op, oidcIDToken.Audience, p.config.ClientID, ErrInvalidAudience)
 	}
 
