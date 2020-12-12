@@ -451,6 +451,16 @@ func TestProvider_Exchange(t *testing.T) {
 		assert.Truef(errors.Is(err, ErrMissingIDToken), "wanted \"%s\" but got \"%s\"", ErrMissingIDToken, err)
 		assert.Empty(gotTk)
 	})
+	t.Run("omit-access-token", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		tp.SetOmitAccessTokens(true)
+		defer tp.SetOmitAccessTokens(false)
+		tp.SetExpectedAuthCode("valid-code")
+		gotTk, err := p.Exchange(ctx, validState, validState.ID(), "valid-code")
+		require.Error(err)
+		assert.Nil(gotTk)
+		assert.Contains(err.Error(), "oauth2: server response missing access_token")
+	})
 	t.Run("expired-token", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
 		tp.SetOmitIDTokens(false)
@@ -608,6 +618,15 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 	k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	defaultKeys := keys{priv: k, pub: &k.PublicKey, alg: ES256, keyID: "valid-ES256"}
+	defaultClaims :=
+		jwt.Claims{
+			Subject:   "alice@bob.com",
+			Audience:  jwt.Audience{clientID},
+			NotBefore: jwt.NewNumericDate(time.Now()),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Expiry:    jwt.NewNumericDate(time.Now().Add(1 * time.Minute)),
+			ID:        "1",
+		}
 	type args struct {
 		keys    keys
 		claims  jwt.Claims
@@ -616,11 +635,12 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		opt     []Option
 	}
 	tests := []struct {
-		name      string
-		p         *Provider
-		args      args
-		wantErr   bool
-		wantIsErr error
+		name            string
+		p               *Provider
+		args            args
+		wantErr         bool
+		wantIsErr       error
+		wantErrContains string
 	}{
 		{
 			name: "valid-ES256",
@@ -630,42 +650,8 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 				return p
 			}(),
 			args: args{
-				keys: defaultKeys,
-				claims: jwt.Claims{
-					Subject:   "alice@bob.com",
-					Audience:  jwt.Audience{clientID},
-					NotBefore: jwt.NewNumericDate(time.Now()),
-					IssuedAt:  jwt.NewNumericDate(time.Now()),
-					Expiry:    jwt.NewNumericDate(time.Now().Add(10 * time.Second)),
-					ID:        "1",
-				},
-				pClaims: map[string]interface{}{
-					"nonce": "valid",
-				},
-				nonce: "valid",
-			},
-		},
-		{
-			name: "valid-ES384",
-			p: func() *Provider {
-				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
-				p.config.SupportedSigningAlgs = []Alg{ES384}
-				return p
-			}(),
-			args: args{
-				keys: func() keys {
-					k, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
-					require.NoError(t, err)
-					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
-				}(),
-				claims: jwt.Claims{
-					Subject:   "alice@bob.com",
-					Audience:  jwt.Audience{clientID},
-					NotBefore: jwt.NewNumericDate(time.Now()),
-					IssuedAt:  jwt.NewNumericDate(time.Now()),
-					Expiry:    jwt.NewNumericDate(time.Now().Add(10 * time.Second)),
-					ID:        "1",
-				},
+				keys:   defaultKeys,
+				claims: defaultClaims,
 				pClaims: map[string]interface{}{
 					"nonce": "valid",
 				},
@@ -680,15 +666,8 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 				return p
 			}(),
 			args: args{
-				keys: defaultKeys,
-				claims: jwt.Claims{
-					Subject:   "alice@bob.com",
-					Audience:  jwt.Audience{clientID},
-					NotBefore: jwt.NewNumericDate(time.Now()),
-					IssuedAt:  jwt.NewNumericDate(time.Now()),
-					Expiry:    jwt.NewNumericDate(time.Now().Add(10 * time.Second)),
-					ID:        "1",
-				},
+				keys:   defaultKeys,
+				claims: defaultClaims,
 				pClaims: map[string]interface{}{
 					"nonce": "valid",
 				},
@@ -705,15 +684,8 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 				return p
 			}(),
 			args: args{
-				keys: defaultKeys,
-				claims: jwt.Claims{
-					Subject:   "alice@bob.com",
-					Audience:  jwt.Audience{clientID},
-					NotBefore: jwt.NewNumericDate(time.Now()),
-					IssuedAt:  jwt.NewNumericDate(time.Now()),
-					Expiry:    jwt.NewNumericDate(time.Now().Add(10 * time.Second)),
-					ID:        "1",
-				},
+				keys:   defaultKeys,
+				claims: defaultClaims,
 				pClaims: map[string]interface{}{
 					"nonce": "valid",
 				},
@@ -721,17 +693,68 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 				opt:   []Option{WithAudiences(clientID, "second-aud")},
 			},
 		},
+		{
+			name: "unsupported-alg",
+			p: func() *Provider {
+				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+				p.config.SupportedSigningAlgs = []Alg{RS256}
+				return p
+			}(),
+			args: args{
+				keys: func() keys {
+					k, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+					require.NoError(t, err)
+					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
+				}(),
+				claims: defaultClaims,
+				pClaims: map[string]interface{}{
+					"nonce": "valid",
+				},
+				nonce: "valid",
+			},
+			wantErr:         true,
+			wantErrContains: "signed with unsupported algorithm",
+		},
+		{
+			name: "valid-ES384",
+			p: func() *Provider {
+				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+				p.config.SupportedSigningAlgs = []Alg{ES384}
+				return p
+			}(),
+			args: args{
+				keys: func() keys {
+					k, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+					require.NoError(t, err)
+					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
+				}(),
+				claims: defaultClaims,
+				pClaims: map[string]interface{}{
+					"nonce": "valid",
+				},
+				nonce: "valid",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
 			tp.SetSigningKeys(tt.args.keys.priv, tt.args.keys.pub, tt.args.keys.alg, tt.args.keys.keyID)
+			priv, pub, alg := tp.SigningKeys()
+			require.Equalf(tt.args.keys.priv, priv, "TestProvider priv key is invalid")
+			require.Equalf(tt.args.keys.pub, pub, "TestProvider pub key is invalid")
+			require.Equalf(tt.args.keys.alg, alg, "TestProvider alg key is invalid")
 			tt.args.claims.Issuer = tt.p.config.Issuer
 			idToken := IDToken(TestSignJWT(t, tt.args.keys.priv, tt.args.keys.alg, tt.args.claims, tt.args.pClaims, []byte(tt.args.keys.keyID)))
 			err := tt.p.VerifyIDToken(ctx, idToken, tt.args.nonce, tt.args.opt...)
 			if tt.wantErr {
 				require.Error(err)
-				assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)
+				if tt.wantIsErr != nil {
+					assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)
+				}
+				if tt.wantErrContains != "" {
+					assert.Containsf(err.Error(), tt.wantErrContains, "wanted \"%s\" but got \"%s\"", tt.wantErrContains, err)
+				}
 				return
 			}
 			require.NoError(err)
@@ -752,5 +775,30 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		err := p.VerifyIDToken(ctx, "token", "")
 		require.Error(err)
 		assert.Truef(errors.Is(err, ErrInvalidParameter), "wanted \"%s\" but got \"%s\"", ErrInvalidParameter, err)
+	})
+	t.Run("missing-and-disabled-jwks", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+		p.config.SupportedSigningAlgs = []Alg{defaultKeys.alg}
+		tp.SetSigningKeys(defaultKeys.priv, defaultKeys.pub, defaultKeys.alg, defaultKeys.keyID)
+		claims := defaultClaims
+		claims.Issuer = p.config.Issuer
+		pClaims := map[string]interface{}{"nonce": "valid"}
+		idToken := IDToken(TestSignJWT(t, defaultKeys.priv, defaultKeys.alg, claims, pClaims, []byte(defaultKeys.keyID)))
+		func() {
+			tp.SetDisableJWKs(true)
+			defer tp.SetDisableJWKs(false)
+			err := p.VerifyIDToken(ctx, idToken, "valid")
+			require.Error(err)
+			assert.Contains(err.Error(), "get keys failed: 404 Not Found")
+		}()
+		idToken = IDToken(TestSignJWT(t, defaultKeys.priv, defaultKeys.alg, claims, pClaims, []byte(defaultKeys.keyID)))
+		func() {
+			tp.SetInvalidJWKS(true)
+			defer tp.SetInvalidJWKS(false)
+			err = p.VerifyIDToken(ctx, idToken, "valid")
+			require.Error(err)
+			assert.Contains(err.Error(), "failed to decode keys")
+		}()
 	})
 }
