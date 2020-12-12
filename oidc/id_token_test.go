@@ -54,7 +54,7 @@ func TestIDToken_Claims(t *testing.T) {
 		Audience: []string{"www.example.com"},
 		Subject:  "alice@example.com",
 	}
-	testJWT := TestSignJWT(t, priv, ES256, claims, map[string]interface{}{})
+	testJWT := TestSignJWT(t, priv, ES256, claims, map[string]interface{}{}, nil)
 	t.Parallel()
 	t.Run("all-claim", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
@@ -212,7 +212,7 @@ func TestIDToken_VerifyAccessToken(t *testing.T) {
 			additionalClaims := map[string]interface{}{
 				"at_hash": testHashAccessToken(t, tt.alg, tt.accessToken),
 			}
-			testJWT := TestSignJWT(t, tt.priKey, tt.alg, stdClaims, additionalClaims)
+			testJWT := TestSignJWT(t, tt.priKey, tt.alg, stdClaims, additionalClaims, nil)
 			tk := IDToken(testJWT)
 			err := tk.VerifyAccessToken(tt.accessToken)
 			require.NoError(err)
