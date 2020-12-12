@@ -755,6 +755,36 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			wantErrContains: "before the nbf (not before) time",
 		},
 		{
+			name: "bad-exp",
+			p: func() *Provider {
+				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+				p.config.SupportedSigningAlgs = []Alg{ES384}
+				return p
+			}(),
+			args: args{
+				keys: func() keys {
+					k, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+					require.NoError(t, err)
+					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
+				}(),
+				claims: func() map[string]interface{} {
+					c := map[string]interface{}{
+						"sub":   "alice@bob.com",
+						"aud":   []string{clientID},
+						"nbf":   float64(time.Now().Unix()),
+						"iat":   float64(time.Now().Unix()),
+						"exp":   float64(time.Now().Add(-10 * time.Minute).Unix()),
+						"id":    "1",
+						"nonce": defaultValidNonce,
+					}
+					return c
+				}(),
+				nonce: defaultValidNonce,
+			},
+			wantErr:         true,
+			wantErrContains: "token is expired ",
+		},
+		{
 			name: "valid-ES384",
 			p: func() *Provider {
 				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
@@ -801,6 +831,19 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			require.NoError(err)
 		})
 	}
+	t.Run("bad-sig", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+		p.config.SupportedSigningAlgs = []Alg{defaultKeys.alg}
+		tp.SetSigningKeys(defaultKeys.priv, defaultKeys.pub, defaultKeys.alg, defaultKeys.keyID)
+		k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		require.NoError(err)
+		defaultClaims["iss"] = p.config.Issuer
+		idToken := IDToken(TestSignJWT(t, k, ES256, defaultClaims, []byte(defaultKeys.keyID)))
+		err = p.VerifyIDToken(ctx, idToken, "valid")
+		require.Error(err)
+		assert.Contains(err.Error(), "failed to verify id token signature")
+	})
 	t.Run("empty-token", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
 		p := testNewProvider(t, clientID, clientSecret, redirect, tp)
