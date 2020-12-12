@@ -317,7 +317,7 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, nonce string, o
 	// verifier.Verify will check the supported algs, signature, iss, exp, nbf, the aud includes the client_id
 	oidcIDToken, err := verifier.Verify(ctx, string(t))
 	if err != nil {
-		return fmt.Errorf("%s: invalid id_token signature: %w", op, err)
+		return fmt.Errorf("%s: invalid id_token: %w", op, err)
 	}
 	// so.. we still need to check: nonce, iat, auth_time, azp, the aud includes
 	// additional audiences configured.
