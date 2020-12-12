@@ -327,7 +327,13 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, nonce string, o
 		return fmt.Errorf("%s: invalid id_token nonce: %w", op, ErrInvalidNonce)
 	}
 	if nowTime.Add(leeway).Before(oidcIDToken.IssuedAt) {
-		return fmt.Errorf("%s: invalid id_token current time %v before the iat (issued at) time %v: %w", op, nowTime, oidcIDToken.IssuedAt, ErrInvalidIssuedAt)
+		return fmt.Errorf(
+			"%s: invalid id_token current time %v before the iat (issued at) time %v: %w",
+			op,
+			nowTime,
+			oidcIDToken.IssuedAt,
+			ErrInvalidIssuedAt,
+		)
 	}
 
 	opts := getProviderOpts(opt...)
