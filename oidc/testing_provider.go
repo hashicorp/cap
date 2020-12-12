@@ -3,6 +3,9 @@ package oidc
 import (
 	"bytes"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -155,7 +158,9 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 		},
 	}
 
-	p.pubKey, p.privKey = TestGenerateKeys(t)
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(err)
+	p.pubKey, p.privKey = &priv.PublicKey, priv
 	p.alg = ES256
 	p.jwks = &jose.JSONWebKeySet{
 		Keys: []jose.JSONWebKey{

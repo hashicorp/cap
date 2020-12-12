@@ -57,94 +57,6 @@ func TestSignJWT(t *testing.T, key crypto.PrivateKey, alg Alg, claims interface{
 	return raw
 }
 
-func testHashAccessToken(t *testing.T, idSigTokenAlg Alg, token AccessToken) string {
-	t.Helper()
-	require := require.New(t)
-	var h hash.Hash
-	switch idSigTokenAlg {
-	case RS256, ES256, PS256:
-		h = sha256.New()
-	case RS384, ES384, PS384:
-		h = sha512.New384()
-	case RS512, ES512, PS512:
-		h = sha512.New()
-	default:
-		require.FailNowf("testHashAccessToken: unsupported signing algorithm %q: %w", string(idSigTokenAlg))
-	}
-	require.NotNil(h)
-	_, _ = h.Write([]byte(string(token))) // hash documents that Write will never return an error
-	sum := h.Sum(nil)[:h.Size()/2]
-	actual := base64.RawURLEncoding.EncodeToString(sum)
-	return actual
-}
-
-// testDefaultJWT is internally helpful, but for now we won't export it.
-func testDefaultJWT(t *testing.T, privKey crypto.PrivateKey, expireIn time.Duration, nonce string, additionalClaims map[string]interface{}) string {
-	t.Helper()
-	now := float64(time.Now().Unix())
-	claims := map[string]interface{}{
-		"iss":   "https://example.com/",
-		"iat":   now,
-		"nbf":   now,
-		"exp":   float64(time.Now().Unix()),
-		"aud":   []string{"www.example.com"},
-		"sub":   "alice@example.com",
-		"nonce": nonce,
-	}
-	for k, v := range additionalClaims {
-		claims[k] = v
-	}
-	testJWT := TestSignJWT(t, privKey, ES256, claims, nil)
-	return testJWT
-}
-
-// testNewConfig creates a new config from the TestProvider.
-// This is helpful internally, but intentionally not exported.
-func testNewConfig(t *testing.T, clientID, clientSecret, redirectURL string, tp *TestProvider) *Config {
-	const op = "testNewConfig"
-	t.Helper()
-	require := require.New(t)
-
-	require.NotEmptyf(clientID, "%s: client id is empty", op)
-	require.NotEmptyf(clientSecret, "%s: client secret is empty", op)
-	require.NotEmptyf(redirectURL, "%s: redirect URL is empty", op)
-
-	tp.SetClientCreds(clientID, clientSecret)
-	_, _, alg := tp.SigningKeys()
-	c, err := NewConfig(
-		tp.Addr(),
-		clientID,
-		ClientSecret(clientSecret),
-		[]Alg{alg},
-		redirectURL,
-		nil,
-		WithProviderCA(tp.CACert()),
-	)
-	require.NoError(err)
-	return c
-}
-
-func testNewProvider(t *testing.T, clientID, clientSecret, redirectURL string, tp *TestProvider) *Provider {
-	const op = "testNewProvider"
-	t.Helper()
-	require := require.New(t)
-	require.NotEmptyf(clientID, "%s: client id is empty", op)
-	require.NotEmptyf(clientSecret, "%s: client secret is empty", op)
-	require.NotEmptyf(redirectURL, "%s: redirect URL is empty", op)
-
-	tc := testNewConfig(t, clientID, clientSecret, redirectURL, tp)
-	p, err := NewProvider(tc)
-	require.NoError(err)
-	return p
-}
-
-func testAssertEqualFunc(t *testing.T, wantFunc, gotFunc interface{}, format string, args ...interface{}) {
-	t.Helper()
-	want := runtime.FuncForPC(reflect.ValueOf(wantFunc).Pointer()).Name()
-	got := runtime.FuncForPC(reflect.ValueOf(gotFunc).Pointer()).Name()
-	assert.Equalf(t, want, got, format, args...)
-}
-
 // TestGenerateCA will generate a test x509 CA cert, along with it encoded in a
 // PEM format.
 func TestGenerateCA(t *testing.T, hosts []string) (*x509.Certificate, string) {
@@ -197,4 +109,104 @@ func TestGenerateCA(t *testing.T, hosts []string) (*x509.Certificate, string) {
 	require.NoError(err)
 
 	return c, string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes}))
+}
+
+// testHashAccessToken will generate an id_token at_hash claim using the
+// id_token's signature algorithm. This is helpful internally, but
+// intentionally not exported.
+func testHashAccessToken(t *testing.T, signatureAlg Alg, token AccessToken) string {
+	t.Helper()
+	require := require.New(t)
+	var h hash.Hash
+	switch signatureAlg {
+	case RS256, ES256, PS256:
+		h = sha256.New()
+	case RS384, ES384, PS384:
+		h = sha512.New384()
+	case RS512, ES512, PS512:
+		h = sha512.New()
+	default:
+		require.FailNowf("testHashAccessToken: unsupported signing algorithm %q: %w", string(signatureAlg))
+	}
+	require.NotNil(h)
+	_, _ = h.Write([]byte(string(token))) // hash documents that Write will never return an error
+	sum := h.Sum(nil)[:h.Size()/2]
+	actual := base64.RawURLEncoding.EncodeToString(sum)
+	return actual
+}
+
+// testDefaultJWT creates a default test JWT and is internally helpful, but for now we won't export it.
+func testDefaultJWT(t *testing.T, privKey crypto.PrivateKey, expireIn time.Duration, nonce string, additionalClaims map[string]interface{}) string {
+	t.Helper()
+	now := float64(time.Now().Unix())
+	claims := map[string]interface{}{
+		"iss":   "https://example.com/",
+		"iat":   now,
+		"nbf":   now,
+		"exp":   float64(time.Now().Unix()),
+		"aud":   []string{"www.example.com"},
+		"sub":   "alice@example.com",
+		"nonce": nonce,
+	}
+	for k, v := range additionalClaims {
+		claims[k] = v
+	}
+	testJWT := TestSignJWT(t, privKey, ES256, claims, nil)
+	return testJWT
+}
+
+// testNewConfig creates a new config from the TestProvider. It will set the
+// TestProvider's client ID/secret and use the TestProviders signing algorithm
+// when building the configuration. This is helpful internally, but
+// intentionally not exported.
+func testNewConfig(t *testing.T, clientID, clientSecret, redirectURL string, tp *TestProvider) *Config {
+	const op = "testNewConfig"
+	t.Helper()
+	require := require.New(t)
+
+	require.NotEmptyf(clientID, "%s: client id is empty", op)
+	require.NotEmptyf(clientSecret, "%s: client secret is empty", op)
+	require.NotEmptyf(redirectURL, "%s: redirect URL is empty", op)
+
+	tp.SetClientCreds(clientID, clientSecret)
+	_, _, alg := tp.SigningKeys()
+	c, err := NewConfig(
+		tp.Addr(),
+		clientID,
+		ClientSecret(clientSecret),
+		[]Alg{alg},
+		redirectURL,
+		nil,
+		WithProviderCA(tp.CACert()),
+	)
+	require.NoError(err)
+	return c
+}
+
+// testNewProvider creates a new Provider.  It uses the TestProvider (tp) to properly
+// construct the provider's configuration (see testNewConfig). This is helpful internally, but
+// intentionally not exported.
+func testNewProvider(t *testing.T, clientID, clientSecret, redirectURL string, tp *TestProvider) *Provider {
+	const op = "testNewProvider"
+	t.Helper()
+	require := require.New(t)
+	require.NotEmptyf(clientID, "%s: client id is empty", op)
+	require.NotEmptyf(clientSecret, "%s: client secret is empty", op)
+	require.NotEmptyf(redirectURL, "%s: redirect URL is empty", op)
+
+	tc := testNewConfig(t, clientID, clientSecret, redirectURL, tp)
+	p, err := NewProvider(tc)
+	require.NoError(err)
+	t.Cleanup(p.Done)
+	return p
+}
+
+// testAssertEqualFunc gives you a way to assert that two functions (passed as
+// interface{}) are equal.  This is helpful internally, but intentionally not
+// exported.
+func testAssertEqualFunc(t *testing.T, wantFunc, gotFunc interface{}, format string, args ...interface{}) {
+	t.Helper()
+	want := runtime.FuncForPC(reflect.ValueOf(wantFunc).Pointer()).Name()
+	got := runtime.FuncForPC(reflect.ValueOf(gotFunc).Pointer()).Name()
+	assert.Equalf(t, want, got, format, args...)
 }
