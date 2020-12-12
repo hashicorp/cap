@@ -3,6 +3,9 @@ package oidc
 import (
 	"context"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"net/http"
@@ -333,11 +336,12 @@ func TestProvider_Exchange(t *testing.T) {
 	require.NoError(t, err)
 
 	type args struct {
-		ctx           context.Context
-		s             State
-		authState     string
-		authCode      string
-		expectedNonce string
+		ctx               context.Context
+		s                 State
+		authState         string
+		authCode          string
+		expectedNonce     string
+		expectedAudiences []string
 	}
 	tests := []struct {
 		name      string
@@ -360,10 +364,11 @@ func TestProvider_Exchange(t *testing.T) {
 			name: "valid-all-opts-state",
 			p:    p,
 			args: args{
-				ctx:       ctx,
-				s:         allOptsState,
-				authState: allOptsState.ID(),
-				authCode:  "test-code",
+				ctx:               ctx,
+				s:                 allOptsState,
+				authState:         allOptsState.ID(),
+				authCode:          "test-code",
+				expectedAudiences: []string{"state-override"},
 			},
 		},
 		{
@@ -408,6 +413,10 @@ func TestProvider_Exchange(t *testing.T) {
 			}
 			if tt.args.expectedNonce != "" {
 				tp.SetExpectedAuthNonce(tt.args.expectedNonce)
+			}
+			if len(tt.args.expectedAudiences) != 0 {
+				tp.SetCustomAudience(tt.args.expectedAudiences...)
+				tp.SetCustomClaims(map[string]interface{}{"azp": clientID})
 			}
 			gotTk, err := tt.p.Exchange(tt.args.ctx, tt.args.s, tt.args.authState, tt.args.authCode)
 			if tt.wantErr {
@@ -584,17 +593,23 @@ func TestProvider_UserInfo(t *testing.T) {
 }
 
 func TestProvider_VerifyIDToken(t *testing.T) {
+	type keys struct {
+		priv  crypto.PrivateKey
+		pub   crypto.PublicKey
+		alg   Alg
+		keyID string
+	}
 	ctx := context.Background()
 	clientID := "test-client-id"
 	clientSecret := "test-client-secret"
 	redirect := "test-redirect"
 	tp := StartTestProvider(t)
 	tp.SetAllowedRedirectURIs([]string{redirect})
-	p := testNewProvider(t, clientID, clientSecret, redirect, tp)
-
+	k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	defaultKeys := keys{priv: k, pub: &k.PublicKey, alg: ES256, keyID: "valid-ES256"}
 	type args struct {
-		key     crypto.PrivateKey
-		alg     Alg
+		keys    keys
 		claims  jwt.Claims
 		pClaims interface{}
 		nonce   string
@@ -608,16 +623,15 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		wantIsErr error
 	}{
 		{
-			name: "valid",
-			p:    p,
+			name: "valid-ES256",
+			p: func() *Provider {
+				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+				p.config.SupportedSigningAlgs = []Alg{ES256}
+				return p
+			}(),
 			args: args{
-				key: func() crypto.PrivateKey {
-					pKey, _ := tp.SigningKeys()
-					return pKey
-				}(),
-				alg: ES256,
+				keys: defaultKeys,
 				claims: jwt.Claims{
-					Issuer:    p.config.Issuer,
 					Subject:   "alice@bob.com",
 					Audience:  jwt.Audience{clientID},
 					NotBefore: jwt.NewNumericDate(time.Now()),
@@ -631,11 +645,89 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 				nonce: "valid",
 			},
 		},
+		{
+			name: "valid-ES384",
+			p: func() *Provider {
+				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+				p.config.SupportedSigningAlgs = []Alg{ES384}
+				return p
+			}(),
+			args: args{
+				keys: func() keys {
+					k, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+					require.NoError(t, err)
+					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
+				}(),
+				claims: jwt.Claims{
+					Subject:   "alice@bob.com",
+					Audience:  jwt.Audience{clientID},
+					NotBefore: jwt.NewNumericDate(time.Now()),
+					IssuedAt:  jwt.NewNumericDate(time.Now()),
+					Expiry:    jwt.NewNumericDate(time.Now().Add(10 * time.Second)),
+					ID:        "1",
+				},
+				pClaims: map[string]interface{}{
+					"nonce": "valid",
+				},
+				nonce: "valid",
+			},
+		},
+		{
+			name: "nonces-not-equal",
+			p: func() *Provider {
+				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+				p.config.SupportedSigningAlgs = []Alg{ES256}
+				return p
+			}(),
+			args: args{
+				keys: defaultKeys,
+				claims: jwt.Claims{
+					Subject:   "alice@bob.com",
+					Audience:  jwt.Audience{clientID},
+					NotBefore: jwt.NewNumericDate(time.Now()),
+					IssuedAt:  jwt.NewNumericDate(time.Now()),
+					Expiry:    jwt.NewNumericDate(time.Now().Add(10 * time.Second)),
+					ID:        "1",
+				},
+				pClaims: map[string]interface{}{
+					"nonce": "valid",
+				},
+				nonce: "not-valid",
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidNonce,
+		},
+		{
+			name: "valid-with-audiences-option",
+			p: func() *Provider {
+				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+				p.config.SupportedSigningAlgs = []Alg{ES256}
+				return p
+			}(),
+			args: args{
+				keys: defaultKeys,
+				claims: jwt.Claims{
+					Subject:   "alice@bob.com",
+					Audience:  jwt.Audience{clientID},
+					NotBefore: jwt.NewNumericDate(time.Now()),
+					IssuedAt:  jwt.NewNumericDate(time.Now()),
+					Expiry:    jwt.NewNumericDate(time.Now().Add(10 * time.Second)),
+					ID:        "1",
+				},
+				pClaims: map[string]interface{}{
+					"nonce": "valid",
+				},
+				nonce: "valid",
+				opt:   []Option{WithAudiences(clientID, "second-aud")},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			idToken := IDToken(TestSignJWT(t, tt.args.key, tt.args.alg, tt.args.claims, tt.args.pClaims))
+			tp.SetSigningKeys(tt.args.keys.priv, tt.args.keys.pub, tt.args.keys.alg, tt.args.keys.keyID)
+			tt.args.claims.Issuer = tt.p.config.Issuer
+			idToken := IDToken(TestSignJWT(t, tt.args.keys.priv, tt.args.keys.alg, tt.args.claims, tt.args.pClaims, []byte(tt.args.keys.keyID)))
 			err := tt.p.VerifyIDToken(ctx, idToken, tt.args.nonce, tt.args.opt...)
 			if tt.wantErr {
 				require.Error(err)
@@ -645,4 +737,20 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			require.NoError(err)
 		})
 	}
+	t.Run("empty-token", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+		p.config.SupportedSigningAlgs = []Alg{ES256}
+		err := p.VerifyIDToken(ctx, "", "nonce")
+		require.Error(err)
+		assert.Truef(errors.Is(err, ErrInvalidParameter), "wanted \"%s\" but got \"%s\"", ErrInvalidParameter, err)
+	})
+	t.Run("empty-nonce", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+		p.config.SupportedSigningAlgs = []Alg{ES256}
+		err := p.VerifyIDToken(ctx, "token", "")
+		require.Error(err)
+		assert.Truef(errors.Is(err, ErrInvalidParameter), "wanted \"%s\" but got \"%s\"", ErrInvalidParameter, err)
+	})
 }
