@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
@@ -998,6 +999,24 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					k, err := rsa.GenerateKey(rand.Reader, 2048)
 					require.NoError(t, err)
 					return keys{priv: k, pub: &k.PublicKey, alg: PS512, keyID: "valid-PS512"}
+				}(),
+				claims: defaultClaims(),
+				nonce:  defaultValidNonce,
+			},
+		},
+		{
+			name: "valid-EdDSA",
+			p: func() *Provider {
+				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+				p.config.SupportedSigningAlgs = []Alg{EdDSA}
+				return p
+			}(),
+			args: args{
+				keys: func() keys {
+					pub, priv, err := ed25519.GenerateKey(rand.Reader)
+					require.NoError(t, err)
+					// notice the pub key is not a pointer in this case!!!!
+					return keys{priv: priv, pub: pub, alg: EdDSA, keyID: "valid-EdDSA"}
 				}(),
 				claims: defaultClaims(),
 				nonce:  defaultValidNonce,
