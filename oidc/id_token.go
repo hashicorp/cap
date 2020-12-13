@@ -80,7 +80,6 @@ func (t IDToken) VerifyAccessToken(accessToken AccessToken) error {
 	}
 
 	sigAlgorithm := Alg(sig.Header.Algorithm)
-	fmt.Println(sigAlgorithm)
 
 	var h hash.Hash
 	switch sigAlgorithm {
