@@ -16,6 +16,7 @@ const (
 	PS256 Alg = "PS256" // RSASSA-PSS using SHA256 and MGF1-SHA256
 	PS384 Alg = "PS384" // RSASSA-PSS using SHA384 and MGF1-SHA384
 	PS512 Alg = "PS512" // RSASSA-PSS using SHA512 and MGF1-SHA512
+	EdDSA Alg = "EdDSA"
 )
 
 var supportedAlgorithms = map[Alg]bool{
@@ -28,4 +29,5 @@ var supportedAlgorithms = map[Alg]bool{
 	PS256: true,
 	PS384: true,
 	PS512: true,
+	EdDSA: true,
 }

@@ -47,25 +47,29 @@ type StaticTokenSource interface {
 type Tk struct {
 	idToken    IDToken
 	underlying *oauth2.Token
+
+	// nowFunc is an optional function that returns the current time
+	nowFunc func() time.Time
 }
 
-// ensure that Tk implements the Token interface.
+// ensure that Tk implements the Token interface
 var _ Token = (*Tk)(nil)
 
 // NewToken creates a new Token (*Tk).  The IDToken is required and the
-// *oauth2.Token may be nil.
-func NewToken(i IDToken, t *oauth2.Token) (*Tk, error) {
+// *oauth2.Token may be nil.  Supports the WithNow option (with a default to
+// time.Now).
+func NewToken(i IDToken, t *oauth2.Token, opt ...Option) (*Tk, error) {
 	// since oauth2 is part of stdlib we're not going to worry about it leaking
 	// into our abstraction in this factory
 	const op = "NewToken"
-
 	if i == "" {
 		return nil, fmt.Errorf("%s: id_token is empty: %w", op, ErrInvalidParameter)
-
 	}
+	opts := getTokenOpts(opt...)
 	return &Tk{
 		idToken:    i,
 		underlying: t,
+		nowFunc:    opts.withNowFunc,
 	}, nil
 }
 
@@ -133,6 +137,33 @@ func (t *Tk) Valid() bool {
 		return false
 	}
 	return !t.IsExpired()
+}
+
+// now returns the current time using the optional nowFunc.
+func (t *Tk) now() time.Time {
+	if t.nowFunc != nil {
+		return t.nowFunc()
+	}
+	return time.Now() // fallback to this default
+}
+
+// tokenOptions is the set of available options for Token functions
+type tokenOptions struct {
+	withNowFunc func() time.Time
+}
+
+// tokenDefaults is a handy way to get the defaults at runtime and during unit
+// tests.
+func tokenDefaults() tokenOptions {
+	return tokenOptions{}
+}
+
+// getTokenOpts gets the token defaults and applies the opt overrides passed
+// in
+func getTokenOpts(opt ...Option) tokenOptions {
+	opts := tokenDefaults()
+	ApplyOpts(&opts, opt...)
+	return opts
 }
 
 // UnmarshalClaims will retrieve the claims from the provided raw JWT token.
