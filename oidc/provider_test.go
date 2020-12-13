@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/rsa"
 	"errors"
 	"fmt"
 	"net/http"
@@ -878,6 +879,125 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					k, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 					require.NoError(t, err)
 					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
+				}(),
+				claims: defaultClaims(),
+				nonce:  defaultValidNonce,
+			},
+		},
+		{
+			name: "valid-ES512",
+			p: func() *Provider {
+				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+				p.config.SupportedSigningAlgs = []Alg{ES512}
+				return p
+			}(),
+			args: args{
+				keys: func() keys {
+					k, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+					require.NoError(t, err)
+					return keys{priv: k, pub: &k.PublicKey, alg: ES512, keyID: "valid-ES512"}
+				}(),
+				claims: defaultClaims(),
+				nonce:  defaultValidNonce,
+			},
+		},
+		{
+			name: "valid-RS256",
+			p: func() *Provider {
+				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+				p.config.SupportedSigningAlgs = []Alg{RS256}
+				return p
+			}(),
+			args: args{
+				keys: func() keys {
+					k, err := rsa.GenerateKey(rand.Reader, 2048)
+					require.NoError(t, err)
+					return keys{priv: k, pub: &k.PublicKey, alg: RS256, keyID: "valid-RS256"}
+				}(),
+				claims: defaultClaims(),
+				nonce:  defaultValidNonce,
+			},
+		},
+		{
+			name: "valid-RS384",
+			p: func() *Provider {
+				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+				p.config.SupportedSigningAlgs = []Alg{RS384}
+				return p
+			}(),
+			args: args{
+				keys: func() keys {
+					k, err := rsa.GenerateKey(rand.Reader, 2048)
+					require.NoError(t, err)
+					return keys{priv: k, pub: &k.PublicKey, alg: RS384, keyID: "valid-RS384"}
+				}(),
+				claims: defaultClaims(),
+				nonce:  defaultValidNonce,
+			},
+		},
+		{
+			name: "valid-RS512",
+			p: func() *Provider {
+				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+				p.config.SupportedSigningAlgs = []Alg{RS512}
+				return p
+			}(),
+			args: args{
+				keys: func() keys {
+					k, err := rsa.GenerateKey(rand.Reader, 2048)
+					require.NoError(t, err)
+					return keys{priv: k, pub: &k.PublicKey, alg: RS512, keyID: "valid-RS512"}
+				}(),
+				claims: defaultClaims(),
+				nonce:  defaultValidNonce,
+			},
+		},
+		{
+			name: "valid-PS256",
+			p: func() *Provider {
+				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+				p.config.SupportedSigningAlgs = []Alg{PS256}
+				return p
+			}(),
+			args: args{
+				keys: func() keys {
+					k, err := rsa.GenerateKey(rand.Reader, 2048)
+					require.NoError(t, err)
+					return keys{priv: k, pub: &k.PublicKey, alg: PS256, keyID: "valid-PS256"}
+				}(),
+				claims: defaultClaims(),
+				nonce:  defaultValidNonce,
+			},
+		},
+		{
+			name: "valid-PS384",
+			p: func() *Provider {
+				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+				p.config.SupportedSigningAlgs = []Alg{PS384}
+				return p
+			}(),
+			args: args{
+				keys: func() keys {
+					k, err := rsa.GenerateKey(rand.Reader, 2048)
+					require.NoError(t, err)
+					return keys{priv: k, pub: &k.PublicKey, alg: PS384, keyID: "valid-PS384"}
+				}(),
+				claims: defaultClaims(),
+				nonce:  defaultValidNonce,
+			},
+		},
+		{
+			name: "valid-PS512",
+			p: func() *Provider {
+				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+				p.config.SupportedSigningAlgs = []Alg{PS512}
+				return p
+			}(),
+			args: args{
+				keys: func() keys {
+					k, err := rsa.GenerateKey(rand.Reader, 2048)
+					require.NoError(t, err)
+					return keys{priv: k, pub: &k.PublicKey, alg: PS512, keyID: "valid-PS512"}
 				}(),
 				claims: defaultClaims(),
 				nonce:  defaultValidNonce,
