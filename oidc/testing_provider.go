@@ -469,8 +469,6 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		token               = "/token"
 		userInfo            = "/userinfo"
 		wellKnownJwks       = "/.well-known/jwks.json"
-		missingJwks         = "/.well-known/missing-jwks.json"
-		invalidJwks         = "/.well-known/invalid-jwks.json"
 	)
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -577,7 +575,7 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		if p.invalidJWKs {
 			_, err := w.Write([]byte("It's not a keyset!"))
-			require.NoErrorf(err, "%s: internal error: %w", invalidJwks, err)
+			require.NoErrorf(err, "%s: internal error: %w", wellKnownJwks, err)
 			return
 		}
 		if req.Method != "GET" {
