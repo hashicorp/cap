@@ -41,10 +41,16 @@ func (t IDToken) Claims(claims interface{}) error {
 }
 
 // VerifyAccessToken verifies that the hash of the access_token  matches the
-// hash in the id_token. It returns an error if the hashes don't match. It
-// returns nil when the optional access_token hash is not present in the in
+// hash in the id_token. It returns an error if the hashes don't match.
+// See: https://openid.net/specs/openid-connect-core-1_0.html#CodeIDToken
+//
+// Returns nil when the optional access_token hash is not present in the in
 // the id_token.
-// See https://openid.net/specs/openid-connect-core-1_0.html#CodeIDToken
+//
+// Returns nil when the id_token's signing algorithm is EdDSA, since the hash
+// cannot be verified without knowing the key's curve
+// See: https://bitbucket.org/openid/connect/issues/1125
+//
 func (t IDToken) VerifyAccessToken(accessToken AccessToken) error {
 	const op = "VerifyAccessToken"
 	var claims map[string]interface{}
@@ -74,6 +80,7 @@ func (t IDToken) VerifyAccessToken(accessToken AccessToken) error {
 	}
 
 	sigAlgorithm := Alg(sig.Header.Algorithm)
+	fmt.Println(sigAlgorithm)
 
 	var h hash.Hash
 	switch sigAlgorithm {
@@ -83,8 +90,10 @@ func (t IDToken) VerifyAccessToken(accessToken AccessToken) error {
 		h = sha512.New384()
 	case RS512, ES512, PS512:
 		h = sha512.New()
+	case EdDSA:
+		return nil
 	default:
-		return fmt.Errorf("%s: unsupported signing algorithm %q: %w", op, sigAlgorithm, ErrUnsupportedAlg)
+		return fmt.Errorf("%s: unsupported signing algorithm %s: %w", op, sigAlgorithm, ErrUnsupportedAlg)
 	}
 	_, _ = h.Write([]byte(accessToken)) // hash documents that Write will never return an error
 	sum := h.Sum(nil)[:h.Size()/2]

@@ -125,8 +125,10 @@ func testHashAccessToken(t *testing.T, signatureAlg Alg, token AccessToken) stri
 		h = sha512.New384()
 	case RS512, ES512, PS512:
 		h = sha512.New()
+	case EdDSA:
+		return "EdDSA-hash"
 	default:
-		require.FailNowf("testHashAccessToken: unsupported signing algorithm %q: %w", string(signatureAlg))
+		require.FailNowf("", "testHashAccessToken: unsupported signing algorithm %s", string(signatureAlg))
 	}
 	require.NotNil(h)
 	_, _ = h.Write([]byte(string(token))) // hash documents that Write will never return an error

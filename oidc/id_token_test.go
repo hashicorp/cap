@@ -3,6 +3,7 @@ package oidc
 import (
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
@@ -201,6 +202,16 @@ func TestIDToken_VerifyAccessToken(t *testing.T) {
 				k, err := rsa.GenerateKey(rand.Reader, 2048)
 				require.NoError(t, err)
 				return k
+			}(),
+			accessToken: "test-access-token",
+		},
+		{
+			name: "EdDSA",
+			alg:  EdDSA,
+			priKey: func() crypto.PrivateKey {
+				_, priv, err := ed25519.GenerateKey(rand.Reader)
+				require.NoError(t, err)
+				return priv
 			}(),
 			accessToken: "test-access-token",
 		},
