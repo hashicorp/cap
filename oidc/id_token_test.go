@@ -99,21 +99,24 @@ func TestIDToken_VerifyAccessToken(t *testing.T) {
 	t.Parallel()
 	testIat := float64(time.Now().Unix())
 	testExp := float64(time.Now().Add(10 * time.Minute).Unix())
-	claims := map[string]interface{}{
-		"iss": "https://example.com/",
-		"iat": testIat,
-		"exp": testExp,
-		"aud": []string{"www.example.com"},
-		"sub": "alice@example.com",
+	claimsFn := func() map[string]interface{} {
+		return map[string]interface{}{
+			"iss": "https://example.com/",
+			"iat": testIat,
+			"exp": testExp,
+			"aud": []string{"www.example.com"},
+			"sub": "alice@example.com",
+		}
 	}
 	tests := []struct {
-		name        string
-		t           IDToken
-		priKey      crypto.PrivateKey
-		alg         Alg
-		accessToken AccessToken
-		wantErr     bool
-		wantIsErr   error
+		name            string
+		t               IDToken
+		priKey          crypto.PrivateKey
+		alg             Alg
+		accessToken     AccessToken
+		wantErr         bool
+		wantIsErr       error
+		WantNotVerified bool
 	}{
 		{
 			name: "RS256",
@@ -213,17 +216,46 @@ func TestIDToken_VerifyAccessToken(t *testing.T) {
 				require.NoError(t, err)
 				return priv
 			}(),
-			accessToken: "test-access-token",
+			accessToken:     "test-access-token",
+			WantNotVerified: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
+			assert, require := assert.New(t), require.New(t)
+			claims := claimsFn()
 			claims["at_hash"] = testHashAccessToken(t, tt.alg, tt.accessToken)
 			testJWT := TestSignJWT(t, tt.priKey, tt.alg, claims, nil)
 			tk := IDToken(testJWT)
-			err := tk.VerifyAccessToken(tt.accessToken)
+			verified, err := tk.VerifyAccessToken(tt.accessToken)
 			require.NoError(err)
+			if tt.WantNotVerified {
+				assert.Falsef(verified, "should not have been verified.")
+			}
 		})
 	}
+	t.Run("missing-at-hash", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		k, err := rsa.GenerateKey(rand.Reader, 2048)
+		require.NoError(err)
+		claims := claimsFn()
+		testJWT := TestSignJWT(t, k, RS256, claims, nil)
+		tk := IDToken(testJWT)
+		verified, err := tk.VerifyAccessToken("access_token")
+		require.NoError(err)
+		assert.Falsef(verified, "should not have been verified.")
+	})
+	t.Run("at-hash-not-equal", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		k, err := rsa.GenerateKey(rand.Reader, 2048)
+		require.NoError(err)
+		claims := claimsFn()
+		claims["at_hash"] = testHashAccessToken(t, RS256, "this-isn't-going-to-match")
+		testJWT := TestSignJWT(t, k, RS256, claims, nil)
+		tk := IDToken(testJWT)
+		verified, err := tk.VerifyAccessToken("access_token")
+		require.Error(err)
+		assert.True(errors.Is(err, ErrInvalidAtHash))
+		assert.Falsef(verified, "should not have been verified.")
+	})
 }
