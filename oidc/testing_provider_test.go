@@ -2,6 +2,8 @@ package oidc
 
 import (
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -304,4 +306,210 @@ func TestTestProvider_writeTokenErrorResponse(t *testing.T) {
 		assert.Equal("error_code", errBody.Code)
 		assert.Empty(errBody.Desc)
 	})
+}
+
+func TestTestProvider_authorize(t *testing.T) {
+	tp := StartTestProvider(t)
+	echo := startEchoServer(t)
+	type errResp struct {
+		Code string `json:"error"`
+		Desc string `json:"error_description,omitempty"`
+	}
+	tests := []struct {
+		name          string
+		urlParameters string
+		want          string
+	}{
+		{
+			name:          "bad-response-type",
+			urlParameters: "&response_type=unknown&state=state-value",
+			want:          "unsupported_response_type",
+		},
+		{
+			name:          "bad-scopes",
+			urlParameters: "&scopes=unknown&state=state-value&response_type=code",
+			want:          "invalid_scope",
+		},
+		{
+			name:          "bad-auth-code",
+			urlParameters: "&code=bad-auth-code&scope=openid&state=state-value&response_type=code",
+			want:          "access_denied",
+		},
+		{
+			name:          "bad-nonce",
+			urlParameters: "&nonce=bad-nonce&code=valid-code&scope=openid&state=state-value&response_type=code",
+			want:          "access_denied",
+		},
+		{
+			name:          "empty-state",
+			urlParameters: "&nonce=valid-nonce&code=valid-code&scope=openid&response_type=code",
+			want:          "missing+state+parameter",
+		},
+		{
+			name:          "bad-resp-mode",
+			urlParameters: "&response_type=id_token&response_mode=unknown&state=valid-state&nonce=valid-nonce&code=valid-code&scope=openid&response_type=code",
+			want:          "unsupported_response_mode",
+		},
+		{
+			name:          "valid",
+			urlParameters: "&state=valid-state&nonce=valid-nonce&code=valid-code&scope=openid&response_type=code",
+			want:          "GET /?state=valid-state&code=valid-code",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert, require := assert.New(t), require.New(t)
+			tp.SetExpectedAuthCode("valid-code")
+			tp.SetExpectedAuthNonce("valid-nonce")
+			client := tp.HttpClient()
+			url := fmt.Sprintf("%s/authorize?redirect_uri=%s%s", tp.Addr(), echo.Addr(), tt.urlParameters)
+			resp, err := client.Get(url)
+			require.NoError(err)
+			assert.NotEmpty(resp)
+			defer resp.Body.Close()
+			contents, err := ioutil.ReadAll(resp.Body)
+			require.NoError(err)
+			assert.Contains(string(contents), tt.want)
+		})
+	}
+	t.Run("bad-method", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		client := tp.HttpClient()
+		req, err := http.NewRequest(http.MethodPut, tp.Addr()+"/authorize", nil)
+		require.NoError(err)
+		resp, err := client.Do(req)
+		require.NoError(err)
+		assert.Equal(http.StatusMethodNotAllowed, resp.StatusCode)
+	})
+}
+
+func TestTestProvider_token(t *testing.T) {
+	tp := StartTestProvider(t)
+	echo := startEchoServer(t)
+
+	type payload struct {
+		code        string
+		grantType   string
+		redirectURI string
+	}
+	type errResp struct {
+		Code string `json:"error"`
+		Desc string `json:"error_description,omitempty"`
+	}
+	tests := []struct {
+		name               string
+		payload            payload
+		allowedRedirectURI string
+		wantErrStatus      int
+	}{
+		{
+			name: "valid",
+			payload: payload{
+				redirectURI: echo.Addr(),
+				grantType:   "authorization_code",
+				code:        "valid-code",
+			},
+			allowedRedirectURI: echo.Addr(),
+		},
+		{
+			name: "empty-code",
+			payload: payload{
+				redirectURI: echo.Addr(),
+				grantType:   "authorization_code",
+			},
+			allowedRedirectURI: echo.Addr(),
+			wantErrStatus:      http.StatusUnauthorized,
+		},
+		{
+			name: "bad-code",
+			payload: payload{
+				redirectURI: echo.Addr(),
+				grantType:   "authorization_code",
+				code:        "bad-code",
+			},
+			allowedRedirectURI: echo.Addr(),
+			wantErrStatus:      http.StatusUnauthorized,
+		},
+		{
+			name: "bad-redirect",
+			payload: payload{
+				redirectURI: echo.Addr(),
+				grantType:   "authorization_code",
+				code:        "valid-code",
+			},
+			allowedRedirectURI: "http://alice.com",
+			wantErrStatus:      http.StatusBadRequest,
+		},
+		{
+			name: "valid",
+			payload: payload{
+				redirectURI: echo.Addr(),
+				grantType:   "unknown",
+				code:        "valid-code",
+			},
+			allowedRedirectURI: echo.Addr(),
+			wantErrStatus:      http.StatusBadRequest,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert, require := assert.New(t), require.New(t)
+			tp.SetExpectedAuthCode("valid-code")
+			tp.SetAllowedRedirectURIs([]string{tt.allowedRedirectURI})
+			client := tp.HttpClient()
+			form := url.Values{}
+			form.Add("redirect_uri", tt.payload.redirectURI)
+			form.Add("grant_type", tt.payload.grantType)
+			form.Add("code", tt.payload.code)
+
+			req, err := http.NewRequest("POST", fmt.Sprintf("%s/token", tp.Addr()), strings.NewReader(form.Encode()))
+			require.NoError(err)
+			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			resp, err := client.Do(req)
+			require.NoError(err)
+			assert.NotEmpty(resp)
+			defer resp.Body.Close()
+			if tt.wantErrStatus != 0 {
+				assert.Equal(tt.wantErrStatus, resp.StatusCode)
+				return
+			}
+			contents, err := ioutil.ReadAll(resp.Body)
+			require.NoError(err)
+			type successResp struct {
+				Id_token string
+			}
+			var got successResp
+			err = json.Unmarshal(contents, &got)
+			require.NoError(err)
+			assert.NotEmpty(got.Id_token)
+		})
+	}
+}
+
+/// testEchoServer is a really simple test http server that echos back whatever
+// it's requests as responses
+type testEchoServer struct {
+	httpServer *httptest.Server
+	t          *testing.T
+}
+
+func (s *testEchoServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	s.t.Helper()
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Range, Content-Disposition, Content-Type, ETag")
+	_ = req.Write(w)
+}
+
+// Addr returns the server's base URL
+func (s *testEchoServer) Addr() string { return s.httpServer.URL }
+
+// startEchoServer starts a test echo http server which will be stopped when the
+// test and its subtests are completed by function registered with t.Cleanup
+func startEchoServer(t *testing.T) *testEchoServer {
+	t.Helper()
+	s := &testEchoServer{t: t}
+	s.httpServer = httptestNewUnstartedServerWithPort(t, s, 0)
+	s.httpServer.Start()
+	t.Cleanup(s.httpServer.Close)
+	return s
 }
