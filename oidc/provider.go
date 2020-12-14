@@ -236,7 +236,7 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 		return nil, fmt.Errorf("%s: id_token failed verification: %w", op, err)
 	}
 	if t.AccessToken() != "" {
-		if err := t.IDToken().VerifyAccessToken(t.AccessToken()); err != nil {
+		if _, err := t.IDToken().VerifyAccessToken(t.AccessToken()); err != nil {
 			return nil, fmt.Errorf("%s: access_token failed verification: %w", op, err)
 		}
 	}
