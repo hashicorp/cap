@@ -590,12 +590,13 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		err := req.ParseForm()
 		require.NoErrorf(err, "%s: internal error: %w", authorize, err)
 
-		respType := req.FormValue("code")
+		respType := req.FormValue("response_type")
 		scopes := req.Form["scope"]
 		state := req.FormValue("state")
 		redirectURI := req.FormValue("redirect_uri")
+		respMode := req.FormValue("response_mode")
 
-		if respType != "code" {
+		if respType != "code" && !strings.Contains(respType, "id_token") {
 			p.writeAuthErrorResponse(w, req, redirectURI, state, "unsupported_response_type", "")
 			return
 		}
@@ -625,7 +626,10 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		if req.FormValue("response_mode") == "form_post" {
+		if strings.Contains(respType, "id_token") {
+			if respMode != "form_post" {
+				p.writeAuthErrorResponse(w, req, redirectURI, state, "unsupported_response_mode", "must be form_post")
+			}
 			err := p.writeImplicitResponse(w)
 			require.NoErrorf(err, "%s: internal error: %w", token, err)
 			return
