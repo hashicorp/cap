@@ -6,6 +6,8 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -22,6 +24,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/cap/oidc/internal/strutils"
+	"github.com/hashicorp/go-cleanhttp"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/square/go-jose.v2"
 )
@@ -49,6 +52,9 @@ import (
 //
 //    * GET /.well-known/jwks.json               JWKs used to verify issued JWT tokens
 //
+//  Making requests to these endpoints are facilitated by
+//    * TestProvider.HttpClient which returns an http.Client for making requests.
+//    * TestProvider.CACert which the pem-encoded CA certificate used by the HTTPS server.
 //
 // Runtime Configuration:
 //  * Issuer: Addr() returns the the current base URL for the test provider's
@@ -123,11 +129,16 @@ type TestProvider struct {
 	alg     Alg
 
 	t *testing.T
+
+	client *http.Client
 }
 
 // Stop stops the running TestProvider.
 func (p *TestProvider) Stop() {
 	p.httpServer.Close()
+	if p.client != nil {
+		p.client.CloseIdleConnections()
+	}
 }
 
 // StartTestProvider creates and starts a running TestProvider http server.  The
@@ -172,7 +183,7 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 	p.httpServer = httptestNewUnstartedServerWithPort(t, p, opts.withPort)
 	p.httpServer.Config.ErrorLog = log.New(ioutil.Discard, "", 0)
 	p.httpServer.StartTLS()
-	t.Cleanup(p.httpServer.Close)
+	t.Cleanup(p.Stop)
 
 	cert := p.httpServer.Certificate()
 
@@ -211,6 +222,36 @@ func WithTestPort(port int) Option {
 			o.withPort = port
 		}
 	}
+}
+
+// HttpClient returns an http.Client for the test provider. The returned client
+// uses a pooled transport (so it can reuse connections) that uses the
+// test provider's CA certificate. This client's idle connections are closed in
+// TestProvider.Done()
+func (p *TestProvider) HttpClient() *http.Client {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.client != nil {
+		return p.client
+	}
+	p.t.Helper()
+	require := require.New(p.t)
+
+	tr := cleanhttp.DefaultPooledTransport()
+
+	certPool := x509.NewCertPool()
+	ok := certPool.AppendCertsFromPEM([]byte(p.caCert))
+	require.True(ok)
+
+	tr.TLSClientConfig = &tls.Config{
+		RootCAs: certPool,
+	}
+
+	p.client = &http.Client{
+		Transport: tr,
+	}
+	return p.client
 }
 
 // SetExpectedExpiry is for configuring the expected expiry for any JWTs issued
@@ -283,6 +324,9 @@ func (p *TestProvider) SetCustomAudience(customAudiences ...string) {
 func (p *TestProvider) SetNowFunc(n func() time.Time) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.t.Helper()
+	require := require.New(p.t)
+	require.NotNilf(n, "TestProvider.SetNowFunc: time func is nil")
 	p.nowFunc = n
 }
 
@@ -313,12 +357,12 @@ func (p *TestProvider) SetOmitAccessTokens(omitAccessTokens bool) {
 	p.omitAccessToken = omitAccessTokens
 }
 
-// DisableUserInfo makes the userinfo endpoint return 404 and omits it from the
+// SetDisableUserInfo makes the userinfo endpoint return 404 and omits it from the
 // discovery config.
-func (p *TestProvider) DisableUserInfo() {
+func (p *TestProvider) SetDisableUserInfo(disable bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.disableUserInfo = true
+	p.disableUserInfo = disable
 }
 
 // SetDisableJWKs makes the JWKs endpoint return 404
@@ -353,8 +397,15 @@ func (p *TestProvider) SigningKeys() (crypto.PrivateKey, crypto.PublicKey, Alg) 
 
 // SetSigningKeys sets the test provider's keys and alg used to sign JWTs.
 func (p *TestProvider) SetSigningKeys(privKey crypto.PrivateKey, pubKey crypto.PublicKey, alg Alg, KeyID string) {
+	const op = "TestProvider.SetSigningKeys"
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.t.Helper()
+	require := require.New(p.t)
+	require.NotNilf(privKey, "%s: private key is nil")
+	require.NotNilf(pubKey, "%s: public key is empty")
+	require.NotEmptyf(alg, "%s: alg is empty")
+	require.NotEmptyf(KeyID, "%s: key id is empty")
 	p.privKey = privKey
 	p.pubKey = pubKey
 	p.alg = alg
@@ -369,6 +420,10 @@ func (p *TestProvider) SetSigningKeys(privKey crypto.PrivateKey, pubKey crypto.P
 }
 
 func (p *TestProvider) writeJSON(w http.ResponseWriter, out interface{}) error {
+	const op = "TestProvider.writeJSON"
+	p.t.Helper()
+	require := require.New(p.t)
+	require.NotNilf(w, "%s: http.ResponseWriter is nil")
 	enc := json.NewEncoder(w)
 	return enc.Encode(out)
 }
@@ -376,20 +431,24 @@ func (p *TestProvider) writeJSON(w http.ResponseWriter, out interface{}) error {
 // writeImplicitResponse will write the required form data response for an
 // implicit flow response to the OIDC authorize endpoint
 func (p *TestProvider) writeImplicitResponse(w http.ResponseWriter) error {
+	p.t.Helper()
+	require := require.New(p.t)
+	require.NotNilf(w, "%s: http.ResponseWriter is nil")
+
 	w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
 	const respForm = `
 <!DOCTYPE html>
 <html lang="en">
 <head><title>Submit This Form</title></head>
 <body onload="javascript:document.forms[0].submit()">
-	<form method="post" action="https://client.example.org/callback">
-	<input type="hidden" name="state"
-	value="%s"/>
-	%s
-	</form>
+<form method="post" action="https://client.example.org/callback">
+<input type="hidden" name="state" value="%s"/>
+%s
+</form>
 </body>
 </html>`
-	const tokenField = `<input type="hidden" name="%s" value="%s"/>`
+	const tokenField = `<input type="hidden" name="%s" value="%s"/>
+`
 	jwtData := p.issueSignedJWT()
 	var respTokens strings.Builder
 	if !p.omitAccessToken {
@@ -428,12 +487,16 @@ func (p *TestProvider) issueSignedJWT() string {
 
 // writeAuthErrorResponse writes a standard OIDC authentication error response.
 // See: https://openid.net/specs/openid-connect-core-1_0.html#AuthError
-func (p *TestProvider) writeAuthErrorResponse(w http.ResponseWriter, req *http.Request, errorCode, errorMessage string) {
-	qv := req.URL.Query()
+func (p *TestProvider) writeAuthErrorResponse(w http.ResponseWriter, req *http.Request, redirectURL, state, errorCode, errorMessage string) {
+	p.t.Helper()
+	require := require.New(p.t)
+	require.NotNilf(w, "%s: http.ResponseWriter is nil")
+	require.NotNilf(req, "%s: http.Request is nil")
+	require.NotEmptyf(errorCode, "%s: errorCode is empty")
 
 	// state and error are required error response parameters
-	redirectURI := qv.Get("redirect_uri") +
-		"?state=" + url.QueryEscape(qv.Get("state")) +
+	redirectURI := redirectURL +
+		"?state=" + url.QueryEscape(state) +
 		"&error=" + url.QueryEscape(errorCode)
 
 	if errorMessage != "" {
@@ -446,7 +509,12 @@ func (p *TestProvider) writeAuthErrorResponse(w http.ResponseWriter, req *http.R
 
 // writeTokenErrorResponse writes a standard OIDC token error response.
 // See: https://openid.net/specs/openid-connect-core-1_0.html#TokenErrorResponse
-func (p *TestProvider) writeTokenErrorResponse(w http.ResponseWriter, req *http.Request, statusCode int, errorCode, errorMessage string) error {
+func (p *TestProvider) writeTokenErrorResponse(w http.ResponseWriter, statusCode int, errorCode, errorMessage string) error {
+	require := require.New(p.t)
+	require.NotNilf(w, "%s: http.ResponseWriter is nil")
+	require.NotEmptyf(errorCode, "%s: errorCode is empty")
+	require.NotEmptyf(statusCode, "%s: statusCode is empty")
+
 	body := struct {
 		Code string `json:"error"`
 		Desc string `json:"error_description,omitempty"`
@@ -475,6 +543,8 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	p.t.Helper()
 	require := require.New(p.t)
+	require.NotNilf(w, "%s: http.ResponseWriter is nil")
+	require.NotNilf(req, "%s: http.Request is nil")
 
 	// set a default Content-Type which will be overridden as needed.
 	w.Header().Set("Content-Type", "application/json")
@@ -522,36 +592,36 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		respType := req.FormValue("code")
 		scopes := req.Form["scope"]
+		state := req.FormValue("state")
+		redirectURI := req.FormValue("redirect_uri")
 
 		if respType != "code" {
-			p.writeAuthErrorResponse(w, req, "unsupported_response_type", "")
+			p.writeAuthErrorResponse(w, req, redirectURI, state, "unsupported_response_type", "")
 			return
 		}
 		if !strutils.StrListContains(scopes, "openid") {
-			p.writeAuthErrorResponse(w, req, "invalid_scope", "")
+			p.writeAuthErrorResponse(w, req, redirectURI, state, "invalid_scope", "")
 			return
 		}
 
 		if p.expectedAuthCode == "" {
-			p.writeAuthErrorResponse(w, req, "access_denied", "")
+			p.writeAuthErrorResponse(w, req, redirectURI, state, "access_denied", "")
 			return
 		}
 
 		nonce := req.FormValue("nonce")
 		if p.expectedAuthNonce != "" && p.expectedAuthNonce != nonce {
-			p.writeAuthErrorResponse(w, req, "access_denied", "")
+			p.writeAuthErrorResponse(w, req, redirectURI, state, "access_denied", "")
 			return
 		}
 
-		state := req.FormValue("state")
 		if state == "" {
-			p.writeAuthErrorResponse(w, req, "invalid_request", "missing state parameter")
+			p.writeAuthErrorResponse(w, req, redirectURI, state, "invalid_request", "missing state parameter")
 			return
 		}
 
-		redirectURI := req.FormValue("redirect_uri")
 		if redirectURI == "" {
-			p.writeAuthErrorResponse(w, req, "invalid_request", "missing redirect_uri parameter")
+			p.writeAuthErrorResponse(w, req, redirectURI, state, "invalid_request", "missing redirect_uri parameter")
 			return
 		}
 
@@ -593,13 +663,13 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		switch {
 		case req.FormValue("grant_type") != "authorization_code":
-			_ = p.writeTokenErrorResponse(w, req, http.StatusBadRequest, "invalid_request", "bad grant_type")
+			_ = p.writeTokenErrorResponse(w, http.StatusBadRequest, "invalid_request", "bad grant_type")
 			return
 		case !strutils.StrListContains(p.allowedRedirectURIs, req.FormValue("redirect_uri")):
-			_ = p.writeTokenErrorResponse(w, req, http.StatusBadRequest, "invalid_request", "redirect_uri is not allowed")
+			_ = p.writeTokenErrorResponse(w, http.StatusBadRequest, "invalid_request", "redirect_uri is not allowed")
 			return
 		case req.FormValue("code") != p.expectedAuthCode:
-			_ = p.writeTokenErrorResponse(w, req, http.StatusUnauthorized, "invalid_grant", "unexpected auth code")
+			_ = p.writeTokenErrorResponse(w, http.StatusUnauthorized, "invalid_grant", "unexpected auth code")
 			return
 		}
 
@@ -651,6 +721,7 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func httptestNewUnstartedServerWithPort(t *testing.T, handler http.Handler, port int) *httptest.Server {
 	t.Helper()
 	require := require.New(t)
+	require.NotNil(handler)
 	if port == 0 {
 		return httptest.NewUnstartedServer(handler)
 	}

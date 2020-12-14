@@ -595,7 +595,7 @@ func TestProvider_UserInfo(t *testing.T) {
 			AccessToken: "dummy_access_token",
 			Expiry:      time.Now().Add(10 * time.Second),
 		})
-		tp.DisableUserInfo()
+		tp.SetDisableUserInfo(true)
 		var claims interface{}
 		err := p.UserInfo(ctx, tokenSource, &claims)
 		require.Error(err)

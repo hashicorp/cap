@@ -48,10 +48,10 @@ type Provider struct {
 	backgroundCtxCancel context.CancelFunc
 }
 
-// NewProvider creates and initializes a Provider. Intializing the the provider,
+// NewProvider creates and initializes a Provider. Intializing the provider,
 // includes making an http request to the provider's issuer.
 //
-// See Provider.Stop() which must be called to release provider resources.
+// See Provider.Done() which must be called to release provider resources.
 func NewProvider(c *Config) (*Provider, error) {
 	const op = "NewProvider"
 	if c == nil {

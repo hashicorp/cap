@@ -10,7 +10,9 @@ import (
 const defaultIDLength = 10
 
 // NewID generates a ID with an optional prefix.   The ID generated is suitable
-// for a State's ID or Nonce
+// for a State's ID or Nonce. The ID length will be 10, unless an optional
+// prefix is provided which will add the prefix's length + an underscore.  The
+// WithPrefix option is supported.
 func NewID(opt ...Option) (string, error) {
 	const op = "NewID"
 	opts := getIDOpts(opt...)
