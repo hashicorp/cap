@@ -40,43 +40,47 @@ func (t IDToken) Claims(claims interface{}) error {
 	return UnmarshalClaims(string(t), claims)
 }
 
-// VerifyAccessToken verifies that the hash of the access_token  matches the
-// hash in the id_token. It returns an error if the hashes don't match.
-// See: https://openid.net/specs/openid-connect-core-1_0.html#CodeIDToken
+// VerifyAccessToken verifies the at_hash claim of the id_token against the hash
+// of the access_token.
 //
-// Returns nil when the optional access_token hash is not present in the in
-// the id_token.
+// It will return true when it can verify the access_token. It will return false
+// when it's unable to verify the access_token.
 //
-// Returns nil when the id_token's signing algorithm is EdDSA, since the hash
-// cannot be verified without knowing the key's curve
-// See: https://bitbucket.org/openid/connect/issues/1125
+// It will return an error whenever it's possible to verify the access_token and
+// the verification fails.
 //
-func (t IDToken) VerifyAccessToken(accessToken AccessToken) error {
+// Note: while we support signing id_tokens with EdDSA, unfortunately the
+// access_token hash cannot be verified without knowing the key's curve. See:
+// https://bitbucket.org/openid/connect/issues/1125
+//
+// For more info about verifying access_tokens returned during an OIDC flow see:
+// https://openid.net/specs/openid-connect-core-1_0.html#CodeIDToken
+func (t IDToken) VerifyAccessToken(accessToken AccessToken) (bool, error) {
 	const op = "VerifyAccessToken"
 	var claims map[string]interface{}
 	if err := t.Claims(&claims); err != nil {
-		return fmt.Errorf("%s: %w", op, err)
+		return false, fmt.Errorf("%s: %w", op, err)
 	}
 	atHash, ok := claims["at_hash"]
 	if !ok {
-		return nil
+		return false, nil
 	}
 
 	jws, err := jose.ParseSigned(string(t))
 	if err != nil {
-		return fmt.Errorf("%s: malformed jwt (%v): %w", op, err, ErrMalformedToken)
+		return false, fmt.Errorf("%s: malformed jwt (%v): %w", op, err, ErrMalformedToken)
 	}
 	switch len(jws.Signatures) {
 	case 0:
-		return fmt.Errorf("%s: id_token not signed: %w", op, ErrTokenNotSigned)
+		return false, fmt.Errorf("%s: id_token not signed: %w", op, ErrTokenNotSigned)
 	case 1:
 	default:
-		return fmt.Errorf("%s: multiple signatures on id_token not supported", op)
+		return false, fmt.Errorf("%s: multiple signatures on id_token not supported", op)
 	}
 
 	sig := jws.Signatures[0]
 	if _, ok := supportedAlgorithms[Alg(sig.Header.Algorithm)]; !ok {
-		return fmt.Errorf("%s: id_token signed with algorithm %q: %w", op, sig.Header.Algorithm, ErrUnsupportedAlg)
+		return false, fmt.Errorf("%s: id_token signed with algorithm %q: %w", op, sig.Header.Algorithm, ErrUnsupportedAlg)
 	}
 
 	sigAlgorithm := Alg(sig.Header.Algorithm)
@@ -90,15 +94,15 @@ func (t IDToken) VerifyAccessToken(accessToken AccessToken) error {
 	case RS512, ES512, PS512:
 		h = sha512.New()
 	case EdDSA:
-		return nil
+		return false, nil
 	default:
-		return fmt.Errorf("%s: unsupported signing algorithm %s: %w", op, sigAlgorithm, ErrUnsupportedAlg)
+		return false, fmt.Errorf("%s: unsupported signing algorithm %s: %w", op, sigAlgorithm, ErrUnsupportedAlg)
 	}
 	_, _ = h.Write([]byte(accessToken)) // hash documents that Write will never return an error
 	sum := h.Sum(nil)[:h.Size()/2]
 	actual := base64.RawURLEncoding.EncodeToString(sum)
 	if actual != atHash {
-		return ErrInvalidAtHash
+		return false, ErrInvalidAtHash
 	}
-	return nil
+	return true, nil
 }
