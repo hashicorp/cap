@@ -72,7 +72,7 @@ func NewProvider(c *Config) (*Provider, error) {
 		backgroundCtxCancel: cancel,
 	}
 
-	oidcCtx, err := p.HttpClientContext(p.backgroundCtx)
+	oidcCtx, err := p.HTTPClientContext(p.backgroundCtx)
 	if err != nil {
 		p.Done() // release the backgroundCtxCancel resources
 		return nil, fmt.Errorf("%s: unable to create http client: %w", op, err)
@@ -194,7 +194,7 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 		return nil, fmt.Errorf("%s: authentication state is expired: %w", op, ErrInvalidParameter)
 	}
 
-	oidcCtx, err := p.HttpClientContext(ctx)
+	oidcCtx, err := p.HTTPClientContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to create http client: %w", op, err)
 	}
@@ -255,7 +255,7 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource,
 	if reflect.ValueOf(claims).Kind() != reflect.Ptr {
 		return fmt.Errorf("%s: interface parameter must to be a pointer: %w", op, ErrInvalidParameter)
 	}
-	oidcCtx, err := p.HttpClientContext(ctx)
+	oidcCtx, err := p.HTTPClientContext(ctx)
 	if err != nil {
 		return fmt.Errorf("%s: unable to create http client: %w", op, err)
 	}
@@ -410,12 +410,12 @@ func (p *Provider) convertError(e error) error {
 	}
 }
 
-// HttpClient returns an http.Client for the provider. The returned client uses
+// HTTPClient returns an http.Client for the provider. The returned client uses
 // a pooled transport (so it can reuse connections) that uses the provider's
 // config CA certificate PEM if provided, otherwise it will use the installed
 // system CA chain.  This client's idle connections are closed in
 // Provider.Done()
-func (p *Provider) HttpClient() (*http.Client, error) {
+func (p *Provider) HTTPClient() (*http.Client, error) {
 	const op = "Provider.NewHTTPClient"
 	if p.client != nil {
 		return p.client, nil
@@ -446,13 +446,13 @@ func (p *Provider) HttpClient() (*http.Client, error) {
 	return p.client, nil
 }
 
-// HttpClientContext returns a new Context that carries the provider's HTTP
+// HTTPClientContext returns a new Context that carries the provider's HTTP
 // client. This method sets the same context key used by the
 // github.com/coreos/go-oidc and golang.org/x/oauth2 packages, so the returned
 // context works for those packages as well.
-func (p *Provider) HttpClientContext(ctx context.Context) (context.Context, error) {
-	const op = "Provider.HttpClientContext"
-	c, err := p.HttpClient()
+func (p *Provider) HTTPClientContext(ctx context.Context) (context.Context, error) {
+	const op = "Provider.HTTPClientContext"
+	c, err := p.HTTPClient()
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 

@@ -53,7 +53,7 @@ import (
 //    * GET /.well-known/jwks.json               JWKs used to verify issued JWT tokens
 //
 //  Making requests to these endpoints are facilitated by
-//    * TestProvider.HttpClient which returns an http.Client for making requests.
+//    * TestProvider.HTTPClient which returns an http.Client for making requests.
 //    * TestProvider.CACert which the pem-encoded CA certificate used by the HTTPS server.
 //
 // Runtime Configuration:
@@ -224,11 +224,11 @@ func WithTestPort(port int) Option {
 	}
 }
 
-// HttpClient returns an http.Client for the test provider. The returned client
+// HTTPClient returns an http.Client for the test provider. The returned client
 // uses a pooled transport (so it can reuse connections) that uses the
 // test provider's CA certificate. This client's idle connections are closed in
 // TestProvider.Done()
-func (p *TestProvider) HttpClient() *http.Client {
+func (p *TestProvider) HTTPClient() *http.Client {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 

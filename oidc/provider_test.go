@@ -476,13 +476,13 @@ func TestProvider_Exchange(t *testing.T) {
 	})
 }
 
-func TestHttpClient(t *testing.T) {
-	// HttpClientContext if mostly covered by other tests, but we need to make
+func TestHTTPClient(t *testing.T) {
+	// HTTPClientContext if mostly covered by other tests, but we need to make
 	// sure we handle nil configs and invalid CA certs
 	t.Parallel()
 	t.Run("nil-config", func(t *testing.T) {
 		p := &Provider{}
-		c, err := p.HttpClient()
+		c, err := p.HTTPClient()
 		assert.Error(t, err)
 		assert.Truef(t, errors.Is(err, ErrNilParameter), "wanted \"%s\" but got \"%s\"", ErrNilParameter, err)
 		assert.Empty(t, c)
@@ -493,7 +493,7 @@ func TestHttpClient(t *testing.T) {
 				ProviderCA: "bad-cert",
 			},
 		}
-		c, err := p.HttpClient()
+		c, err := p.HTTPClient()
 		require.Error(t, err)
 		assert.Truef(t, errors.Is(err, ErrInvalidCACert), "wanted \"%s\" but got \"%s\"", ErrInvalidCACert, err)
 		assert.Empty(t, c)
