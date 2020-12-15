@@ -42,7 +42,7 @@ func TestNewProvider(t *testing.T) {
 	tp := StartTestProvider(t)
 	clientID := "test-client-id"
 	clientSecret := "test-client-secret"
-	redirect := "test-redirect"
+	redirect := "https://test-redirect"
 	tests := []struct {
 		name      string
 		config    *Config
@@ -158,15 +158,16 @@ func TestProvider_AuthURL(t *testing.T) {
 	ctx := context.Background()
 	clientID := "test-client-id"
 	clientSecret := "test-client-secret"
-	redirect := "test-redirect"
+	redirect := "https://test-redirect"
+	redirectEncoded := "https%3A%2F%2Ftest-redirect"
 	tp := StartTestProvider(t)
 	p := testNewProvider(t, clientID, clientSecret, redirect, tp)
-	validState, err := NewState(1 * time.Second)
+	validState, err := NewState(1*time.Second, redirect)
 	require.NoError(t, err)
 
 	allOptsState, err := NewState(
 		1*time.Second,
-		WithRedirectURL("https://state-override"),
+		redirect,
 		WithAudiences("state-override"),
 		WithScopes("email", "profile"),
 	)
@@ -198,7 +199,7 @@ func TestProvider_AuthURL(t *testing.T) {
 					tp.Addr(),
 					clientID,
 					validState.Nonce(),
-					redirect,
+					redirectEncoded,
 					validState.ID(),
 				)
 			}(),
@@ -217,7 +218,7 @@ func TestProvider_AuthURL(t *testing.T) {
 					tp.Addr(),
 					clientID,
 					validState.Nonce(),
-					redirect,
+					redirectEncoded,
 					validState.ID(),
 				)
 			}(),
@@ -235,7 +236,7 @@ func TestProvider_AuthURL(t *testing.T) {
 					tp.Addr(),
 					clientID,
 					allOptsState.Nonce(),
-					"https%3A%2F%2Fstate-override",
+					redirectEncoded,
 					allOptsState.ID(),
 				)
 			}(),
@@ -254,7 +255,7 @@ func TestProvider_AuthURL(t *testing.T) {
 					tp.Addr(),
 					clientID,
 					validState.Nonce(),
-					redirect,
+					redirectEncoded,
 					validState.ID(),
 				)
 			}(),
@@ -306,6 +307,7 @@ func TestProvider_AuthURL(t *testing.T) {
 				assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)
 				return
 			}
+			require.NoError(err)
 			require.Equalf(tt.wantURL, gotURL, "Provider.AuthURL() = %v, want %v", gotURL, tt.wantURL)
 		})
 	}
@@ -322,15 +324,15 @@ func TestProvider_Exchange(t *testing.T) {
 	tp.SetAllowedRedirectURIs([]string{redirect, "https://state-override"})
 	p := testNewProvider(t, clientID, clientSecret, redirect, tp)
 
-	validState, err := NewState(10 * time.Second)
+	validState, err := NewState(10*time.Second, redirect)
 	require.NoError(t, err)
 
-	expiredState, err := NewState(1 * time.Nanosecond)
+	expiredState, err := NewState(1*time.Nanosecond, redirect)
 	require.NoError(t, err)
 
 	allOptsState, err := NewState(
 		10*time.Second,
-		WithRedirectURL("https://state-override"),
+		redirect,
 		WithAudiences("state-override"),
 		WithScopes("email", "profile"),
 	)
@@ -502,7 +504,7 @@ func TestProvider_UserInfo(t *testing.T) {
 	ctx := context.Background()
 	clientID := "test-client-id"
 	clientSecret := "test-client-secret"
-	redirect := "test-redirect"
+	redirect := "https://test-redirect"
 
 	tp := StartTestProvider(t)
 	tp.SetAllowedRedirectURIs([]string{redirect})
@@ -614,7 +616,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 	ctx := context.Background()
 	clientID := "test-client-id"
 	clientSecret := "test-client-secret"
-	redirect := "test-redirect"
+	redirect := "https://test-redirect"
 
 	tp := StartTestProvider(t)
 	tp.SetAllowedRedirectURIs([]string{redirect})
@@ -1093,4 +1095,45 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			assert.Truef(errors.Is(err, ErrInvalidJWKs), "wanted \"%s\" but got \"%s\"", ErrInvalidJWKs, err)
 		}()
 	})
+}
+
+func TestProvider_validRedirect(t *testing.T) {
+	tests := []struct {
+		uri      string
+		allowed  []string
+		expected error
+	}{
+		// valid
+		{"https://example.com", []string{"https://example.com"}, nil},
+		{"https://example.com:5000", []string{"a", "b", "https://example.com:5000"}, nil},
+		{"https://example.com/a/b/c", []string{"a", "b", "https://example.com/a/b/c"}, nil},
+		{"https://localhost:9000", []string{"a", "b", "https://localhost:5000"}, nil},
+		{"https://127.0.0.1:9000", []string{"a", "b", "https://127.0.0.1:5000"}, nil},
+		{"https://[::1]:9000", []string{"a", "b", "https://[::1]:5000"}, nil},
+		{"https://[::1]:9000/x/y?r=42", []string{"a", "b", "https://[::1]:5000/x/y?r=42"}, nil},
+
+		// invalid
+		{"https://example.com", []string{}, ErrUnauthorizedRedirectURI},
+		{"http://example.com", []string{"a", "b", "https://example.com"}, ErrUnauthorizedRedirectURI},
+		{"https://example.com:9000", []string{"a", "b", "https://example.com:5000"}, ErrUnauthorizedRedirectURI},
+		{"https://[::2]:9000", []string{"a", "b", "https://[::2]:5000"}, ErrUnauthorizedRedirectURI},
+		{"https://localhost:5000", []string{"a", "b", "https://127.0.0.1:5000"}, ErrUnauthorizedRedirectURI},
+		{"https://localhost:5000", []string{"a", "b", "https://127.0.0.1:5000"}, ErrUnauthorizedRedirectURI},
+		{"https://localhost:5000", []string{"a", "b", "http://localhost:5000"}, ErrUnauthorizedRedirectURI},
+		{"https://[::1]:5000/x/y?r=42", []string{"a", "b", "https://[::1]:5000/x/y?r=43"}, ErrUnauthorizedRedirectURI},
+
+		// extra invalid
+		{"%%%%%%%%%%%", []string{}, ErrInvalidParameter},
+	}
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("uri=%q allowed=%#v", tt.uri, tt.allowed), func(t *testing.T) {
+			p := &Provider{
+				config: &Config{
+					AllowedRedirectURLs: tt.allowed,
+				},
+			}
+			p.config.AllowedRedirectURLs = tt.allowed
+			require.Truef(t, errors.Is(p.validRedirect(tt.uri), tt.expected), "got [%v] and expected [%v]", p.validRedirect(tt.uri), tt.expected)
+		})
+	}
 }

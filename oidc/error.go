@@ -30,4 +30,5 @@ var (
 	ErrNotFound                  = errors.New("not found")
 	ErrLoginFailed               = errors.New("login failed")
 	ErrUserInfoFailed            = errors.New("user info failed")
+	ErrUnauthorizedRedirectURI   = errors.New("unauthorized redirect_uri")
 )

@@ -7,6 +7,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/coreos/go-oidc"
@@ -61,14 +62,8 @@ type Config struct {
 	// access_token, etc.
 	SupportedSigningAlgs []Alg
 
-	// DefaultRedirectURL is the URL where the provider will redirect responses to
-	// authentication requests.  This default can be overridden for a specific
-	// authentication attempt by setting a State's RedirectURL.
-	DefaultRedirectURL string
-
 	// AllowedRedirectURLs is a list of allowed URLs for the provider to
-	// redirect to after a user authenticates.  NewConfig(...) will append the
-	// DefaultRedirectURL to this list for you.
+	// redirect to after a user authenticates.
 	AllowedRedirectURLs []string
 
 	// Audiences is an optional default list of case-sensitive strings to use when
@@ -89,32 +84,24 @@ type Config struct {
 
 // NewConfig composes a new config for a provider.
 //
-// The "oidc" scope will always
-// be added to the new configuration's Scopes, regardless of what additional scopes
-// are requested via the WithScopes option and duplicate scopes are allowed.
+// The "oidc" scope will always be added to the new configuration's Scopes,
+// regardless of what additional scopes are requested via the WithScopes option
+// and duplicate scopes are allowed.
 //
-// The defaultRedirect will always be addded to the new configurations
-// AllowedRedirectURLs, regardless of what additional redirects are requested
-// via WithAllowRedirects and duplicates are allowed.
-//
-// Supported options: WithAllowedRedirects, WithProviderCA, WithScopes,
-// WithAudiences, WithNow
-func NewConfig(issuer string, clientID string, clientSecret ClientSecret, supported []Alg, defaultRedirect string, opt ...Option) (*Config, error) {
+// Supported options: WithProviderCA, WithScopes, WithAudiences, WithNow
+func NewConfig(issuer string, clientID string, clientSecret ClientSecret, supported []Alg, allowedRedirectURLs []string, opt ...Option) (*Config, error) {
 	const op = "NewConfig"
 	opts := getConfigOpts(opt...)
-	opts.withAllowedRedirects = append([]string{defaultRedirect}, opts.withAllowedRedirects...)
-	opts.withAllowedRedirects = strutils.RemoveDuplicatesStable(opts.withAllowedRedirects, false)
 	c := &Config{
 		Issuer:               issuer,
 		ClientID:             clientID,
 		ClientSecret:         clientSecret,
 		SupportedSigningAlgs: supported,
-		DefaultRedirectURL:   defaultRedirect,
 		Scopes:               opts.withScopes,
 		ProviderCA:           opts.withProviderCA,
 		Audiences:            opts.withAudiences,
 		NowFunc:              opts.withNowFunc,
-		AllowedRedirectURLs:  opts.withAllowedRedirects,
+		AllowedRedirectURLs:  allowedRedirectURLs,
 	}
 	if err := c.Validate(); err != nil {
 		return nil, fmt.Errorf("%s: invalid provider config: %w", op, err)
@@ -141,12 +128,19 @@ func (c *Config) Validate() error {
 	if c.Issuer == "" {
 		return fmt.Errorf("%s: discovery URL is empty: %w", op, ErrInvalidParameter)
 	}
-	if c.DefaultRedirectURL == "" {
-		return fmt.Errorf("%s: redirect URL is empty: %w", op, ErrInvalidParameter)
+	if len(c.AllowedRedirectURLs) == 0 {
+		return fmt.Errorf("%s: allowed redirect URLs is empty: %w", op, ErrInvalidParameter)
 	}
-	if !strutils.StrListContains(c.AllowedRedirectURLs, c.DefaultRedirectURL) {
-		return fmt.Errorf("%s: allowed redirect URLs does not contain the default redirect: %w", op, ErrInvalidParameter)
+	var invalidURLs []string
+	for _, allowed := range c.AllowedRedirectURLs {
+		if _, err := url.Parse(allowed); err != nil {
+			invalidURLs = append(invalidURLs, allowed)
+		}
 	}
+	if len(invalidURLs) > 0 {
+		return fmt.Errorf("Invalid AllowedRedirectURLs provided %s: %w", strings.Join(invalidURLs, ", "), ErrInvalidParameter)
+	}
+
 	u, err := url.Parse(c.Issuer)
 	if err != nil {
 		return fmt.Errorf("%s: issuer %s is invalid (%s): %w", op, c.Issuer, err, ErrInvalidIssuer)
@@ -181,11 +175,10 @@ func (c *Config) Now() time.Time {
 
 // configOptions is the set of available options
 type configOptions struct {
-	withScopes           []string
-	withAudiences        []string
-	withProviderCA       string
-	withNowFunc          func() time.Time
-	withAllowedRedirects []string
+	withScopes     []string
+	withAudiences  []string
+	withProviderCA string
+	withNowFunc    func() time.Time
 }
 
 // configDefaults is a handy way to get the defaults at runtime and
@@ -237,16 +230,4 @@ func EncodeCertificates(certs ...*x509.Certificate) (string, error) {
 		}
 	}
 	return buffer.String(), nil
-}
-
-// WithAllowedRedirects is a list of allowed URLs for the provider to
-// redirect to after a user authenticates.  NewConfig(...) will append the
-// DefaultRedirectURL to this list for you.  Valid for: Config
-func WithAllowedRedirects(urls ...string) Option {
-	return func(o interface{}) {
-		if o, ok := o.(*configOptions); ok {
-			urls := strutils.RemoveDuplicatesStable(urls, false)
-			o.withAllowedRedirects = append(o.withAllowedRedirects, urls...)
-		}
-	}
 }

@@ -161,14 +161,14 @@ func testDefaultJWT(t *testing.T, privKey crypto.PrivateKey, expireIn time.Durat
 // TestProvider's client ID/secret and use the TestProviders signing algorithm
 // when building the configuration. This is helpful internally, but
 // intentionally not exported.
-func testNewConfig(t *testing.T, clientID, clientSecret, redirectURL string, tp *TestProvider) *Config {
+func testNewConfig(t *testing.T, clientID, clientSecret, allowedRedirectURL string, tp *TestProvider) *Config {
 	const op = "testNewConfig"
 	t.Helper()
 	require := require.New(t)
 
 	require.NotEmptyf(clientID, "%s: client id is empty", op)
 	require.NotEmptyf(clientSecret, "%s: client secret is empty", op)
-	require.NotEmptyf(redirectURL, "%s: redirect URL is empty", op)
+	require.NotEmptyf(allowedRedirectURL, "%s: redirect URL is empty", op)
 
 	tp.SetClientCreds(clientID, clientSecret)
 	_, _, alg := tp.SigningKeys()
@@ -177,7 +177,7 @@ func testNewConfig(t *testing.T, clientID, clientSecret, redirectURL string, tp 
 		clientID,
 		ClientSecret(clientSecret),
 		[]Alg{alg},
-		redirectURL,
+		[]string{allowedRedirectURL},
 		nil,
 		WithProviderCA(tp.CACert()),
 	)
