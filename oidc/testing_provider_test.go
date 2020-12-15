@@ -34,17 +34,17 @@ func Test_StartTestProvider(t *testing.T) {
 	require.NoError(err)
 	assert.Equal(strconv.Itoa(port), url.Port())
 
-	client := tp.HttpClient()
+	client := tp.HTTPClient()
 	resp, err := client.Get(tp.Addr() + "/.well-known/jwks.json")
 	require.NoError(err)
 	assert.Equal(http.StatusOK, resp.StatusCode)
 }
 
-func Test_HttpClient(t *testing.T) {
+func Test_HTTPClient(t *testing.T) {
 	t.Parallel()
 	assert, require := assert.New(t), require.New(t)
 	tp := StartTestProvider(t)
-	client := tp.HttpClient()
+	client := tp.HTTPClient()
 	assert.Equal(tp.client, client)
 	resp, err := client.Get(tp.Addr() + "/.well-known/jwks.json")
 	require.NoError(err)
@@ -361,7 +361,7 @@ func TestTestProvider_authorize(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
 			tp.SetExpectedAuthCode("valid-code")
 			tp.SetExpectedAuthNonce("valid-nonce")
-			client := tp.HttpClient()
+			client := tp.HTTPClient()
 			url := fmt.Sprintf("%s/authorize?redirect_uri=%s%s", tp.Addr(), echo.Addr(), tt.urlParameters)
 			resp, err := client.Get(url)
 			require.NoError(err)
@@ -374,7 +374,7 @@ func TestTestProvider_authorize(t *testing.T) {
 	}
 	t.Run("bad-method", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		client := tp.HttpClient()
+		client := tp.HTTPClient()
 		req, err := http.NewRequest(http.MethodPut, tp.Addr()+"/authorize", nil)
 		require.NoError(err)
 		resp, err := client.Do(req)
@@ -456,7 +456,7 @@ func TestTestProvider_token(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
 			tp.SetExpectedAuthCode("valid-code")
 			tp.SetAllowedRedirectURIs([]string{tt.allowedRedirectURI})
-			client := tp.HttpClient()
+			client := tp.HTTPClient()
 			form := url.Values{}
 			form.Add("redirect_uri", tt.payload.redirectURI)
 			form.Add("grant_type", tt.payload.grantType)
