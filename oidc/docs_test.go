@@ -17,7 +17,7 @@ func Example() {
 		"your_client_id",
 		"your_client_secret",
 		[]oidc.Alg{oidc.RS256},
-		"http://your_redirect_url",
+		[]string{"http://your_redirect_url"},
 	)
 
 	// Create a provider
@@ -26,7 +26,7 @@ func Example() {
 
 	// Create a State for a user's authentication attempt
 	ttl := 2 * time.Minute
-	s, _ := oidc.NewState(ttl)
+	s, _ := oidc.NewState(ttl, "http://your_redirect_url")
 
 	// Create an auth URL
 	authURL, _ := p.AuthURL(context.Background(), s)
@@ -68,12 +68,12 @@ func ExampleNewConfig() {
 		"your_client_id",
 		"your_client_secret",
 		[]oidc.Alg{oidc.RS256},
-		"http://your_redirect_url",
+		[]string{"http://your_redirect_url"},
 	)
 	fmt.Println(pc)
 
 	// Output:
-	// &{your_client_id [REDACTED: client secret] [openid] http://your_issuer/ [RS256] http://your_redirect_url [http://your_redirect_url] []  <nil>}
+	// &{your_client_id [REDACTED: client secret] [openid] http://your_issuer/ [RS256] [http://your_redirect_url] []  <nil>}
 }
 
 func ExampleNewProvider() {
@@ -83,7 +83,7 @@ func ExampleNewProvider() {
 		"your_client_id",
 		"your_client_secret",
 		[]oidc.Alg{oidc.RS256},
-		"http://your_redirect_url",
+		[]string{"http://your_redirect_url"},
 	)
 
 	// Create a provider
@@ -98,7 +98,7 @@ func ExampleProvider_AuthURL() {
 		"your_client_id",
 		"your_client_secret",
 		[]oidc.Alg{oidc.RS256},
-		"http://your_redirect_url",
+		[]string{"http://your_redirect_url"},
 	)
 
 	// Create a provider
@@ -107,7 +107,7 @@ func ExampleProvider_AuthURL() {
 
 	// Create a State for a user's authentication attempt
 	ttl := 2 * time.Minute
-	s, _ := oidc.NewState(ttl)
+	s, _ := oidc.NewState(ttl, "http://your_redirect_url")
 
 	// Create an auth URL
 	authURL, _ := p.AuthURL(context.Background(), s)
@@ -121,7 +121,7 @@ func ExampleProvider_Exchange() {
 		"your_client_id",
 		"your_client_secret",
 		[]oidc.Alg{oidc.RS256},
-		"http://your_redirect_url",
+		[]string{"http://your_redirect_url"},
 	)
 
 	// Create a provider
@@ -130,7 +130,7 @@ func ExampleProvider_Exchange() {
 
 	// Create a State for a user's authentication attempt
 	ttl := 2 * time.Minute
-	s, _ := oidc.NewState(ttl)
+	s, _ := oidc.NewState(ttl, "http://your_redirect_url")
 
 	// Create an auth URL
 	authURL, _ := p.AuthURL(context.Background(), s)
@@ -150,7 +150,7 @@ func ExampleProvider_UserInfo() {
 		"your_client_id",
 		"your_client_secret",
 		[]oidc.Alg{oidc.RS256},
-		"http://your_redirect_url",
+		[]string{"http://your_redirect_url"},
 	)
 
 	// Create a provider
@@ -159,7 +159,7 @@ func ExampleProvider_UserInfo() {
 
 	// Create a State for a user's authentication attempt
 	ttl := 2 * time.Minute
-	s, _ := oidc.NewState(ttl)
+	s, _ := oidc.NewState(ttl, "http://your_redirect_url")
 
 	// Exchange a successful authentication's authorization code and
 	// authorization state (received in a callback) for a verified Token.

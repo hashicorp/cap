@@ -15,8 +15,8 @@ import (
 // the OIDC flow to prevent CSRF and replay attacks (see the oidc spec for
 // specifics).
 //
-// Audiences, Scopes, and RedirectURL are optional overrides of configured
-// provider defaults for specific authentication attempts
+// Audiences and Scopes are optional overrides of configured provider defaults
+// for specific authentication attempts
 type State interface {
 	// ID is a unique identifier and an opaque value used to maintain state
 	// between the oidc request and the callback. ID cannot equal the Nonce.
@@ -48,10 +48,8 @@ type State interface {
 	// requested scopes will be used.
 	Scopes() []string
 
-	// RedirectURL is a specific authentication attempt's redirect URL, where
-	// providers will direct responses to authentication requests. Of a State
-	// does not have a RedirectURL, then the configured default redirect URL
-	// will be used.
+	// RedirectURL is a URL where providers will redirect responses to
+	// authentication requests.
 	RedirectURL() string
 }
 
@@ -67,10 +65,8 @@ type St struct {
 	// Expiration is the expiration time for the State.
 	expiration time.Time
 
-	// redirectURL is a specific authentication attempt's redirect URL, where
-	// providers will direct responses to authentication requests. Of a State
-	// does not have a RedirectURL, then the configured default redirect URL
-	// will be used.
+	// redirectURL is a URL where providers will redirect responses to
+	// authentication requests.
 	redirectURL string
 
 	// scopes is a specific authentication attempt's list of optional
@@ -97,13 +93,14 @@ var _ State = (*St)(nil)
 // NewState creates a new State (*St).
 //  Supports the options:
 //   * WithNow: (with a default to time.Now).
-//   * WithRedirectURL
 //   * WithAudiences
 //   * WithScopes
-func NewState(expireIn time.Duration, opt ...Option) (*St, error) {
+func NewState(expireIn time.Duration, redirectURL string, opt ...Option) (*St, error) {
 	const op = "oidc.NewState"
 	opts := getStOpts(opt...)
-
+	if redirectURL == "" {
+		return nil, fmt.Errorf("%s: redirect URL is empty: %w", op, ErrInvalidParameter)
+	}
 	nonce, err := NewID(WithPrefix("n"))
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to generate a state's nonce: %w", op, err)
@@ -119,8 +116,8 @@ func NewState(expireIn time.Duration, opt ...Option) (*St, error) {
 	s := &St{
 		id:          id,
 		nonce:       nonce,
+		redirectURL: redirectURL,
 		nowFunc:     opts.withNowFunc,
-		redirectURL: opts.withRedirectURL,
 		audiences:   opts.withAudiences,
 		scopes:      opts.withScopes,
 	}
@@ -128,11 +125,11 @@ func NewState(expireIn time.Duration, opt ...Option) (*St, error) {
 	return s, nil
 }
 
-func (s *St) ID() string          { return s.id }    // ID implements the State.ID() interface function.
-func (s *St) Nonce() string       { return s.nonce } // Nonce implements the State.Nonce() interface function.
-func (s *St) Audiences() []string { return s.audiences }
-func (s *St) Scopes() []string    { return s.scopes }
-func (s *St) RedirectURL() string { return s.redirectURL }
+func (s *St) ID() string          { return s.id }          // ID implements the State.ID() interface function.
+func (s *St) Nonce() string       { return s.nonce }       // Nonce implements the State.Nonce() interface function.
+func (s *St) Audiences() []string { return s.audiences }   // Audiences implements the State.Audiences() interface function.
+func (s *St) Scopes() []string    { return s.scopes }      // Scopes implements the State.Scopes() interface function.
+func (s *St) RedirectURL() string { return s.redirectURL } // RedirectURL implements the State.RedirectURL() interface function.
 
 // StateExpirySkew defines a time skew when checking a State's expiration.
 const StateExpirySkew = 1 * time.Second
@@ -152,10 +149,9 @@ func (s *St) now() time.Time {
 
 // stOptions is the set of available options for St functions
 type stOptions struct {
-	withNowFunc     func() time.Time
-	withScopes      []string
-	withRedirectURL string
-	withAudiences   []string
+	withNowFunc   func() time.Time
+	withScopes    []string
+	withAudiences []string
 }
 
 // stDefaults is a handy way to get the defaults at runtime and during unit
@@ -169,14 +165,4 @@ func getStOpts(opt ...Option) stOptions {
 	opts := stDefaults()
 	ApplyOpts(&opts, opt...)
 	return opts
-}
-
-// WithRedirectURL is the URL where the provider will send responses to
-// authentication requests. Valid for: St
-func WithRedirectURL(redirect string) Option {
-	return func(o interface{}) {
-		if o, ok := o.(*stOptions); ok {
-			o.withRedirectURL = redirect
-		}
-	}
 }

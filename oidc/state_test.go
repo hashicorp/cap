@@ -20,6 +20,7 @@ func TestNewState(t *testing.T) {
 	tests := []struct {
 		name            string
 		expireIn        time.Duration
+		redirectURL     string
 		opts            []Option
 		wantNowFunc     func() time.Time
 		wantRedirectURL string
@@ -29,22 +30,24 @@ func TestNewState(t *testing.T) {
 		wantIsErr       error
 	}{
 		{
-			name:     "valid-with-all-options",
-			expireIn: defaultExpireIn,
+			name:        "valid-with-all-options",
+			expireIn:    defaultExpireIn,
+			redirectURL: "https://bob.com",
 			opts: []Option{
 				WithNow(testNow),
-				WithRedirectURL("https://bobs.com"),
 				WithAudiences("bob", "alice"),
 				WithScopes("email", "profile"),
 			},
 			wantNowFunc:     testNow,
-			wantRedirectURL: "https://bobs.com",
+			wantRedirectURL: "https://bob.com",
 			wantAudiences:   []string{"bob", "alice"},
 			wantScopes:      []string{oidc.ScopeOpenID, "email", "profile"},
 		},
 		{
-			name:     "valid-no-opt",
-			expireIn: defaultExpireIn,
+			name:            "valid-no-opt",
+			expireIn:        defaultExpireIn,
+			redirectURL:     "https://bob.com",
+			wantRedirectURL: "https://bob.com",
 		},
 		{
 			name:      "zero-expireIn",
@@ -56,7 +59,7 @@ func TestNewState(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			got, err := NewState(tt.expireIn, tt.opts...)
+			got, err := NewState(tt.expireIn, tt.redirectURL, tt.opts...)
 			if tt.wantErr {
 				require.Error(err)
 				assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)
@@ -81,13 +84,13 @@ func TestState_IsExpired(t *testing.T) {
 	t.Parallel()
 	t.Run("not-expired", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		s, err := NewState(2 * time.Second)
+		s, err := NewState(2*time.Second, "https://redirect")
 		require.NoError(err)
 		assert.False(s.IsExpired())
 	})
 	t.Run("expired", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		s, err := NewState(1 * time.Nanosecond)
+		s, err := NewState(1*time.Nanosecond, "https://redirect")
 		require.NoError(err)
 		assert.True(s.IsExpired())
 	})

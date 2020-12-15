@@ -72,7 +72,7 @@ func main() {
 
 	sc := newStateCache(env[attemptExp].(time.Duration), timeout)
 
-	pc, err := oidc.NewConfig(issuer, clientID, clientSecret, []oidc.Alg{oidc.RS256}, redirectURL)
+	pc, err := oidc.NewConfig(issuer, clientID, clientSecret, []oidc.Alg{oidc.RS256}, []string{redirectURL})
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return
@@ -92,7 +92,7 @@ func main() {
 
 	// Set up callback handler
 	http.HandleFunc("/callback", CallbackHandler(context.Background(), p, sc, *useImplicit))
-	http.HandleFunc("/login", LoginHandler(context.Background(), p, sc, timeout, *useImplicit))
+	http.HandleFunc("/login", LoginHandler(context.Background(), p, sc, timeout, redirectURL, *useImplicit))
 	http.HandleFunc("/success", SuccessHandler(context.Background(), sc))
 
 	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", env[port]))

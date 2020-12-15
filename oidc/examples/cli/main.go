@@ -75,7 +75,7 @@ func main() {
 	clientID := env[clientID].(string)
 	clientSecret := oidc.ClientSecret(env[clientSecret].(string))
 	redirectURL := fmt.Sprintf("http://localhost:%s/callback", env[port].(string))
-	pc, err := oidc.NewConfig(issuer, clientID, clientSecret, []oidc.Alg{oidc.RS256}, redirectURL)
+	pc, err := oidc.NewConfig(issuer, clientID, clientSecret, []oidc.Alg{oidc.RS256}, []string{redirectURL})
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return
@@ -88,7 +88,7 @@ func main() {
 	}
 	defer p.Done()
 
-	s, err := oidc.NewState(env[attemptExp].(time.Duration))
+	s, err := oidc.NewState(env[attemptExp].(time.Duration), redirectURL)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return

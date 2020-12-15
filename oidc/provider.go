@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net/http"
+	"net/url"
 	"reflect"
 	"strings"
 	"sync"
@@ -127,13 +128,11 @@ func (p *Provider) AuthURL(ctx context.Context, s State, opt ...Option) (url str
 	if s.ID() == s.Nonce() {
 		return "", fmt.Errorf("%s: state id and nonce cannot be equal: %w", op, ErrInvalidParameter)
 	}
-
-	var redirect string
-	switch {
-	case s.RedirectURL() != "":
-		redirect = s.RedirectURL()
-	default:
-		redirect = p.config.DefaultRedirectURL
+	if s.RedirectURL() == "" {
+		return "", fmt.Errorf("%s: state redirect URL is empty: %w", op, ErrInvalidParameter)
+	}
+	if err := p.validRedirect(s.RedirectURL()); err != nil {
+		return "", fmt.Errorf("%s: %w", op, err)
 	}
 	var scopes []string
 	switch {
@@ -151,7 +150,7 @@ func (p *Provider) AuthURL(ctx context.Context, s State, opt ...Option) (url str
 	oauth2Config := oauth2.Config{
 		ClientID:     p.config.ClientID,
 		ClientSecret: string(p.config.ClientSecret),
-		RedirectURL:  redirect,
+		RedirectURL:  s.RedirectURL(),
 		Endpoint:     p.provider.Endpoint(),
 		Scopes:       scopes,
 	}
@@ -185,6 +184,12 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 	if s.ID() != authorizationState {
 		return nil, fmt.Errorf("%s: authentication state and authorization state are not equal: %w", op, ErrInvalidParameter)
 	}
+	if s.RedirectURL() == "" {
+		return nil, fmt.Errorf("%s: authentication state redirect URL is empty: %w", op, ErrInvalidParameter)
+	}
+	if err := p.validRedirect(s.RedirectURL()); err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
 	if s.IsExpired() {
 		return nil, fmt.Errorf("%s: authentication state is expired: %w", op, ErrInvalidParameter)
 	}
@@ -192,14 +197,6 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 	oidcCtx, err := p.HttpClientContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to create http client: %w", op, err)
-	}
-
-	var redirect string
-	switch {
-	case s.RedirectURL() != "":
-		redirect = s.RedirectURL()
-	default:
-		redirect = p.config.DefaultRedirectURL
 	}
 	var scopes []string
 	switch {
@@ -214,7 +211,7 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 	var oauth2Config = oauth2.Config{
 		ClientID:     p.config.ClientID,
 		ClientSecret: string(p.config.ClientSecret),
-		RedirectURL:  redirect,
+		RedirectURL:  s.RedirectURL(),
 		Endpoint:     p.provider.Endpoint(),
 		Scopes:       scopes,
 	}
@@ -308,7 +305,6 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, nonce string, o
 	oidcConfig := &oidc.Config{
 		SkipClientIDCheck:    true,
 		SupportedSigningAlgs: algs,
-		ClientID:             p.config.ClientID,
 		Now:                  p.config.Now,
 	}
 	verifier := p.provider.Verifier(oidcConfig)
@@ -463,6 +459,39 @@ func (p *Provider) HttpClientContext(ctx context.Context) (context.Context, erro
 	}
 	// simple to implement as a wrapper for the coreos package
 	return oidc.ClientContext(ctx, c), nil
+}
+
+// validRedirect checks whether uri is in allowed using special handling for loopback uris.
+// Ref: https://tools.ietf.org/html/rfc8252#section-7.3
+func (p *Provider) validRedirect(uri string) error {
+	const op = "Provider.validRedirect"
+	inputURI, err := url.Parse(uri)
+	if err != nil {
+		return fmt.Errorf("redirect URI %s is an invalid URI %s: %w", uri, err.Error(), ErrInvalidParameter)
+	}
+
+	// if uri isn't a loopback, just string search the allowed list
+	if !strutils.StrListContains([]string{"localhost", "127.0.0.1", "::1"}, inputURI.Hostname()) {
+		if !strutils.StrListContains(p.config.AllowedRedirectURLs, uri) {
+			return fmt.Errorf("redirect URI %s: %w", uri, ErrUnauthorizedRedirectURI)
+		}
+	}
+
+	// otherwise, search for a match in a port-agnostic manner, per the OAuth RFC.
+	inputURI.Host = inputURI.Hostname()
+
+	for _, a := range p.config.AllowedRedirectURLs {
+		allowedURI, err := url.Parse(a)
+		if err != nil {
+			return fmt.Errorf("allowed redirect URI %s is an invalid URI %s: %w", allowedURI, err.Error(), ErrInvalidParameter)
+		}
+		allowedURI.Host = allowedURI.Hostname()
+
+		if inputURI.String() == allowedURI.String() {
+			return nil
+		}
+	}
+	return fmt.Errorf("redirect URI %s: %w", uri, ErrUnauthorizedRedirectURI)
 }
 
 type implicitFlow struct {
