@@ -10,21 +10,24 @@ import (
 // Implementations must be concurrently safe, since the reader will likely be
 // used within a concurrent http.Handler
 type StateReader interface {
-	// Read an existing AuthCodeState entry.  The returned state's ID()
+	// Read an existing State entry.  The returned state's ID()
 	// must match the stateID used to look it up. Implementations must be
-	// concurrently safe, which likely means returning a deep copy
+	// concurrently safe, which likely means returning a deep copy.
 	Read(ctx context.Context, stateID string) (oidc.State, error)
 }
 
 // SingleStateReader implements the StateReader interface for a single state.
-// When it's Read() receiver function is called it will always return the same
-// state.  It is concurrently safe.
+// It is concurrently safe.
 type SingleStateReader struct {
 	State oidc.State
 }
 
-// Read() will always return the same state and satisfies the StateReader
-// interface.  Read() is concurrently safe.
+// Read() will return it's single-state if the stateID matches it's ID(),
+// otherwise it returns an error of oidc.ErrNotFound. It satisfies the
+// StateReader interface.  Read() is concurrently safe.
 func (s *SingleStateReader) Read(ctx context.Context, stateID string) (oidc.State, error) {
+	if s.State.ID() != stateID {
+		return nil, oidc.ErrNotFound
+	}
 	return s.State, nil
 }
