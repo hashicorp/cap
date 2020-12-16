@@ -16,7 +16,20 @@ import (
 // The SuccessResponseFunc is used to create a response when callback is
 // successful. The ErrorResponseFunc is to create a response when the callback
 // fails.
-func Implicit(ctx context.Context, p *oidc.Provider, rw StateReader, sFn SuccessResponseFunc, eFn ErrorResponseFunc) http.HandlerFunc {
+func Implicit(ctx context.Context, p *oidc.Provider, rw StateReader, sFn SuccessResponseFunc, eFn ErrorResponseFunc) (http.HandlerFunc, error) {
+	const op = "callback.Implicit"
+	if p == nil {
+		return nil, fmt.Errorf("%s: provider is empty: %w", op, oidc.ErrInvalidParameter)
+	}
+	if rw == nil {
+		return nil, fmt.Errorf("%s: state reader is empty: %w", op, oidc.ErrInvalidParameter)
+	}
+	if sFn == nil {
+		return nil, fmt.Errorf("%s: success response func is empty: %w", op, oidc.ErrInvalidParameter)
+	}
+	if eFn == nil {
+		return nil, fmt.Errorf("%s: error response func is empty: %w", op, oidc.ErrInvalidParameter)
+	}
 	return func(w http.ResponseWriter, req *http.Request) {
 		const op = "callback.Implicit"
 
@@ -102,5 +115,5 @@ func Implicit(ctx context.Context, p *oidc.Provider, rw StateReader, sFn Success
 			return
 		}
 		sFn(reqState, responseToken, w, req)
-	}
+	}, nil
 }

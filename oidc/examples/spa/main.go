@@ -90,8 +90,13 @@ func main() {
 		return
 	}
 
+	callback, err := CallbackHandler(context.Background(), p, sc, *useImplicit)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error creating callback handler: %s", err)
+		return
+	}
 	// Set up callback handler
-	http.HandleFunc("/callback", CallbackHandler(context.Background(), p, sc, *useImplicit))
+	http.HandleFunc("/callback", callback)
 	http.HandleFunc("/login", LoginHandler(context.Background(), p, sc, timeout, redirectURL, *useImplicit))
 	http.HandleFunc("/success", SuccessHandler(context.Background(), sc))
 

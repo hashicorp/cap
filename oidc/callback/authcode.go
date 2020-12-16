@@ -15,17 +15,24 @@ import (
 // The SuccessResponseFunc is used to create a response when callback is
 // successful. The ErrorResponseFunc is to create a response when the callback
 // fails.
-func AuthCode(ctx context.Context, p *oidc.Provider, rw StateReader, sFn SuccessResponseFunc, eFn ErrorResponseFunc) http.HandlerFunc {
+func AuthCode(ctx context.Context, p *oidc.Provider, rw StateReader, sFn SuccessResponseFunc, eFn ErrorResponseFunc) (http.HandlerFunc, error) {
+	const op = "callback.AuthCode"
+	if p == nil {
+		return nil, fmt.Errorf("%s: provider is empty: %w", op, oidc.ErrInvalidParameter)
+	}
+	if rw == nil {
+		return nil, fmt.Errorf("%s: state reader is empty: %w", op, oidc.ErrInvalidParameter)
+	}
+	if sFn == nil {
+		return nil, fmt.Errorf("%s: success response func is empty: %w", op, oidc.ErrInvalidParameter)
+	}
+	if eFn == nil {
+		return nil, fmt.Errorf("%s: error response func is empty: %w", op, oidc.ErrInvalidParameter)
+	}
 	return func(w http.ResponseWriter, req *http.Request) {
 		const op = "callback.AuthCodeState"
 
 		reqState := req.FormValue("state")
-
-		if rw == nil {
-			responseErr := fmt.Errorf("%s: state read/writer is nil: %w", op, oidc.ErrNilParameter)
-			eFn(reqState, nil, responseErr, w, req)
-			return
-		}
 
 		if err := req.FormValue("error"); err != "" {
 			// get parameters from either the body or query parameters.
@@ -65,8 +72,7 @@ func AuthCode(ctx context.Context, p *oidc.Provider, rw StateReader, sFn Success
 		if reqState != state.ID() {
 			// the stateReadWriter didn't return the correct state for the key
 			// given... this is an internal sort of error on the part of the
-			// reader, but given this error, we probably shouldn't update the
-			// state
+			// reader.
 			responseErr := fmt.Errorf("%s: authen state and response state are not equal: %w", op, oidc.ErrResponseStateInvalid)
 			eFn(reqState, nil, responseErr, w, req)
 			return
@@ -79,5 +85,5 @@ func AuthCode(ctx context.Context, p *oidc.Provider, rw StateReader, sFn Success
 			return
 		}
 		sFn(reqState, responseToken, w, req)
-	}
+	}, nil
 }

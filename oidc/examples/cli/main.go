@@ -101,9 +101,17 @@ func main() {
 	var urlOption oidc.Option
 	if *useImplicit {
 		urlOption = oidc.WithImplicitFlow()
-		handler = callback.Implicit(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
+		handler, err = callback.Implicit(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error creating callback handler: %s", err)
+			return
+		}
 	} else {
-		handler = callback.AuthCode(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
+		handler, err = callback.AuthCode(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error creating auth code handler: %s", err)
+			return
+		}
 	}
 
 	authURL, err := p.AuthURL(context.Background(), s, urlOption)

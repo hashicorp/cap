@@ -51,7 +51,7 @@ func Example() {
 		}
 		w.WriteHeader(http.StatusUnauthorized)
 	}
-	callback := callback.AuthCode(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
+	callback, _ := callback.AuthCode(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
 	http.HandleFunc("/callback", callback)
 
 	// Get the user's claims via the provider's UserInfo endpoint
