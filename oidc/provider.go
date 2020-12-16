@@ -41,7 +41,7 @@ type Provider struct {
 	mu sync.Mutex
 
 	// backgroundCtx is the context used by the provider for background
-	// activities like: refreshing JWKs ket sets, refreshing tokens, etc
+	// activities like: refreshing JWKs Key sets, refreshing tokens, etc
 	backgroundCtx context.Context
 
 	// backgroundCtxCancel is used to cancel any background activities running
@@ -93,6 +93,11 @@ func NewProvider(c *Config) (*Provider, error) {
 // Done with the provider's background resources and must be called for every
 // Provider created
 func (p *Provider) Done() {
+	// checking for nil here prevents a panic when developers neglect to check
+	// the for an error before deferring a call to p.Done():
+	// 		p, err := NewProvider(...)
+	// 		defer p.Done()
+	// 		if err != nil { ... }
 	if p == nil {
 		return
 	}
@@ -431,6 +436,8 @@ func (p *Provider) convertError(e error) error {
 // Provider.Done()
 func (p *Provider) HTTPClient() (*http.Client, error) {
 	const op = "Provider.NewHTTPClient"
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if p.client != nil {
 		return p.client, nil
 	}
