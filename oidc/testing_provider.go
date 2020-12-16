@@ -102,6 +102,12 @@ import (
 //  * Issuing access_tokens: SetOmitAccessTokens(...) allows you to turn off/on
 //  the issuing of access_tokens from the /token endpoint. access_tokens are issued
 //  by default.
+//
+//  * Authorization State: SetExpectedState sets the value for the state parameter
+//  returned from the /authorized endpoint
+//
+//  * Token Responses: SetDisableToken disables the /token endpoint, causing
+//  it to return a 401 http status.
 type TestProvider struct {
 	httpServer *httptest.Server
 	caCert     string
@@ -117,6 +123,7 @@ type TestProvider struct {
 	clientSecret      string
 	expectedAuthCode  string
 	expectedAuthNonce string
+	expectedState     string
 	customClaims      map[string]interface{}
 	customAudiences   []string
 	omitAuthTimeClaim bool
@@ -124,6 +131,7 @@ type TestProvider struct {
 	omitAccessToken   bool
 	disableUserInfo   bool
 	disableJWKs       bool
+	disableToken      bool
 	invalidJWKs       bool
 	nowFunc           func() time.Time
 
@@ -404,6 +412,21 @@ func (p *TestProvider) SetInvalidJWKS(invalid bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.invalidJWKs = true
+}
+
+// SetExpectedState sets the value for the state parameter returned from
+// /authorized
+func (p *TestProvider) SetExpectedState(s string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.expectedState = s
+}
+
+// SetDisableToken makes the /token endpoint return 401
+func (p *TestProvider) SetDisableToken(disable bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.disableToken = disable
 }
 
 // Addr returns the current base URL for the test provider's running webserver,
@@ -697,8 +720,15 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			require.NoErrorf(err, "%s: internal error: %w", token, err)
 			return
 		}
+		var s string
+		switch {
+		case p.expectedState != "":
+			s = p.expectedState
+		default:
+			s = state
+		}
 
-		redirectURI += "?state=" + url.QueryEscape(state) +
+		redirectURI += "?state=" + url.QueryEscape(s) +
 			"&code=" + url.QueryEscape(p.expectedAuthCode)
 
 		http.Redirect(w, req, redirectURI, http.StatusFound)
@@ -723,6 +753,10 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		require.NoErrorf(err, "%s: internal error: %w", wellKnownJwks, err)
 		return
 	case token:
+		if p.disableToken {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 		if req.Method != "POST" {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
