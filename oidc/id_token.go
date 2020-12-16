@@ -57,11 +57,45 @@ func (t IDToken) Claims(claims interface{}) error {
 // https://openid.net/specs/openid-connect-core-1_0.html#CodeIDToken
 func (t IDToken) VerifyAccessToken(accessToken AccessToken) (bool, error) {
 	const op = "VerifyAccessToken"
+	canVerify, err := t.verifyHashClaim("at_hash", string(accessToken))
+	if err != nil {
+		return canVerify, fmt.Errorf("%s: %w", op, err)
+	}
+	return canVerify, nil
+}
+
+// VerifyAuthorizationCode verifies the c_hash claim of the id_token against the
+// hash of the authorization code.
+//
+// It will return true when it can verify the authorization code. It will return
+// false when it's unable to verify the authorization code.
+//
+// It will return an error whenever it's possible to verify the authorization
+// code and the verification fails.
+//
+// Note: while we support signing id_tokens with EdDSA, unfortunately the
+// authorization code hash cannot be verified without knowing the key's curve.
+// See: https://bitbucket.org/openid/connect/issues/1125
+//
+// For more info about authorization code verification using the id_token's
+// c_hash claim see:
+// https://openid.net/specs/openid-connect-core-1_0.html#HybridIDToken
+func (t IDToken) VerifyAuthorizationCode(code string) (bool, error) {
+	const op = "VerifyAccessToken"
+	canVerify, err := t.verifyHashClaim("c_hash", code)
+	if err != nil {
+		return canVerify, fmt.Errorf("%s: %w", op, err)
+	}
+	return canVerify, nil
+}
+
+func (t IDToken) verifyHashClaim(claimName string, token string) (bool, error) {
+	const op = "verifyHashClaim"
 	var claims map[string]interface{}
 	if err := t.Claims(&claims); err != nil {
 		return false, fmt.Errorf("%s: %w", op, err)
 	}
-	atHash, ok := claims["at_hash"]
+	tokenHash, ok := claims[claimName].(string)
 	if !ok {
 		return false, nil
 	}
@@ -77,12 +111,10 @@ func (t IDToken) VerifyAccessToken(accessToken AccessToken) (bool, error) {
 	default:
 		return false, fmt.Errorf("%s: multiple signatures on id_token not supported", op)
 	}
-
 	sig := jws.Signatures[0]
 	if _, ok := supportedAlgorithms[Alg(sig.Header.Algorithm)]; !ok {
 		return false, fmt.Errorf("%s: id_token signed with algorithm %q: %w", op, sig.Header.Algorithm, ErrUnsupportedAlg)
 	}
-
 	sigAlgorithm := Alg(sig.Header.Algorithm)
 
 	var h hash.Hash
@@ -98,11 +130,16 @@ func (t IDToken) VerifyAccessToken(accessToken AccessToken) (bool, error) {
 	default:
 		return false, fmt.Errorf("%s: unsupported signing algorithm %s: %w", op, sigAlgorithm, ErrUnsupportedAlg)
 	}
-	_, _ = h.Write([]byte(accessToken)) // hash documents that Write will never return an error
+	_, _ = h.Write([]byte(token)) // hash documents that Write will never return an error
 	sum := h.Sum(nil)[:h.Size()/2]
 	actual := base64.RawURLEncoding.EncodeToString(sum)
-	if actual != atHash {
-		return false, ErrInvalidAtHash
+	if actual != tokenHash {
+		switch claimName {
+		case "at_hash":
+			return false, fmt.Errorf("%s: %w", op, ErrInvalidAtHash)
+		case "c_hash":
+			return false, fmt.Errorf("%s: %w", op, ErrInvalidCodeHash)
+		}
 	}
 	return true, nil
 }

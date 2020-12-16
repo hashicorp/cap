@@ -21,6 +21,7 @@ func Implicit(ctx context.Context, p *oidc.Provider, rw StateReader, sFn Success
 		const op = "callback.Implicit"
 
 		reqState := req.FormValue("state")
+		reqCode := req.FormValue("code")
 
 		if rw == nil {
 			responseErr := fmt.Errorf("%s: state read/writer is nil: %w", op, oidc.ErrNilParameter)
@@ -69,23 +70,34 @@ func Implicit(ctx context.Context, p *oidc.Provider, rw StateReader, sFn Success
 			return
 		}
 
+		reqIDToken := oidc.IDToken(req.FormValue("id_token"))
+		if _, err := p.VerifyIDToken(ctx, reqIDToken, state); err != nil {
+			responseErr := fmt.Errorf("%s: unable to verify id_token: %w", op, err)
+			eFn(reqState, nil, responseErr, w, req)
+			return
+		}
+		if _, err := reqIDToken.VerifyAuthorizationCode(reqCode); err != nil {
+			responseErr := fmt.Errorf("%s: unable to authorization code: %w", op, err)
+			eFn(reqState, nil, responseErr, w, req)
+			return
+		}
+
 		var oath2Token *oauth2.Token
 		reqAccessToken := req.FormValue("access_token")
 		if reqAccessToken != "" {
+			if _, err := reqIDToken.VerifyAccessToken(oidc.AccessToken(reqAccessToken)); err != nil {
+				responseErr := fmt.Errorf("%s: unable to verify access_token: %w", op, err)
+				eFn(reqState, nil, responseErr, w, req)
+				return
+			}
 			oath2Token = &oauth2.Token{
 				AccessToken: reqAccessToken,
 			}
 		}
 
-		reqIDToken := req.FormValue("id_token")
 		responseToken, err := oidc.NewToken(oidc.IDToken(reqIDToken), oath2Token)
 		if err != nil {
-			responseErr := fmt.Errorf("%s: unable to create id_token: %w", op, err)
-			eFn(reqState, nil, responseErr, w, req)
-			return
-		}
-		if err := p.VerifyIDToken(ctx, responseToken.IDToken(), state.Nonce(), oidc.WithAudiences(state.Audiences()...)); err != nil {
-			responseErr := fmt.Errorf("%s: unable to verify id_token: %w", op, err)
+			responseErr := fmt.Errorf("%s: unable to create response tokens: %w", op, err)
 			eFn(reqState, nil, responseErr, w, req)
 			return
 		}

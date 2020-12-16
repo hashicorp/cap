@@ -111,10 +111,10 @@ func TestGenerateCA(t *testing.T, hosts []string) (*x509.Certificate, string) {
 	return c, string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes}))
 }
 
-// testHashAccessToken will generate an id_token at_hash claim using the
-// id_token's signature algorithm. This is helpful internally, but
+// testHash will generate an hash using a signature algorithm. It is used to
+// test at_hash and c_hash id_token claims. This is helpful internally, but
 // intentionally not exported.
-func testHashAccessToken(t *testing.T, signatureAlg Alg, token AccessToken) string {
+func testHash(t *testing.T, signatureAlg Alg, data string) string {
 	t.Helper()
 	require := require.New(t)
 	var h hash.Hash
@@ -128,10 +128,10 @@ func testHashAccessToken(t *testing.T, signatureAlg Alg, token AccessToken) stri
 	case EdDSA:
 		return "EdDSA-hash"
 	default:
-		require.FailNowf("", "testHashAccessToken: unsupported signing algorithm %s", string(signatureAlg))
+		require.FailNowf("", "testHash: unsupported signing algorithm %s", string(signatureAlg))
 	}
 	require.NotNil(h)
-	_, _ = h.Write([]byte(string(token))) // hash documents that Write will never return an error
+	_, _ = h.Write([]byte(string(data))) // hash documents that Write will never return an error
 	sum := h.Sum(nil)[:h.Size()/2]
 	actual := base64.RawURLEncoding.EncodeToString(sum)
 	return actual
