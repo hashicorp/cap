@@ -362,7 +362,7 @@ func TestTestProvider_authorize(t *testing.T) {
 			tp.SetExpectedAuthCode("valid-code")
 			tp.SetExpectedAuthNonce("valid-nonce")
 			client := tp.HTTPClient()
-			url := fmt.Sprintf("%s/authorize?redirect_uri=%s%s", tp.Addr(), echo.Addr(), tt.urlParameters)
+			url := fmt.Sprintf("%s/authorize?redirect_uri=%s%s", tp.Addr(), echo.URL, tt.urlParameters)
 			resp, err := client.Get(url)
 			require.NoError(err)
 			assert.NotEmpty(resp)
@@ -405,35 +405,35 @@ func TestTestProvider_token(t *testing.T) {
 		{
 			name: "valid",
 			payload: payload{
-				redirectURI: echo.Addr(),
+				redirectURI: echo.URL,
 				grantType:   "authorization_code",
 				code:        "valid-code",
 			},
-			allowedRedirectURI: echo.Addr(),
+			allowedRedirectURI: echo.URL,
 		},
 		{
 			name: "empty-code",
 			payload: payload{
-				redirectURI: echo.Addr(),
+				redirectURI: echo.URL,
 				grantType:   "authorization_code",
 			},
-			allowedRedirectURI: echo.Addr(),
+			allowedRedirectURI: echo.URL,
 			wantErrStatus:      http.StatusUnauthorized,
 		},
 		{
 			name: "bad-code",
 			payload: payload{
-				redirectURI: echo.Addr(),
+				redirectURI: echo.URL,
 				grantType:   "authorization_code",
 				code:        "bad-code",
 			},
-			allowedRedirectURI: echo.Addr(),
+			allowedRedirectURI: echo.URL,
 			wantErrStatus:      http.StatusUnauthorized,
 		},
 		{
 			name: "bad-redirect",
 			payload: payload{
-				redirectURI: echo.Addr(),
+				redirectURI: echo.URL,
 				grantType:   "authorization_code",
 				code:        "valid-code",
 			},
@@ -443,11 +443,11 @@ func TestTestProvider_token(t *testing.T) {
 		{
 			name: "valid",
 			payload: payload{
-				redirectURI: echo.Addr(),
+				redirectURI: echo.URL,
 				grantType:   "unknown",
 				code:        "valid-code",
 			},
-			allowedRedirectURI: echo.Addr(),
+			allowedRedirectURI: echo.URL,
 			wantErrStatus:      http.StatusBadRequest,
 		},
 	}
@@ -486,30 +486,15 @@ func TestTestProvider_token(t *testing.T) {
 	}
 }
 
-/// testEchoServer is a really simple test http server that echos back whatever
-// it's requests as responses
-type testEchoServer struct {
-	httpServer *httptest.Server
-	t          *testing.T
-}
-
-func (s *testEchoServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	s.t.Helper()
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Range, Content-Disposition, Content-Type, ETag")
-	_ = req.Write(w)
-}
-
-// Addr returns the server's base URL
-func (s *testEchoServer) Addr() string { return s.httpServer.URL }
-
 // startEchoServer starts a test echo http server which will be stopped when the
 // test and its subtests are completed by function registered with t.Cleanup
-func startEchoServer(t *testing.T) *testEchoServer {
+func startEchoServer(t *testing.T) *httptest.Server {
 	t.Helper()
-	s := &testEchoServer{t: t}
-	s.httpServer = httptestNewUnstartedServerWithPort(t, s, 0)
-	s.httpServer.Start()
-	t.Cleanup(s.httpServer.Close)
+	s := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Range, Content-Disposition, Content-Type, ETag")
+		_ = req.Write(w)
+	}))
+	t.Cleanup(s.Close)
 	return s
 }
