@@ -628,7 +628,8 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 	require.NoError(t, err)
 	defaultKeys := keys{priv: k, pub: &k.PublicKey, alg: ES256, keyID: "valid-ES256"}
 
-	defaultValidNonce := "valid"
+	defaultState, err := NewState(1*time.Minute, "http://localhost")
+	require.NoError(t, err)
 	defaultClaims := func() map[string]interface{} {
 
 		return map[string]interface{}{
@@ -638,15 +639,14 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			"iat":   float64(time.Now().Unix()),
 			"exp":   float64(time.Now().Add(1 * time.Minute).Unix()),
 			"id":    "1",
-			"nonce": defaultValidNonce,
+			"nonce": defaultState.Nonce(),
 		}
 	}
 	type args struct {
 		keys           keys
 		claims         map[string]interface{}
-		nonce          string
+		state          State
 		overrideIssuer string
-		opt            []Option
 	}
 	tests := []struct {
 		name      string
@@ -661,28 +661,37 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			args: args{
 				keys:   defaultKeys,
 				claims: defaultClaims(),
-				nonce:  defaultValidNonce,
+				state:  defaultState,
 			},
 		},
 		{
 			name: "nonces-not-equal",
 			p:    defaultProvider,
 			args: args{
-				keys:   defaultKeys,
-				claims: defaultClaims(),
-				nonce:  "not-valid",
+				keys: defaultKeys,
+				claims: func() map[string]interface{} {
+					c := defaultClaims()
+					c["nonce"] = "not-equal"
+					return c
+				}(),
+				state: defaultState,
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidNonce,
 		},
 		{
-			name: "valid-with-audiences-option",
+			name: "valid-with-state-audiences",
 			p:    defaultProvider,
 			args: args{
 				keys:   defaultKeys,
 				claims: defaultClaims(),
-				nonce:  defaultValidNonce,
-				opt:    []Option{WithAudiences(clientID, "second-aud")},
+				state: func() State {
+					aud := []string{tp.clientID, "second-aud"}
+					s, err := NewState(1*time.Minute, "http://localhost", WithAudiences(aud...))
+					s.nonce = defaultState.nonce
+					require.NoError(t, err)
+					return s
+				}(),
 			},
 		},
 		{
@@ -699,7 +708,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
 				}(),
 				claims: defaultClaims(),
-				nonce:  defaultValidNonce,
+				state:  defaultState,
 			},
 			wantErr:   true,
 			wantIsErr: ErrUnsupportedAlg,
@@ -711,7 +720,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 				overrideIssuer: "bad-issuer",
 				keys:           defaultKeys,
 				claims:         defaultClaims(),
-				nonce:          defaultValidNonce,
+				state:          defaultState,
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidIssuer,
@@ -726,7 +735,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					c["nbf"] = float64(time.Now().Add(10 * time.Minute).Unix())
 					return c
 				}(),
-				nonce: defaultValidNonce,
+				state: defaultState,
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidNotBefore,
@@ -741,7 +750,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					c["exp"] = float64(time.Now().Add(-10 * time.Minute).Unix())
 					return c
 				}(),
-				nonce: defaultValidNonce,
+				state: defaultState,
 			},
 			wantErr:   true,
 			wantIsErr: ErrExpiredToken,
@@ -756,7 +765,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					c["iat"] = float64(time.Now().Add(10 * time.Minute).Unix())
 					return c
 				}(),
-				nonce: defaultValidNonce,
+				state: defaultState,
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidIssuedAt,
@@ -776,7 +785,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					c["aud"] = []string{"alice", "bob"}
 					return c
 				}(),
-				nonce: defaultValidNonce,
+				state: defaultState,
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidAudience,
@@ -791,7 +800,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					c["aud"] = []string{"alice", "bob"}
 					return c
 				}(),
-				nonce: defaultValidNonce,
+				state: defaultState,
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidAudience,
@@ -806,7 +815,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					c["aud"] = []string{"alice", "bob", defaultProvider.config.ClientID}
 					return c
 				}(),
-				nonce: defaultValidNonce,
+				state: defaultState,
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidAuthorizedParty,
@@ -822,7 +831,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					c["azp"] = "bob"
 					return c
 				}(),
-				nonce: defaultValidNonce,
+				state: defaultState,
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidAuthorizedParty,
@@ -838,7 +847,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					c["azp"] = defaultProvider.config.ClientID
 					return c
 				}(),
-				nonce: defaultValidNonce,
+				state: defaultState,
 			},
 		},
 		{
@@ -851,7 +860,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					c["aud"] = []string{"alice"}
 					return c
 				}(),
-				nonce: defaultValidNonce,
+				state: defaultState,
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidAuthorizedParty,
@@ -867,7 +876,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					c["azp"] = defaultProvider.config.ClientID
 					return c
 				}(),
-				nonce: defaultValidNonce,
+				state: defaultState,
 			},
 		},
 		{
@@ -884,7 +893,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					return keys{priv: k, pub: &k.PublicKey, alg: ES384, keyID: "valid-ES384"}
 				}(),
 				claims: defaultClaims(),
-				nonce:  defaultValidNonce,
+				state:  defaultState,
 			},
 		},
 		{
@@ -901,7 +910,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					return keys{priv: k, pub: &k.PublicKey, alg: ES512, keyID: "valid-ES512"}
 				}(),
 				claims: defaultClaims(),
-				nonce:  defaultValidNonce,
+				state:  defaultState,
 			},
 		},
 		{
@@ -918,7 +927,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					return keys{priv: k, pub: &k.PublicKey, alg: RS256, keyID: "valid-RS256"}
 				}(),
 				claims: defaultClaims(),
-				nonce:  defaultValidNonce,
+				state:  defaultState,
 			},
 		},
 		{
@@ -935,7 +944,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					return keys{priv: k, pub: &k.PublicKey, alg: RS384, keyID: "valid-RS384"}
 				}(),
 				claims: defaultClaims(),
-				nonce:  defaultValidNonce,
+				state:  defaultState,
 			},
 		},
 		{
@@ -952,7 +961,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					return keys{priv: k, pub: &k.PublicKey, alg: RS512, keyID: "valid-RS512"}
 				}(),
 				claims: defaultClaims(),
-				nonce:  defaultValidNonce,
+				state:  defaultState,
 			},
 		},
 		{
@@ -969,7 +978,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					return keys{priv: k, pub: &k.PublicKey, alg: PS256, keyID: "valid-PS256"}
 				}(),
 				claims: defaultClaims(),
-				nonce:  defaultValidNonce,
+				state:  defaultState,
 			},
 		},
 		{
@@ -986,7 +995,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					return keys{priv: k, pub: &k.PublicKey, alg: PS384, keyID: "valid-PS384"}
 				}(),
 				claims: defaultClaims(),
-				nonce:  defaultValidNonce,
+				state:  defaultState,
 			},
 		},
 		{
@@ -1003,7 +1012,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					return keys{priv: k, pub: &k.PublicKey, alg: PS512, keyID: "valid-PS512"}
 				}(),
 				claims: defaultClaims(),
-				nonce:  defaultValidNonce,
+				state:  defaultState,
 			},
 		},
 		{
@@ -1021,7 +1030,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 					return keys{priv: priv, pub: pub, alg: EdDSA, keyID: "valid-EdDSA"}
 				}(),
 				claims: defaultClaims(),
-				nonce:  defaultValidNonce,
+				state:  defaultState,
 			},
 		},
 	}
@@ -1040,7 +1049,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 				tt.args.claims["iss"] = tt.p.config.Issuer
 			}
 			idToken := IDToken(TestSignJWT(t, tt.args.keys.priv, tt.args.keys.alg, tt.args.claims, []byte(tt.args.keys.keyID)))
-			err := tt.p.VerifyIDToken(ctx, idToken, tt.args.nonce, tt.args.opt...)
+			_, err := tt.p.VerifyIDToken(ctx, idToken, tt.args.state)
 			if tt.wantErr {
 				require.Error(err)
 				if tt.wantIsErr != nil {
@@ -1058,19 +1067,22 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		c := defaultClaims()
 		c["iss"] = defaultProvider.config.Issuer
 		idToken := IDToken(TestSignJWT(t, k, ES256, c, []byte(defaultKeys.keyID)))
-		err = defaultProvider.VerifyIDToken(ctx, idToken, "valid")
+		_, err = defaultProvider.VerifyIDToken(ctx, idToken, defaultState)
 		require.Error(err)
 		assert.Truef(errors.Is(err, ErrInvalidSignature), "wanted \"%s\" but got \"%s\"", ErrInvalidSignature, err)
 	})
 	t.Run("empty-token", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		err := defaultProvider.VerifyIDToken(ctx, "", "nonce")
+		_, err := defaultProvider.VerifyIDToken(ctx, "", defaultState)
 		require.Error(err)
 		assert.Truef(errors.Is(err, ErrInvalidParameter), "wanted \"%s\" but got \"%s\"", ErrInvalidParameter, err)
 	})
 	t.Run("empty-nonce", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		err := defaultProvider.VerifyIDToken(ctx, "token", "")
+		s, err := NewState(1*time.Minute, "http://localhost")
+		require.NoError(err)
+		s.nonce = ""
+		_, err = defaultProvider.VerifyIDToken(ctx, "token", s)
 		require.Error(err)
 		assert.Truef(errors.Is(err, ErrInvalidParameter), "wanted \"%s\" but got \"%s\"", ErrInvalidParameter, err)
 	})
@@ -1082,7 +1094,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		func() {
 			tp.SetDisableJWKs(true)
 			defer tp.SetDisableJWKs(false)
-			err := defaultProvider.VerifyIDToken(ctx, idToken, "valid")
+			_, err := defaultProvider.VerifyIDToken(ctx, idToken, defaultState)
 			require.Error(err)
 			assert.Truef(errors.Is(err, ErrInvalidJWKs), "wanted \"%s\" but got \"%s\"", ErrInvalidJWKs, err)
 		}()
@@ -1090,7 +1102,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		func() {
 			tp.SetInvalidJWKS(true)
 			defer tp.SetInvalidJWKS(false)
-			err = defaultProvider.VerifyIDToken(ctx, idToken, "valid")
+			_, err = defaultProvider.VerifyIDToken(ctx, idToken, defaultState)
 			require.Error(err)
 			assert.Truef(errors.Is(err, ErrInvalidJWKs), "wanted \"%s\" but got \"%s\"", ErrInvalidJWKs, err)
 		}()

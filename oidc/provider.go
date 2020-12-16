@@ -174,8 +174,15 @@ func (p *Provider) AuthURL(ctx context.Context, s State, opt ...Option) (url str
 // It will also validate the authorizationState it receives against the
 // existing State for the user's oidc authentication flow.
 //
-// On success, the Token returned will include an IDToken and may include an
-// AccessToken and RefreshToken.
+// On success, the Token returned will include an IDToken and may
+// include an AccessToken and RefreshToken.
+//
+// See Provider.VerifyIDToken for info about id_token verification.
+//
+// The id_token at_hash claim is verified when present. (see
+// https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowTokenValidation)
+//
+// The id_token c_hash claim is verified when present.
 func (p *Provider) Exchange(ctx context.Context, s State, authorizationState string, authorizationCode string) (*Tk, error) {
 	const op = "Provider.Exchange"
 	if p.config == nil {
@@ -229,12 +236,22 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to create new id_token: %w", op, err)
 	}
-	if err := p.VerifyIDToken(ctx, t.IDToken(), s.Nonce(), WithAudiences(s.Audiences()...)); err != nil {
+	claims, err := p.VerifyIDToken(ctx, t.IDToken(), s)
+	if err != nil {
 		return nil, fmt.Errorf("%s: id_token failed verification: %w", op, err)
 	}
 	if t.AccessToken() != "" {
 		if _, err := t.IDToken().VerifyAccessToken(t.AccessToken()); err != nil {
 			return nil, fmt.Errorf("%s: access_token failed verification: %w", op, err)
+		}
+	}
+
+	// when the optional c_hash claims is present it needs to be verified.
+	c_hash, ok := claims["c_hash"].(string)
+	if ok && c_hash != "" {
+		_, err := t.IDToken().VerifyAuthorizationCode(authorizationCode)
+		if err != nil {
+			return nil, fmt.Errorf("%s: code hash failed verification: %w", op, err)
 		}
 	}
 	return t, nil
@@ -271,8 +288,7 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource,
 	return nil
 }
 
-// VerifyIDToken will verify the inbound IDToken.  Supports the WithAudiences
-// option which will override the config's audiences.
+// VerifyIDToken will verify the inbound IDToken and return its claims.
 //  It verifies:
 //   * signature (including if a supported signing algorithm was used)
 //   * issuer (iss)
@@ -290,13 +306,13 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource,
 //     id, then the authorized party (azp) must equal the client id
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
-func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, nonce string, opt ...Option) error {
+func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, s State, opt ...Option) (map[string]interface{}, error) {
 	const op = "Provider.VerifyIDToken"
 	if t == "" {
-		return fmt.Errorf("%s: id_token is empty: %w", op, ErrInvalidParameter)
+		return nil, fmt.Errorf("%s: id_token is empty: %w", op, ErrInvalidParameter)
 	}
-	if nonce == "" {
-		return fmt.Errorf("%s: nonce is empty: %w", op, ErrInvalidParameter)
+	if s.Nonce() == "" {
+		return nil, fmt.Errorf("%s: nonce is empty: %w", op, ErrInvalidParameter)
 	}
 	algs := []string{}
 	for _, a := range p.config.SupportedSigningAlgs {
@@ -315,15 +331,15 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, nonce string, o
 	// aud will be checked later in this function.
 	oidcIDToken, err := verifier.Verify(ctx, string(t))
 	if err != nil {
-		return fmt.Errorf("%s: invalid id_token: %w", op, p.convertError(err))
+		return nil, fmt.Errorf("%s: invalid id_token: %w", op, p.convertError(err))
 	}
 	// so.. we still need to check: nonce, iat, auth_time, azp, the aud includes
 	// additional audiences configured.
-	if oidcIDToken.Nonce != nonce {
-		return fmt.Errorf("%s: invalid id_token nonce: %w", op, ErrInvalidNonce)
+	if oidcIDToken.Nonce != s.Nonce() {
+		return nil, fmt.Errorf("%s: invalid id_token nonce: %w", op, ErrInvalidNonce)
 	}
 	if nowTime.Add(leeway).Before(oidcIDToken.IssuedAt) {
-		return fmt.Errorf(
+		return nil, fmt.Errorf(
 			"%s: invalid id_token current time %v before the iat (issued at) time %v: %w",
 			op,
 			nowTime,
@@ -332,11 +348,10 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, nonce string, o
 		)
 	}
 
-	opts := getProviderOpts(opt...)
 	var audiences []string
 	switch {
-	case len(opts.withAudiences) > 0:
-		audiences = opts.withAudiences
+	case len(s.Audiences()) > 0:
+		audiences = s.Audiences()
 	default:
 		audiences = p.config.Audiences
 	}
@@ -351,28 +366,28 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, nonce string, o
 		}
 		return nil
 	}(); err != nil {
-		return fmt.Errorf("%s: invalid id_token audiences: %w", op, err)
+		return nil, fmt.Errorf("%s: invalid id_token audiences: %w", op, err)
 	}
 	if len(oidcIDToken.Audience) > 1 && !strutils.StrListContains(oidcIDToken.Audience, p.config.ClientID) {
-		return fmt.Errorf("%s: invalid id_token: multiple audiences (%s) and one of them is not equal client_id (%s): %w", op, oidcIDToken.Audience, p.config.ClientID, ErrInvalidAudience)
+		return nil, fmt.Errorf("%s: invalid id_token: multiple audiences (%s) and one of them is not equal client_id (%s): %w", op, oidcIDToken.Audience, p.config.ClientID, ErrInvalidAudience)
 	}
 
 	var claims map[string]interface{}
 	if err := t.Claims(&claims); err != nil {
-		return fmt.Errorf("%s: %w", op, err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	azp, foundAzp := claims["azp"]
 	if foundAzp {
 		if azp != p.config.ClientID {
-			return fmt.Errorf("%s: invalid id_token: authorized party (%s) is not equal client_id (%s): %w", op, azp, p.config.ClientID, ErrInvalidAuthorizedParty)
+			return nil, fmt.Errorf("%s: invalid id_token: authorized party (%s) is not equal client_id (%s): %w", op, azp, p.config.ClientID, ErrInvalidAuthorizedParty)
 		}
 	}
 	if len(oidcIDToken.Audience) > 1 && azp != p.config.ClientID {
-		return fmt.Errorf("%s: invalid id_token: multiple audiences and authorized party (%s) is not equal client_id (%s): %w", op, azp, p.config.ClientID, ErrInvalidAuthorizedParty)
+		return nil, fmt.Errorf("%s: invalid id_token: multiple audiences and authorized party (%s) is not equal client_id (%s): %w", op, azp, p.config.ClientID, ErrInvalidAuthorizedParty)
 	}
 	if (len(oidcIDToken.Audience) == 1 && oidcIDToken.Audience[0] != p.config.ClientID) && azp != p.config.ClientID {
-		return fmt.Errorf(
+		return nil, fmt.Errorf(
 			"%s: invalid id_token: one audience (%s) which is not the client_id (%s) and authorized party (%s) is not equal client_id (%s): %w",
 			op,
 			oidcIDToken.Audience[0],
@@ -381,8 +396,7 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, nonce string, o
 			p.config.ClientID,
 			ErrInvalidAuthorizedParty)
 	}
-
-	return nil
+	return claims, nil
 }
 
 func (p *Provider) convertError(e error) error {
@@ -461,8 +475,8 @@ func (p *Provider) HTTPClientContext(ctx context.Context) (context.Context, erro
 	return oidc.ClientContext(ctx, c), nil
 }
 
-// validRedirect checks whether uri is in allowed using special handling for loopback uris.
-// Ref: https://tools.ietf.org/html/rfc8252#section-7.3
+// validRedirect checks whether uri is in allowed using special handling for
+// loopback uris. Ref: https://tools.ietf.org/html/rfc8252#section-7.3
 func (p *Provider) validRedirect(uri string) error {
 	const op = "Provider.validRedirect"
 	inputURI, err := url.Parse(uri)

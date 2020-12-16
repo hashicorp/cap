@@ -20,6 +20,7 @@ var (
 	ErrInvalidIssuedAt           = errors.New("invalid issued at (iat)")
 	ErrInvalidAuthorizedParty    = errors.New("invalid authorized party (azp)")
 	ErrInvalidAtHash             = errors.New("access_token hash does not match value in id_token")
+	ErrInvalidCodeHash           = errors.New("authorization code hash does not match value in id_token")
 	ErrTokenNotSigned            = errors.New("token is not signed")
 	ErrMalformedToken            = errors.New("token malformed")
 	ErrUnsupportedAlg            = errors.New("unsupported signing algorithm")

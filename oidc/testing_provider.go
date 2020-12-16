@@ -6,11 +6,15 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
+	"crypto/sha512"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"hash"
 	"io/ioutil"
 	"log"
 	"net"
@@ -198,7 +202,9 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 // testProviderOptions is the set of available options for TestProvider
 // functions
 type testProviderOptions struct {
-	withPort int
+	withPort     int
+	withAtHashOf string
+	withCHashOf  string
 }
 
 // testProviderDefaults is a handy way to get the defaults at runtime and during unit
@@ -215,11 +221,32 @@ func getTestProviderOpts(opt ...Option) testProviderOptions {
 	return opts
 }
 
-// WithTestPort provides an optional port for the test provider. Valid for: TestProvider
+// WithTestPort provides an optional port for the test provider. Valid for:
+// TestProvider.StartTestProvider
 func WithTestPort(port int) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*testProviderOptions); ok {
 			o.withPort = port
+		}
+	}
+}
+
+// withTestAtHash provides an option to request the at_hash claim. Valid for:
+// TestProvider.issueSignedJWT
+func withTestAtHash(accessToken string) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*testProviderOptions); ok {
+			o.withAtHashOf = accessToken
+		}
+	}
+}
+
+// withTestCHash provides an option to request the c_hash claim. Valid for:
+// TestProvider.issueSignedJWT
+func withTestCHash(authorizationCode string) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*testProviderOptions); ok {
+			o.withCHashOf = authorizationCode
 		}
 	}
 }
@@ -449,13 +476,14 @@ func (p *TestProvider) writeImplicitResponse(w http.ResponseWriter) error {
 </html>`
 	const tokenField = `<input type="hidden" name="%s" value="%s"/>
 `
-	jwtData := p.issueSignedJWT()
+	accessToken := p.issueSignedJWT()
+	idToken := p.issueSignedJWT(withTestCHash(p.expectedAuthCode), withTestAtHash(accessToken))
 	var respTokens strings.Builder
 	if !p.omitAccessToken {
-		respTokens.WriteString(fmt.Sprintf(tokenField, "access_token", jwtData))
+		respTokens.WriteString(fmt.Sprintf(tokenField, "access_token", accessToken))
 	}
 	if !p.omitIDToken {
-		respTokens.WriteString(fmt.Sprintf(tokenField, "id_token", jwtData))
+		respTokens.WriteString(fmt.Sprintf(tokenField, "id_token", idToken))
 	}
 	if _, err := w.Write([]byte(fmt.Sprintf(respForm, p.expectedAuthCode, respTokens.String()))); err != nil {
 		return err
@@ -463,7 +491,9 @@ func (p *TestProvider) writeImplicitResponse(w http.ResponseWriter) error {
 	return nil
 }
 
-func (p *TestProvider) issueSignedJWT() string {
+func (p *TestProvider) issueSignedJWT(opt ...Option) string {
+	opts := getTestProviderOpts(opt...)
+
 	claims := map[string]interface{}{
 		"sub":       p.replySubject,
 		"iss":       p.Addr(),
@@ -482,7 +512,40 @@ func (p *TestProvider) issueSignedJWT() string {
 	for k, v := range p.customClaims {
 		claims[k] = v
 	}
+	if opts.withAtHashOf != "" {
+		claims["at_hash"] = p.testHash(opts.withAtHashOf)
+	}
+	if opts.withCHashOf != "" {
+		claims["c_hash"] = p.testHash(opts.withCHashOf)
+	}
 	return TestSignJWT(p.t, p.privKey, p.alg, claims, nil)
+}
+
+// testHash will generate an hash using a signature algorithm. It is used to
+// test at_hash and c_hash id_token claims. This is helpful internally, but
+// intentionally not exported.
+func (p *TestProvider) testHash(data string) string {
+	p.t.Helper()
+	require := require.New(p.t)
+	require.NotEmptyf(data, "testHash: data to hash is empty")
+	var h hash.Hash
+	switch p.alg {
+	case RS256, ES256, PS256:
+		h = sha256.New()
+	case RS384, ES384, PS384:
+		h = sha512.New384()
+	case RS512, ES512, PS512:
+		h = sha512.New()
+	case EdDSA:
+		return "EdDSA-hash"
+	default:
+		require.FailNowf("", "testHash: unsupported signing algorithm %s", string(p.alg))
+	}
+	require.NotNil(h)
+	_, _ = h.Write([]byte(string(data))) // hash documents that Write will never return an error
+	sum := h.Sum(nil)[:h.Size()/2]
+	actual := base64.RawURLEncoding.EncodeToString(sum)
+	return actual
 }
 
 // writeAuthErrorResponse writes a standard OIDC authentication error response.
@@ -677,13 +740,14 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		jwtData := p.issueSignedJWT()
+		accessToken := p.issueSignedJWT()
+		idToken := p.issueSignedJWT(withTestAtHash(accessToken), withTestCHash(p.expectedAuthCode))
 		reply := struct {
 			AccessToken string `json:"access_token,omitempty"`
 			IDToken     string `json:"id_token,omitempty"`
 		}{
-			AccessToken: jwtData,
-			IDToken:     jwtData,
+			AccessToken: accessToken,
+			IDToken:     idToken,
 		}
 		if p.omitIDToken {
 			reply.IDToken = ""
