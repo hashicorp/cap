@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -143,6 +142,11 @@ func Test_ImplicitResponses(t *testing.T) {
 			authURL, err := p.AuthURL(ctx, state, oidc.WithImplicitFlow())
 			require.NoError(err)
 
+			// the TestProvider is returning an html form which is posted
+			// "onload", which assumes a browser client, so we have to pretend
+			// to be a browser and post the form to the callback.
+			// For implicit form_post response example:
+			// https://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html#FormPostResponseExample
 			resp := testPostFormToCallback(t, tp, authURL)
 			defer resp.Body.Close()
 			contents, err := ioutil.ReadAll(resp.Body)
@@ -172,6 +176,10 @@ func Test_ImplicitResponses(t *testing.T) {
 
 		tp.SetDisableImplicit(true)
 		defer tp.SetDisableImplicit(false)
+
+		// For this sort of authentication error, the TestProvider returns a
+		// redirect (not the typical html response with a form to be posted by
+		// the browser onload)
 		authURL, err := p.AuthURL(ctx, state, oidc.WithImplicitFlow())
 		require.NoError(err)
 		resp, err := tp.HTTPClient().Get(authURL)
@@ -205,20 +213,28 @@ func Test_ImplicitResponses(t *testing.T) {
 		authURL, err := p.AuthURL(ctx, state, oidc.WithImplicitFlow())
 		require.NoError(err)
 
+		// the TestProvider is returning an html form which is posted
+		// "onload", which assumes a browser client, so we have to pretend
+		// to be a browser and post the form to the callback.
+		// For implicit form_post response example:
+		// https://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html#FormPostResponseExample
 		resp := testPostFormToCallback(t, tp, authURL)
 		defer resp.Body.Close()
 
 		contents, err := ioutil.ReadAll(resp.Body)
 		require.NoError(err)
 
-		fmt.Println(string(contents))
 		var errResp AuthenErrorResponse
 		require.NoError(json.Unmarshal(contents, &errResp))
 		assert.Equal("internal-callback-error", errResp.Error)
-		assert.Equal("id token signed with unsupported algorithm", errResp.Description)
+		assert.Contains(errResp.Description, "id token signed with unsupported algorithm")
 	})
 }
 
+// testPostFormToCallback is a helper that supports the TestProvider is
+// returning an html form which is posted "onload", which assumes a browser
+// client, so we have to pretend to be a browser and post the form to the
+// callback.
 func testPostFormToCallback(t *testing.T, tp *oidc.TestProvider, authURL string) *http.Response {
 	t.Helper()
 	assert, require := assert.New(t), require.New(t)
@@ -227,7 +243,8 @@ func testPostFormToCallback(t *testing.T, tp *oidc.TestProvider, authURL string)
 	require.NoError(err)
 	require.Equal(http.StatusOK, resp.StatusCode)
 
-	// For implicit form_post response example: https://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html#FormPostResponseExample
+	// For implicit form_post response example:
+	// https://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html#FormPostResponseExample
 	root, err := html.Parse(resp.Body)
 	require.NoError(err)
 	form, ok := scrape.Find(root, scrape.ByTag(atom.Form))
