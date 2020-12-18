@@ -207,13 +207,43 @@ func TestTestProvider_SetSigningKeys(t *testing.T) {
 		pub, priv := TestGenerateKeys(t)
 		tp.SetSigningKeys(priv, pub, RS256, "test-key-id")
 
-		gotPriv, gotPub, gotAlg := tp.SigningKeys()
+		gotPriv, gotPub, gotAlg, gotKeyID := tp.SigningKeys()
 		assert.Equal(priv, gotPriv)
 		assert.Equal(pub, gotPub)
 		assert.Equal(RS256, gotAlg)
+		assert.Equal("test-key-id", gotKeyID)
 	})
 }
 
+func TestTestProvider_SetDisableImplicit(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		tp := StartTestProvider(t)
+		require.Equal(tp.disableImplicit, false)
+		tp.SetDisableImplicit(true)
+		assert.Equal(true, tp.disableImplicit)
+	})
+}
+
+func TestTestProvider_SetDisableToken(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		tp := StartTestProvider(t)
+		require.Equal(tp.disableToken, false)
+		tp.SetDisableToken(true)
+		assert.Equal(true, tp.disableToken)
+	})
+}
+
+func TestTestProvider_SetExpectedState(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		tp := StartTestProvider(t)
+		require.Equal(tp.expectedState, "")
+		tp.SetExpectedState("expected")
+		assert.Equal("expected", tp.expectedState)
+	})
+}
 func TestTestProvider_writeJSON(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
@@ -237,7 +267,7 @@ func TestTestProvider_writeImplicitResponse(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
 		tp := StartTestProvider(t)
 		rr := httptest.NewRecorder()
-		err := tp.writeImplicitResponse(rr)
+		err := tp.writeImplicitResponse(rr, "valid-state", "http://localhost:8080/")
 		require.NoError(err)
 		assert.Contains(rr.Body.String(), `input type="hidden" name="access_token"`)
 		assert.Contains(rr.Body.String(), `input type="hidden" name="id_token"`)
@@ -248,7 +278,7 @@ func TestTestProvider_writeImplicitResponse(t *testing.T) {
 		tp.SetOmitAccessTokens(true)
 		tp.SetOmitIDTokens(true)
 		rr := httptest.NewRecorder()
-		err := tp.writeImplicitResponse(rr)
+		err := tp.writeImplicitResponse(rr, "valid-state", "http://localhost:8080/")
 		require.NoError(err)
 		assert.NotContains(rr.Body.String(), `input type="hidden" name="access_token"`)
 		assert.NotContains(rr.Body.String(), `input type="hidden" name="id_token"`)
