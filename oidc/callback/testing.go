@@ -1,6 +1,7 @@
 package callback
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -71,7 +72,7 @@ func testNewConfig(t *testing.T, clientID, clientSecret, allowedRedirectURL stri
 	require.NotEmptyf(allowedRedirectURL, "%s: redirect URL is empty", op)
 
 	tp.SetClientCreds(clientID, clientSecret)
-	_, _, alg := tp.SigningKeys()
+	_, _, alg, _ := tp.SigningKeys()
 	c, err := oidc.NewConfig(
 		tp.Addr(),
 		clientID,
@@ -83,4 +84,10 @@ func testNewConfig(t *testing.T, clientID, clientSecret, allowedRedirectURL stri
 	)
 	require.NoError(err)
 	return c
+}
+
+type testNilStateReader struct{}
+
+func (s *testNilStateReader) Read(ctx context.Context, stateID string) (oidc.State, error) {
+	return nil, nil
 }
