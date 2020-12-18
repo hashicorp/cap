@@ -108,6 +108,9 @@ import (
 //
 //  * Token Responses: SetDisableToken disables the /token endpoint, causing
 //  it to return a 401 http status.
+//
+//  * Implicit Flow Responses: SetDisableImplicit disables implicit flow responses,
+//  causing them to return a 401 http status.
 type TestProvider struct {
 	httpServer *httptest.Server
 	caCert     string
@@ -132,12 +135,14 @@ type TestProvider struct {
 	disableUserInfo   bool
 	disableJWKs       bool
 	disableToken      bool
+	disableImplicit   bool
 	invalidJWKs       bool
 	nowFunc           func() time.Time
 
 	// privKey *ecdsa.PrivateKey
 	privKey crypto.PrivateKey
 	pubKey  crypto.PublicKey
+	keyID   string
 	alg     Alg
 
 	t *testing.T
@@ -185,10 +190,12 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 	require.NoError(err)
 	p.pubKey, p.privKey = &priv.PublicKey, priv
 	p.alg = ES256
+	p.keyID = strconv.Itoa(int(time.Now().Unix()))
 	p.jwks = &jose.JSONWebKeySet{
 		Keys: []jose.JSONWebKey{
 			{
-				Key: p.pubKey,
+				Key:   p.pubKey,
+				KeyID: p.keyID,
 			},
 		},
 	}
@@ -429,6 +436,13 @@ func (p *TestProvider) SetDisableToken(disable bool) {
 	p.disableToken = disable
 }
 
+// SetDisableImplicit makes implicit flow responses return 401
+func (p *TestProvider) SetDisableImplicit(disable bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.disableImplicit = disable
+}
+
 // Addr returns the current base URL for the test provider's running webserver,
 // which can be used as an OIDC issuer for discovery and is also used for the
 // iss claim when issuing JWTs.
@@ -438,11 +452,12 @@ func (p *TestProvider) Addr() string { return p.httpServer.URL }
 // HTTPS server.
 func (p *TestProvider) CACert() string { return p.caCert }
 
-// SigningKeys returns the test provider's keys used to sign JWTs and its Alg.
-func (p *TestProvider) SigningKeys() (crypto.PrivateKey, crypto.PublicKey, Alg) {
+// SigningKeys returns the test provider's keys used to sign JWTs, its Alg and
+// Key ID.
+func (p *TestProvider) SigningKeys() (crypto.PrivateKey, crypto.PublicKey, Alg, string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return p.privKey, p.pubKey, p.alg
+	return p.privKey, p.pubKey, p.alg, p.keyID
 }
 
 // SetSigningKeys sets the test provider's keys and alg used to sign JWTs.
@@ -459,11 +474,12 @@ func (p *TestProvider) SetSigningKeys(privKey crypto.PrivateKey, pubKey crypto.P
 	p.privKey = privKey
 	p.pubKey = pubKey
 	p.alg = alg
+	p.keyID = KeyID
 	p.jwks = &jose.JSONWebKeySet{
 		Keys: []jose.JSONWebKey{
 			{
 				Key:   p.pubKey,
-				KeyID: KeyID,
+				KeyID: p.keyID,
 			},
 		},
 	}
@@ -480,7 +496,7 @@ func (p *TestProvider) writeJSON(w http.ResponseWriter, out interface{}) error {
 
 // writeImplicitResponse will write the required form data response for an
 // implicit flow response to the OIDC authorize endpoint
-func (p *TestProvider) writeImplicitResponse(w http.ResponseWriter) error {
+func (p *TestProvider) writeImplicitResponse(w http.ResponseWriter, state, redirectURL string) error {
 	p.t.Helper()
 	require := require.New(p.t)
 	require.NotNilf(w, "%s: http.ResponseWriter is nil")
@@ -491,24 +507,24 @@ func (p *TestProvider) writeImplicitResponse(w http.ResponseWriter) error {
 <html lang="en">
 <head><title>Submit This Form</title></head>
 <body onload="javascript:document.forms[0].submit()">
-<form method="post" action="https://client.example.org/callback">
-<input type="hidden" name="state" value="%s"/>
+<form method="post" action="%s">
+<input type="hidden" name="state" id="state" value="%s"/>
 %s
 </form>
 </body>
 </html>`
-	const tokenField = `<input type="hidden" name="%s" value="%s"/>
+	const tokenField = `<input type="hidden" name="%s" id="%s" value="%s"/>
 `
 	accessToken := p.issueSignedJWT()
-	idToken := p.issueSignedJWT(withTestCHash(p.expectedAuthCode), withTestAtHash(accessToken))
+	idToken := p.issueSignedJWT(withTestAtHash(accessToken))
 	var respTokens strings.Builder
 	if !p.omitAccessToken {
-		respTokens.WriteString(fmt.Sprintf(tokenField, "access_token", accessToken))
+		respTokens.WriteString(fmt.Sprintf(tokenField, "access_token", "access_token", accessToken))
 	}
 	if !p.omitIDToken {
-		respTokens.WriteString(fmt.Sprintf(tokenField, "id_token", idToken))
+		respTokens.WriteString(fmt.Sprintf(tokenField, "id_token", "id_token", idToken))
 	}
-	if _, err := w.Write([]byte(fmt.Sprintf(respForm, p.expectedAuthCode, respTokens.String()))); err != nil {
+	if _, err := w.Write([]byte(fmt.Sprintf(respForm, redirectURL, state, respTokens.String()))); err != nil {
 		return err
 	}
 	return nil
@@ -712,20 +728,24 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		if strings.Contains(respType, "id_token") {
-			if respMode != "form_post" {
-				p.writeAuthErrorResponse(w, req, redirectURI, state, "unsupported_response_mode", "must be form_post")
-			}
-			err := p.writeImplicitResponse(w)
-			require.NoErrorf(err, "%s: internal error: %w", token, err)
-			return
-		}
 		var s string
 		switch {
 		case p.expectedState != "":
 			s = p.expectedState
 		default:
 			s = state
+		}
+
+		if strings.Contains(respType, "id_token") {
+			if respMode != "form_post" {
+				p.writeAuthErrorResponse(w, req, redirectURI, state, "unsupported_response_mode", "must be form_post")
+			}
+			if p.disableImplicit {
+				p.writeAuthErrorResponse(w, req, redirectURI, state, "access_denied", "")
+			}
+			err := p.writeImplicitResponse(w, s, redirectURI)
+			require.NoErrorf(err, "%s: internal error: %w", token, err)
+			return
 		}
 
 		redirectURI += "?state=" + url.QueryEscape(s) +
