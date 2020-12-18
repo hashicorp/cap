@@ -1038,7 +1038,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
 			tp.SetSigningKeys(tt.args.keys.priv, tt.args.keys.pub, tt.args.keys.alg, tt.args.keys.keyID)
-			priv, pub, alg := tp.SigningKeys()
+			priv, pub, alg, _ := tp.SigningKeys()
 			require.Equalf(tt.args.keys.priv, priv, "TestProvider priv key is invalid")
 			require.Equalf(tt.args.keys.pub, pub, "TestProvider pub key is invalid")
 			require.Equalf(tt.args.keys.alg, alg, "TestProvider alg key is invalid")
