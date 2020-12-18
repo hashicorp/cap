@@ -183,9 +183,3 @@ func Test_AuthCodeResponses(t *testing.T) {
 		})
 	}
 }
-
-type testNilStateReader struct{}
-
-func (s *testNilStateReader) Read(ctx context.Context, stateID string) (oidc.State, error) {
-	return nil, nil
-}
