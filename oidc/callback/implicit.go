@@ -34,13 +34,6 @@ func Implicit(ctx context.Context, p *oidc.Provider, rw StateReader, sFn Success
 		const op = "callback.Implicit"
 
 		reqState := req.FormValue("state")
-		reqCode := req.FormValue("code")
-
-		if rw == nil {
-			responseErr := fmt.Errorf("%s: state read/writer is nil: %w", op, oidc.ErrNilParameter)
-			eFn(reqState, nil, responseErr, w, req)
-			return
-		}
 
 		if err := req.FormValue("error"); err != "" {
 			// get parameters from either the body or query parameters.
@@ -86,11 +79,6 @@ func Implicit(ctx context.Context, p *oidc.Provider, rw StateReader, sFn Success
 		reqIDToken := oidc.IDToken(req.FormValue("id_token"))
 		if _, err := p.VerifyIDToken(ctx, reqIDToken, state); err != nil {
 			responseErr := fmt.Errorf("%s: unable to verify id_token: %w", op, err)
-			eFn(reqState, nil, responseErr, w, req)
-			return
-		}
-		if _, err := reqIDToken.VerifyAuthorizationCode(reqCode); err != nil {
-			responseErr := fmt.Errorf("%s: unable to authorization code: %w", op, err)
 			eFn(reqState, nil, responseErr, w, req)
 			return
 		}
