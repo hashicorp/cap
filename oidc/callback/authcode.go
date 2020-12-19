@@ -77,6 +77,11 @@ func AuthCode(ctx context.Context, p *oidc.Provider, rw StateReader, sFn Success
 			eFn(reqState, nil, responseErr, w, req)
 			return
 		}
+		if useImplicit, _ := state.ImplicitFlow(); useImplicit {
+			responseErr := fmt.Errorf("%s: state (%s) should not be using the authorization code flow: %w", op, state.ID(), oidc.ErrInvalidFlow)
+			eFn(reqState, nil, responseErr, w, req)
+			return
+		}
 
 		responseToken, err := p.Exchange(ctx, state, reqState, reqCode)
 		if err != nil {
