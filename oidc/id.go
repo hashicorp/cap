@@ -7,12 +7,17 @@ import (
 )
 
 // defaultIDLength is the default length for generated IDs
-const defaultIDLength = 10
+// For ID length requirements see:
+// https://tools.ietf.org/html/rfc6749#section-10.10
+const defaultIDLength = 20
 
 // NewID generates a ID with an optional prefix.   The ID generated is suitable
-// for a State's ID or Nonce. The ID length will be 10, unless an optional
+// for a State's ID or Nonce. The ID length will be 20, unless an optional
 // prefix is provided which will add the prefix's length + an underscore.  The
 // WithPrefix option is supported.
+//
+// For ID length requirements see:
+// https://tools.ietf.org/html/rfc6749#section-10.10
 func NewID(opt ...Option) (string, error) {
 	const op = "NewID"
 	opts := getIDOpts(opt...)
