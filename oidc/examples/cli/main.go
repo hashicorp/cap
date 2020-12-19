@@ -30,7 +30,7 @@ const (
 
 const attemptExp = "attemptExp"
 
-func envConfig() (map[string]interface{}, error) {
+func envConfig(useImplicit bool) (map[string]interface{}, error) {
 	const op = "envConfig"
 	env := map[string]interface{}{
 		clientID:     os.Getenv("OIDC_CLIENT_ID"),
@@ -42,8 +42,15 @@ func envConfig() (map[string]interface{}, error) {
 	for k, v := range env {
 		switch t := v.(type) {
 		case string:
-			if t == "" {
-				return nil, fmt.Errorf("%s: %s is empty", op, k)
+			switch k {
+			case "OIDC_CLIENT_SECRET":
+				if !useImplicit && t == "" {
+					return nil, fmt.Errorf("%s: %s is empty", op, k)
+				}
+			default:
+				if t == "" {
+					return nil, fmt.Errorf("%s: %s is empty", op, k)
+				}
 			}
 		case time.Duration:
 			if t == 0 {
@@ -60,7 +67,7 @@ func main() {
 	useImplicit := flag.Bool("implicit", false, "use the implicit flow")
 	flag.Parse()
 
-	env, err := envConfig()
+	env, err := envConfig(*useImplicit)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err)
 		return
@@ -88,7 +95,11 @@ func main() {
 	}
 	defer p.Done()
 
-	s, err := oidc.NewState(env[attemptExp].(time.Duration), redirectURL)
+	var stateOption oidc.Option
+	if *useImplicit {
+		stateOption = oidc.WithImplicitFlow()
+	}
+	s, err := oidc.NewState(env[attemptExp].(time.Duration), redirectURL, stateOption)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return
@@ -98,9 +109,7 @@ func main() {
 	errorFn, failedCh := failed()
 
 	var handler http.HandlerFunc
-	var urlOption oidc.Option
 	if *useImplicit {
-		urlOption = oidc.WithImplicitFlow()
 		handler, err = callback.Implicit(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error creating callback handler: %s", err)
@@ -114,7 +123,7 @@ func main() {
 		}
 	}
 
-	authURL, err := p.AuthURL(context.Background(), s, urlOption)
+	authURL, err := p.AuthURL(context.Background(), s)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error getting auth url: %s", err)
 		return

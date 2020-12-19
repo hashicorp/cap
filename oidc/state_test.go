@@ -96,3 +96,24 @@ func TestState_IsExpired(t *testing.T) {
 	})
 
 }
+
+func Test_WithImplicit(t *testing.T) {
+	t.Parallel()
+	t.Run("stOptions", func(t *testing.T) {
+		t.Parallel()
+		assert := assert.New(t)
+		opts := getStOpts()
+		testOpts := stDefaults()
+		assert.Equal(opts, testOpts)
+
+		opts = getStOpts(WithImplicitFlow())
+		testOpts = stDefaults()
+		testOpts.withImplicitFlow = &implicitFlow{}
+		assert.Equal(opts, testOpts)
+
+		opts = getStOpts(WithImplicitFlow(true))
+		testOpts = stDefaults()
+		testOpts.withImplicitFlow = &implicitFlow{true}
+		assert.Equal(opts, testOpts)
+	})
+}

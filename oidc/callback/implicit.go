@@ -46,6 +46,11 @@ func Implicit(ctx context.Context, p *oidc.Provider, rw StateReader, sFn Success
 			eFn(reqState, reqError, nil, w, req)
 			return
 		}
+		if reqState == "" {
+			responseErr := fmt.Errorf("%s: empty state parameter: %w", op, oidc.ErrInvalidParameter)
+			eFn(reqState, nil, responseErr, w, req)
+			return
+		}
 
 		state, err := rw.Read(ctx, reqState)
 		if err != nil {
@@ -60,6 +65,13 @@ func Implicit(ctx context.Context, p *oidc.Provider, rw StateReader, sFn Success
 			eFn(reqState, nil, responseErr, w, req)
 			return
 		}
+		useImplicit, includeAccessToken := state.ImplicitFlow()
+		if !useImplicit {
+			responseErr := fmt.Errorf("%s: state (%s) should not be using the implicit flow: %w", op, state.ID(), oidc.ErrInvalidFlow)
+			eFn(reqState, nil, responseErr, w, req)
+			return
+		}
+
 		if state.IsExpired() {
 			responseErr := fmt.Errorf("%s: authentication state is expired: %w", op, oidc.ErrExpiredState)
 			eFn(reqState, nil, responseErr, w, req)
@@ -83,15 +95,17 @@ func Implicit(ctx context.Context, p *oidc.Provider, rw StateReader, sFn Success
 		}
 
 		var oath2Token *oauth2.Token
-		reqAccessToken := req.FormValue("access_token")
-		if reqAccessToken != "" {
-			if _, err := reqIDToken.VerifyAccessToken(oidc.AccessToken(reqAccessToken)); err != nil {
-				responseErr := fmt.Errorf("%s: unable to verify access_token: %w", op, err)
-				eFn(reqState, nil, responseErr, w, req)
-				return
-			}
-			oath2Token = &oauth2.Token{
-				AccessToken: reqAccessToken,
+		if includeAccessToken {
+			reqAccessToken := req.FormValue("access_token")
+			if reqAccessToken != "" {
+				if _, err := reqIDToken.VerifyAccessToken(oidc.AccessToken(reqAccessToken)); err != nil {
+					responseErr := fmt.Errorf("%s: unable to verify access_token: %w", op, err)
+					eFn(reqState, nil, responseErr, w, req)
+					return
+				}
+				oath2Token = &oauth2.Token{
+					AccessToken: reqAccessToken,
+				}
 			}
 		}
 

@@ -21,20 +21,6 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func TestWithImplicitFlow(t *testing.T) {
-	t.Parallel()
-	assert := assert.New(t)
-	opts := getProviderOpts(WithImplicitFlow())
-	testOpts := providerDefaults()
-	testOpts.withImplicitFlow = &implicitFlow{withoutAccessToken: false}
-	assert.Equal(opts, testOpts)
-
-	opts = getProviderOpts(WithImplicitFlow(true))
-	testOpts = providerDefaults()
-	testOpts.withImplicitFlow = &implicitFlow{withoutAccessToken: true}
-	assert.Equal(opts, testOpts)
-}
-
 // TestNewProvider does not repeat all the Config unit tests.  It just focuses
 // on the additional tests that are unique to creating a new provider.
 func TestNewProvider(t *testing.T) {
@@ -173,10 +159,23 @@ func TestProvider_AuthURL(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	stWithImplicitNoAccessToken, err := NewState(
+		1*time.Second,
+		redirect,
+		WithImplicitFlow(),
+	)
+	require.NoError(t, err)
+
+	stWithImplicitWithAccessToken, err := NewState(
+		1*time.Second,
+		redirect,
+		WithImplicitFlow(true),
+	)
+	require.NoError(t, err)
+
 	type args struct {
 		ctx context.Context
 		s   State
-		opt []Option
 	}
 	tests := []struct {
 		name      string
@@ -209,22 +208,21 @@ func TestProvider_AuthURL(t *testing.T) {
 			p:    p,
 			args: args{
 				ctx: ctx,
-				s:   validState,
-				opt: []Option{WithImplicitFlow()},
+				s:   stWithImplicitNoAccessToken,
 			},
 			wantURL: func() string {
 				return fmt.Sprintf(
-					"%s/authorize?client_id=%s&nonce=%s&redirect_uri=%s&response_mode=form_post&response_type=id_token+token&scope=openid&state=%s",
+					"%s/authorize?client_id=%s&nonce=%s&redirect_uri=%s&response_mode=form_post&response_type=id_token&scope=openid&state=%s",
 					tp.Addr(),
 					clientID,
-					validState.Nonce(),
+					stWithImplicitNoAccessToken.Nonce(),
 					redirectEncoded,
-					validState.ID(),
+					stWithImplicitNoAccessToken.ID(),
 				)
 			}(),
 		},
 		{
-			name: "valid-with-all-options-state",
+			name: "valid-with-all-options-state-except-implicit",
 			p:    p,
 			args: args{
 				ctx: ctx,
@@ -246,17 +244,16 @@ func TestProvider_AuthURL(t *testing.T) {
 			p:    p,
 			args: args{
 				ctx: ctx,
-				s:   validState,
-				opt: []Option{WithImplicitFlow(true)},
+				s:   stWithImplicitWithAccessToken,
 			},
 			wantURL: func() string {
 				return fmt.Sprintf(
-					"%s/authorize?client_id=%s&nonce=%s&redirect_uri=%s&response_mode=form_post&response_type=id_token&scope=openid&state=%s",
+					"%s/authorize?client_id=%s&nonce=%s&redirect_uri=%s&response_mode=form_post&response_type=id_token+token&scope=openid&state=%s",
 					tp.Addr(),
 					clientID,
-					validState.Nonce(),
+					stWithImplicitWithAccessToken.Nonce(),
 					redirectEncoded,
-					validState.ID(),
+					stWithImplicitWithAccessToken.ID(),
 				)
 			}(),
 		},
@@ -301,7 +298,7 @@ func TestProvider_AuthURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			gotURL, err := tt.p.AuthURL(tt.args.ctx, tt.args.s, tt.args.opt...)
+			gotURL, err := tt.p.AuthURL(tt.args.ctx, tt.args.s)
 			if tt.wantErr {
 				require.Error(err)
 				assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)

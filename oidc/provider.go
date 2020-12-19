@@ -115,15 +115,12 @@ func (p *Provider) Done() {
 }
 
 // AuthURL will generate a URL the caller can use to kick off an OIDC
-// authorization code or an implicit flow with an IdP.  Providing a
-// WithImplicitFlow() option overrides the default authorization code default
-// flow.
+// authorization code or an implicit flow with an IdP.
 //
 // See NewState() to create an oidc flow State with a valid ID and Nonce that
 // will uniquely identify the user's authentication attempt throughout the flow.
-func (p *Provider) AuthURL(ctx context.Context, s State, opt ...Option) (url string, e error) {
+func (p *Provider) AuthURL(ctx context.Context, s State) (url string, e error) {
 	const op = "Provider.AuthURL"
-	opts := getProviderOpts(opt...)
 	if s.ID() == "" {
 		return "", fmt.Errorf("%s: state id is empty: %w", op, ErrInvalidParameter)
 	}
@@ -162,9 +159,9 @@ func (p *Provider) AuthURL(ctx context.Context, s State, opt ...Option) (url str
 	authCodeOpts := []oauth2.AuthCodeOption{
 		oidc.Nonce(s.Nonce()),
 	}
-	if opts.withImplicitFlow != nil {
+	if withImplicit, withAccessToken := s.ImplicitFlow(); withImplicit {
 		reqTokens := []string{"id_token"}
-		if !opts.withImplicitFlow.withoutAccessToken {
+		if withAccessToken {
 			reqTokens = append(reqTokens, "token")
 		}
 		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("response_mode", "form_post"), oauth2.SetAuthURLParam("response_type", strings.Join(reqTokens, " ")))
@@ -192,6 +189,13 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 	const op = "Provider.Exchange"
 	if p.config == nil {
 		return nil, fmt.Errorf("%s: provider config is nil: %w", op, ErrNilParameter)
+	}
+	if s == nil {
+		return nil, fmt.Errorf("%s: state is nil: %w", op, ErrNilParameter)
+
+	}
+	if withImplicit, _ := s.ImplicitFlow(); withImplicit {
+		return nil, fmt.Errorf("%s: state (%s) should not be using the implicit flow: %w", op, s.ID(), ErrInvalidFlow)
 	}
 	if s.ID() != authorizationState {
 		return nil, fmt.Errorf("%s: authentication state and authorization state are not equal: %w", op, ErrInvalidParameter)
@@ -513,51 +517,4 @@ func (p *Provider) validRedirect(uri string) error {
 		}
 	}
 	return fmt.Errorf("redirect URI %s: %w", uri, ErrUnauthorizedRedirectURI)
-}
-
-type implicitFlow struct {
-	withoutAccessToken bool
-}
-
-// providerOptions is the set of available options
-type providerOptions struct {
-	withImplicitFlow *implicitFlow
-	withAudiences    []string
-}
-
-// getProviderDefaults is a handy way to get the defaults at runtime and
-// during unit tests.
-func providerDefaults() providerOptions {
-	return providerOptions{}
-}
-
-// getProviderOpts gets the defaults and applies the opt overrides passed
-// in.
-func getProviderOpts(opt ...Option) providerOptions {
-	opts := providerDefaults()
-	ApplyOpts(&opts, opt...)
-	return opts
-}
-
-// WithImplicitFlow provides an option to use an implicit flow for the auth URL
-// being requested. Getting an id_token and access_token is the default, and
-// optionally passing a true bool will prevent an access_token from being
-// requested during the flow.  Valid for: Provider
-func WithImplicitFlow(args ...interface{}) Option {
-	withoutAccessToken := false
-	for _, arg := range args {
-		switch arg := arg.(type) {
-		case bool:
-			if arg {
-				withoutAccessToken = true
-			}
-		}
-	}
-	return func(o interface{}) {
-		if o, ok := o.(*providerOptions); ok {
-			o.withImplicitFlow = &implicitFlow{
-				withoutAccessToken: withoutAccessToken,
-			}
-		}
-	}
 }

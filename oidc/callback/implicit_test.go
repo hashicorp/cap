@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -75,15 +76,16 @@ func Test_ImplicitResponses(t *testing.T) {
 	p := testNewProvider(t, clientID, clientSecret, redirect, tp)
 
 	tests := []struct {
-		name                string
-		exp                 time.Duration
-		stateOverride       string
-		readerOverride      StateReader
-		want                http.HandlerFunc
-		wantStatusCode      int
-		wantError           bool
-		wantRespError       string
-		wantRespDescription string
+		name                  string
+		exp                   time.Duration
+		expectedStateOverride string
+		readerOverride        StateReader
+		withoutImplicit       bool
+		want                  http.HandlerFunc
+		wantStatusCode        int
+		wantError             bool
+		wantRespError         string
+		wantRespDescription   string
 	}{
 		{
 			name:           "basic",
@@ -99,13 +101,13 @@ func Test_ImplicitResponses(t *testing.T) {
 			wantRespDescription: "state is expired",
 		},
 		{
-			name:                "state-not-matching",
-			exp:                 1 * time.Minute,
-			stateOverride:       "not-matching",
-			wantStatusCode:      http.StatusInternalServerError,
-			wantError:           true,
-			wantRespError:       "internal-callback-error",
-			wantRespDescription: "not found",
+			name:                  "state-not-matching",
+			exp:                   1 * time.Minute,
+			expectedStateOverride: "not-matching",
+			wantStatusCode:        http.StatusInternalServerError,
+			wantError:             true,
+			wantRespError:         "internal-callback-error",
+			wantRespDescription:   "not found",
 		},
 		{
 			name:                "state-returns-nil",
@@ -120,13 +122,13 @@ func Test_ImplicitResponses(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			state, err := oidc.NewState(tt.exp, redirect)
+			state, err := oidc.NewState(tt.exp, redirect, oidc.WithImplicitFlow())
 			require.NoError(err)
 
 			tp.SetExpectedAuthNonce(state.Nonce())
 
-			if tt.stateOverride != "" {
-				tp.SetExpectedState(tt.stateOverride)
+			if tt.expectedStateOverride != "" {
+				tp.SetExpectedState(tt.expectedStateOverride)
 				defer tp.SetExpectedState("")
 			}
 			var reader StateReader
@@ -139,7 +141,7 @@ func Test_ImplicitResponses(t *testing.T) {
 			callbackSrv.Config.Handler, err = Implicit(ctx, p, reader, testSuccessFn, testFailFn)
 			require.NoError(err)
 
-			authURL, err := p.AuthURL(ctx, state, oidc.WithImplicitFlow())
+			authURL, err := p.AuthURL(ctx, state)
 			require.NoError(err)
 
 			// the TestProvider is returning an html form which is posted
@@ -167,7 +169,7 @@ func Test_ImplicitResponses(t *testing.T) {
 	}
 	t.Run("authen-error", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		state, err := oidc.NewState(1*time.Minute, redirect)
+		state, err := oidc.NewState(1*time.Minute, redirect, oidc.WithImplicitFlow())
 		require.NoError(err)
 		tp.SetExpectedAuthNonce(state.Nonce())
 		reader := &SingleStateReader{state}
@@ -180,7 +182,7 @@ func Test_ImplicitResponses(t *testing.T) {
 		// For this sort of authentication error, the TestProvider returns a
 		// redirect (not the typical html response with a form to be posted by
 		// the browser onload)
-		authURL, err := p.AuthURL(ctx, state, oidc.WithImplicitFlow())
+		authURL, err := p.AuthURL(ctx, state)
 		require.NoError(err)
 		resp, err := tp.HTTPClient().Get(authURL)
 		require.NoError(err)
@@ -203,14 +205,14 @@ func Test_ImplicitResponses(t *testing.T) {
 		require.NoError(err)
 		tp.SetSigningKeys(k, k.Public(), oidc.ES384, "new-key")
 
-		state, err := oidc.NewState(1*time.Minute, redirect)
+		state, err := oidc.NewState(1*time.Minute, redirect, oidc.WithImplicitFlow())
 		require.NoError(err)
 		tp.SetExpectedAuthNonce(state.Nonce())
 		reader := &SingleStateReader{state}
 		callbackSrv.Config.Handler, err = Implicit(ctx, p, reader, testSuccessFn, testFailFn)
 		require.NoError(err)
 
-		authURL, err := p.AuthURL(ctx, state, oidc.WithImplicitFlow())
+		authURL, err := p.AuthURL(ctx, state)
 		require.NoError(err)
 
 		// the TestProvider is returning an html form which is posted
@@ -229,6 +231,34 @@ func Test_ImplicitResponses(t *testing.T) {
 		assert.Equal("internal-callback-error", errResp.Error)
 		assert.Contains(errResp.Description, "id token signed with unsupported algorithm")
 	})
+	t.Run("not-implicit-flow", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		state, err := oidc.NewState(1*time.Minute, redirect)
+		require.NoError(err)
+		reader := &SingleStateReader{state}
+		handler, err := Implicit(ctx, p, reader, testSuccessFn, testFailFn)
+		require.NoError(err)
+
+		reqForm := url.Values{}
+		reqForm.Add("state", state.ID())
+		reqForm.Add("id_token", "dummy-token")
+
+		req, err := http.NewRequest("POST", "/callback", strings.NewReader(reqForm.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		require.NoError(err)
+		fmt.Println(req)
+
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, req)
+
+		contents, err := ioutil.ReadAll(rr.Body)
+		require.NoError(err)
+
+		var errResp AuthenErrorResponse
+		require.NoError(json.Unmarshal(contents, &errResp))
+		assert.Equal("internal-callback-error", errResp.Error)
+		assert.Contains(errResp.Description, "invalid OIDC flow")
+	})
 }
 
 // testPostFormToCallback is a helper that supports the TestProvider is
@@ -241,12 +271,20 @@ func testPostFormToCallback(t *testing.T, tp *oidc.TestProvider, authURL string)
 
 	resp, err := tp.HTTPClient().Get(authURL)
 	require.NoError(err)
+	if resp.StatusCode != http.StatusOK {
+		defer resp.Body.Close()
+		contents, err := ioutil.ReadAll(resp.Body)
+		require.NoError(err)
+		t.Log("unexpected resp status code: resp contents: ", string(contents))
+		require.Equal(http.StatusOK, resp.StatusCode)
+	}
 	require.Equal(http.StatusOK, resp.StatusCode)
 
 	// For implicit form_post response example:
 	// https://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html#FormPostResponseExample
 	root, err := html.Parse(resp.Body)
 	require.NoError(err)
+	defer resp.Body.Close()
 	form, ok := scrape.Find(root, scrape.ByTag(atom.Form))
 	require.True(ok)
 	require.Equal("post", scrape.Attr(form, "method"))

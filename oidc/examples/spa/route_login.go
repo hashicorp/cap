@@ -11,19 +11,20 @@ import (
 )
 
 func LoginHandler(ctx context.Context, p *oidc.Provider, sc *stateCache, timeout time.Duration, redirectURL string, withImplicit bool) http.HandlerFunc {
-	var urlOption oidc.Option
+	var stateOption oidc.Option
 	if withImplicit {
-		urlOption = oidc.WithImplicitFlow()
+		stateOption = oidc.WithImplicitFlow()
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		s, err := oidc.NewState(timeout, redirectURL)
+
+		s, err := oidc.NewState(timeout, redirectURL, stateOption)
 		if err != nil {
 			fmt.Fprint(os.Stderr, err.Error())
 			return
 		}
 		sc.Add(s)
 
-		authURL, err := p.AuthURL(context.Background(), s, urlOption)
+		authURL, err := p.AuthURL(context.Background(), s)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error getting auth url: %s", err)
 			return
