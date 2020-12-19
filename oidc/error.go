@@ -32,4 +32,5 @@ var (
 	ErrLoginFailed               = errors.New("login failed")
 	ErrUserInfoFailed            = errors.New("user info failed")
 	ErrUnauthorizedRedirectURI   = errors.New("unauthorized redirect_uri")
+	ErrInvalidFlow               = errors.New("invalid OIDC flow")
 )
