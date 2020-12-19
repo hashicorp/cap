@@ -36,7 +36,9 @@ type Config struct {
 	// ClientID is the relying party ID.
 	ClientID string
 
-	// ClientSecret is the relying party secret.
+	// ClientSecret is the relying party secret.  This may be empty if you only
+	// intend to use the provider with the authorization Code with PKCE or the
+	// implicit flows.
 	ClientSecret ClientSecret
 
 	// Scopes is a list of default oidc scopes to request of the provider. The
@@ -116,14 +118,14 @@ func NewConfig(issuer string, clientID string, clientSecret ClientSecret, suppor
 // PS384, PS512
 func (c *Config) Validate() error {
 	const op = "Config.Validate"
+
+	// Note: c.ClientSecret is intentionally not check for empty, in order to
+	// support providers that only use the implicit flow.
 	if c == nil {
 		return fmt.Errorf("%s: provider config is nil: %w", op, ErrNilParameter)
 	}
 	if c.ClientID == "" {
 		return fmt.Errorf("%s: client ID is empty: %w", op, ErrInvalidParameter)
-	}
-	if c.ClientSecret == "" {
-		return fmt.Errorf("%s: client secret is empty: %w", op, ErrInvalidParameter)
 	}
 	if c.Issuer == "" {
 		return fmt.Errorf("%s: discovery URL is empty: %w", op, ErrInvalidParameter)
