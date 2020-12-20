@@ -52,13 +52,28 @@ type State interface {
 	// authentication requests.
 	RedirectURL() string
 
-	// ImplicitFlow indicates whether or not to use the implicit flow.  Getting
-	// only an id_token for an implicit flow should be the default, but at times
-	// it's necessary to also request an access_token, so includeAccessToken
-	// allows for those scenarios. It is recommend to not request access_tokens
-	// during the implicit flow.  If you need an access_token, then use the
-	// authorization code flows.
+	// ImplicitFlow indicates whether or not to use the implicit flow with form
+	// post.  It should be noted that if your OIDC provider supports PKCE, then
+	// use it over the implicit flow. Getting only an id_token for an implicit
+	// flow is the default, but at times it's necessary to also request an
+	// access_token, so includeAccessToken allows for those scenarios. It is
+	// recommend to not request access_tokens during the implicit flow.  If you
+	// need an access_token, then use the authorization code flows and if you
+	// can't secure a client secret then use the authorization code flow with
+	// PKCE.
+	//
+	// See: https://openid.net/specs/openid-connect-core-1_0.html#ImplicitFlowAuth
+	// See: https://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html
 	ImplicitFlow() (useImplicitFlow bool, includeAccessToken bool)
+
+	// PKCEVerifier indicates whether or not to use the authorization code flow
+	// with PKCE.  PKCE should be used for any client which cannot secure a
+	// client secret (SPA and native apps) or is susceptible to authorization
+	// code intercept attacks. When supported by your OIDC provider, PKCE should
+	// be used instead of the implicit flow.
+	//
+	// See: https://tools.ietf.org/html/rfc7636
+	PKCEVerifier() CodeVerifier
 }
 
 // St represents the oidc state used for oidc flows and implements the State interface.
@@ -94,7 +109,17 @@ type St struct {
 	// nowFunc is an optional function that returns the current time
 	nowFunc func() time.Time
 
+	// withImplicit indicates whether or not to use the implicit flow.  Getting
+	// only an id_token for an implicit flow is the default. If an access_token
+	// is also required, then withImplicit.includeAccessToken will be true. It
+	// is recommend to not request access_tokens during the implicit flow.  If
+	// you need an access_token, then use the authorization code flows (with
+	// optional PKCE).
 	withImplicit *implicitFlow
+
+	// withVerifier indicates whether or not to use the authorization code flow
+	// with PKCE.  It suppies the required CodeVerifier for PKCE.
+	withVerifier CodeVerifier
 }
 
 // ensure that St implements the State interface.
@@ -102,10 +127,11 @@ var _ State = (*St)(nil)
 
 // NewState creates a new State (*St).
 //  Supports the options:
-//   * WithNow: (default == time.Now).
+//   * WithNow
 //   * WithAudiences
 //   * WithScopes
-//   * WithImplicit (default == false)
+//   * WithImplicit
+//   * WithPKCE
 func NewState(expireIn time.Duration, redirectURL string, opt ...Option) (*St, error) {
 	const op = "oidc.NewState"
 	opts := getStOpts(opt...)
@@ -124,6 +150,10 @@ func NewState(expireIn time.Duration, redirectURL string, opt ...Option) (*St, e
 	if expireIn == 0 || expireIn < 0 {
 		return nil, fmt.Errorf("%s: expireIn not greater than zero: %w", op, ErrInvalidParameter)
 	}
+	if opts.withVerifier != nil && opts.withImplicitFlow != nil {
+		return nil, fmt.Errorf("%s: requested both implicit flow and authorization code with PKCE: %w", op, ErrInvalidParameter)
+
+	}
 	s := &St{
 		id:           id,
 		nonce:        nonce,
@@ -132,16 +162,18 @@ func NewState(expireIn time.Duration, redirectURL string, opt ...Option) (*St, e
 		audiences:    opts.withAudiences,
 		scopes:       opts.withScopes,
 		withImplicit: opts.withImplicitFlow,
+		withVerifier: opts.withVerifier,
 	}
 	s.expiration = s.now().Add(expireIn)
 	return s, nil
 }
 
-func (s *St) ID() string          { return s.id }          // ID implements the State.ID() interface function.
-func (s *St) Nonce() string       { return s.nonce }       // Nonce implements the State.Nonce() interface function.
-func (s *St) Audiences() []string { return s.audiences }   // Audiences implements the State.Audiences() interface function.
-func (s *St) Scopes() []string    { return s.scopes }      // Scopes implements the State.Scopes() interface function.
-func (s *St) RedirectURL() string { return s.redirectURL } // RedirectURL implements the State.RedirectURL() interface function.
+func (s *St) ID() string                 { return s.id }           // ID implements the State.ID() interface function.
+func (s *St) Nonce() string              { return s.nonce }        // Nonce implements the State.Nonce() interface function.
+func (s *St) Audiences() []string        { return s.audiences }    // Audiences implements the State.Audiences() interface function.
+func (s *St) Scopes() []string           { return s.scopes }       // Scopes implements the State.Scopes() interface function.
+func (s *St) RedirectURL() string        { return s.redirectURL }  // RedirectURL implements the State.RedirectURL() interface function.
+func (s *St) PKCEVerifier() CodeVerifier { return s.withVerifier } // CodeVerifier implements the State.CodeVerifier() interface function.
 
 // ImplicitFlow indicates whether or not to use the implicit flow.  Getting
 // only an id_token for an implicit flow should be the default, but at times
@@ -187,6 +219,7 @@ type stOptions struct {
 	withScopes       []string
 	withAudiences    []string
 	withImplicitFlow *implicitFlow
+	withVerifier     CodeVerifier
 }
 
 // stDefaults is a handy way to get the defaults at runtime and during unit
@@ -202,12 +235,27 @@ func getStOpts(opt ...Option) stOptions {
 	return opts
 }
 
-// WithImplicitFlow provides an option to use an OIDC implicit flow. Getting
-// only an id_token is the default, and optionally passing a true bool will
-// request an access_token as well during the flow.  It is recommend to
-// not request access_tokens during the implicit flow.  If you need an
-// access_token, then use the authorization code flows. Option is valid for:
-// State
+// ImplicitFlow indicates whether or not to use the implicit flow with form
+// post.  It should be noted that if your OIDC provider supports PKCE, then
+// use it over the implicit flow. Getting only an id_token for an implicit
+// flow is the default, but at times it's necessary to also request an
+// access_token, so includeAccessToken allows for those scenarios. It is
+// recommend to not request access_tokens during the implicit flow.  If you
+// need an access_token, then use the authorization code flows and if you
+// can't secure a client secret then use the authorization code flow with
+// PKCE.
+//
+// See: https://openid.net/specs/openid-connect-core-1_0.html#ImplicitFlowAuth
+// See: https://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html
+
+// WithImplicitFlow provides an option to use an OIDC implicit flow with form
+// post. It should be noted that if your OIDC provider supports PKCE, then use
+// it over the implicit flow.  Getting only an id_token is the default, and
+// optionally passing a true bool will request an access_token as well during
+// the flow.  You cannot use WithImplicit and WithPKCE together.  It is
+// recommend to not request access_tokens during the implicit flow.  If you need
+// an access_token, then use the authorization code flows. Option is valid for:
+// St
 func WithImplicitFlow(args ...interface{}) Option {
 	withoutAccessToken := false
 	for _, arg := range args {
@@ -223,6 +271,18 @@ func WithImplicitFlow(args ...interface{}) Option {
 			o.withImplicitFlow = &implicitFlow{
 				withAccessToken: withoutAccessToken,
 			}
+		}
+	}
+}
+
+// WithPKCE provides an option to use a CodeVerifier with the authorization
+// code flow with PKCE.  You cannot use WithImplicit and WithPKCE together.
+// Option is valid for: St
+// See: https://tools.ietf.org/html/rfc7636
+func WithPKCE(v CodeVerifier) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*stOptions); ok {
+			o.withVerifier = v
 		}
 	}
 }

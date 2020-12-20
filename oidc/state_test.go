@@ -17,6 +17,10 @@ func TestNewState(t *testing.T) {
 	testNow := func() time.Time {
 		return time.Now().Add(-1 * time.Minute)
 	}
+
+	testVerifier, err := NewCodeVerifier()
+	require.NoError(t, err)
+
 	tests := []struct {
 		name            string
 		expireIn        time.Duration
@@ -26,6 +30,7 @@ func TestNewState(t *testing.T) {
 		wantRedirectURL string
 		wantAudiences   []string
 		wantScopes      []string
+		wantVerifier    CodeVerifier
 		wantErr         bool
 		wantIsErr       error
 	}{
@@ -37,11 +42,13 @@ func TestNewState(t *testing.T) {
 				WithNow(testNow),
 				WithAudiences("bob", "alice"),
 				WithScopes("email", "profile"),
+				WithPKCE(testVerifier),
 			},
 			wantNowFunc:     testNow,
 			wantRedirectURL: "https://bob.com",
 			wantAudiences:   []string{"bob", "alice"},
 			wantScopes:      []string{oidc.ScopeOpenID, "email", "profile"},
+			wantVerifier:    testVerifier,
 		},
 		{
 			name:            "valid-no-opt",
@@ -76,6 +83,7 @@ func TestNewState(t *testing.T) {
 			assert.Equalf(got.RedirectURL(), tt.wantRedirectURL, "wanted \"%s\" but got \"%s\"", tt.wantRedirectURL, got.RedirectURL())
 			assert.Equalf(got.Audiences(), tt.wantAudiences, "wanted \"%s\" but got \"%s\"", tt.wantAudiences, got.Audiences())
 			assert.Equalf(got.Scopes(), tt.wantScopes, "wanted \"%s\" but got \"%s\"", tt.wantScopes, got.Scopes())
+			assert.Equalf(got.PKCEVerifier(), tt.wantVerifier, "wanted \"%s\" but got \"%s\"", tt.wantVerifier, got.PKCEVerifier())
 		})
 	}
 }
@@ -114,6 +122,25 @@ func Test_WithImplicit(t *testing.T) {
 		opts = getStOpts(WithImplicitFlow(true))
 		testOpts = stDefaults()
 		testOpts.withImplicitFlow = &implicitFlow{true}
+		assert.Equal(opts, testOpts)
+	})
+}
+
+func Test_WithPKCE(t *testing.T) {
+	t.Parallel()
+	t.Run("stOptions", func(t *testing.T) {
+		t.Parallel()
+		assert, require := assert.New(t), require.New(t)
+		opts := getStOpts()
+		testOpts := stDefaults()
+		assert.Equal(opts, testOpts)
+		assert.Nil(testOpts.withVerifier)
+
+		v, err := NewCodeVerifier()
+		require.NoError(err)
+		opts = getStOpts(WithPKCE(v))
+		testOpts = stDefaults()
+		testOpts.withVerifier = v
 		assert.Equal(opts, testOpts)
 	})
 }
