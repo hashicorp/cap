@@ -119,8 +119,8 @@ func NewConfig(issuer string, clientID string, clientSecret ClientSecret, suppor
 func (c *Config) Validate() error {
 	const op = "Config.Validate"
 
-	// Note: c.ClientSecret is intentionally not check for empty, in order to
-	// support providers that only use the implicit flow.
+	// Note: c.ClientSecret is intentionally not checked for empty, in order to
+	// support providers that only use the implicit flow or PKCE.
 	if c == nil {
 		return fmt.Errorf("%s: provider config is nil: %w", op, ErrNilParameter)
 	}
