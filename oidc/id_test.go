@@ -18,13 +18,13 @@ func TestNewID(t *testing.T) {
 	}{
 		{
 			name:    "no-prefix",
-			wantLen: defaultIDLength,
+			wantLen: DefaultIDLength,
 		},
 		{
 			name:       "with-prefix",
 			opt:        []Option{WithPrefix("alice")},
 			wantPrefix: "alice",
-			wantLen:    defaultIDLength + len("alice_"),
+			wantLen:    DefaultIDLength + len("alice_"),
 		},
 	}
 	for _, tt := range tests {
