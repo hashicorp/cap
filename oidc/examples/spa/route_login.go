@@ -19,7 +19,7 @@ func LoginHandler(ctx context.Context, p *oidc.Provider, sc *stateCache, timeout
 		}
 		sc.Add(s)
 
-		authURL, err := p.AuthURL(context.Background(), s)
+		authURL, err := p.AuthURL(ctx, s)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error getting auth url: %s", err)
 			return

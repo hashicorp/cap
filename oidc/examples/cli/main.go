@@ -84,6 +84,9 @@ func main() {
 	signal.Notify(sigintCh, os.Interrupt)
 	defer signal.Stop(sigintCh)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	issuer := env[issuer].(string)
 	clientID := env[clientID].(string)
 	clientSecret := oidc.ClientSecret(env[clientSecret].(string))
@@ -125,20 +128,20 @@ func main() {
 
 	var handler http.HandlerFunc
 	if *useImplicit {
-		handler, err = callback.Implicit(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
+		handler, err = callback.Implicit(ctx, p, &callback.SingleStateReader{State: s}, successFn, errorFn)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error creating callback handler: %s", err)
 			return
 		}
 	} else {
-		handler, err = callback.AuthCode(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
+		handler, err = callback.AuthCode(ctx, p, &callback.SingleStateReader{State: s}, successFn, errorFn)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error creating auth code handler: %s", err)
 			return
 		}
 	}
 
-	authURL, err := p.AuthURL(context.Background(), s)
+	authURL, err := p.AuthURL(ctx, s)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error getting auth url: %s", err)
 		return
@@ -181,7 +184,7 @@ func main() {
 		}
 		printToken(resp.Token)
 		printClaims(resp.Token.IDToken())
-		printUserInfo(p, resp.Token)
+		printUserInfo(ctx, p, resp.Token)
 		return
 	case err := <-failedCh:
 		if err != nil {
@@ -306,7 +309,7 @@ func printClaims(t oidc.IDToken) {
 	}
 }
 
-func printUserInfo(p *oidc.Provider, t oidc.Token) {
+func printUserInfo(ctx context.Context, p *oidc.Provider, t oidc.Token) {
 	const op = "printUserInfo"
 	if t, ok := t.(interface {
 		StaticTokenSource() oauth2.TokenSource
@@ -316,7 +319,7 @@ func printUserInfo(p *oidc.Provider, t oidc.Token) {
 			return
 		}
 		var infoClaims map[string]interface{}
-		err := p.UserInfo(context.Background(), t.StaticTokenSource(), &infoClaims)
+		err := p.UserInfo(ctx, t.StaticTokenSource(), &infoClaims)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s: channel received success, but error getting UserInfo claims: %s", op, err)
 			return

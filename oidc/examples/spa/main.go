@@ -77,6 +77,9 @@ func main() {
 	signal.Notify(sigintCh, os.Interrupt)
 	defer signal.Stop(sigintCh)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	issuer := env[issuer].(string)
 	clientID := env[clientID].(string)
 	clientSecret := oidc.ClientSecret(env[clientSecret].(string))
@@ -103,7 +106,7 @@ func main() {
 		return
 	}
 
-	callback, err := CallbackHandler(context.Background(), p, sc, *useImplicit)
+	callback, err := CallbackHandler(ctx, p, sc, *useImplicit)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error creating callback handler: %s", err)
 		return
@@ -124,8 +127,8 @@ func main() {
 
 	// Set up callback handler
 	http.HandleFunc("/callback", callback)
-	http.HandleFunc("/login", LoginHandler(context.Background(), p, sc, timeout, redirectURL, stateOptions))
-	http.HandleFunc("/success", SuccessHandler(context.Background(), sc))
+	http.HandleFunc("/login", LoginHandler(ctx, p, sc, timeout, redirectURL, stateOptions))
+	http.HandleFunc("/success", SuccessHandler(ctx, sc))
 
 	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", env[port]))
 	if err != nil {
