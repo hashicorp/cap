@@ -7,6 +7,7 @@ import (
 )
 
 // StateReader defines an interface for finding and reading an oidc.State
+//
 // Implementations must be concurrently safe, since the reader will likely be
 // used within a concurrent http.Handler
 type StateReader interface {

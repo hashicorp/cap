@@ -10,11 +10,14 @@ import (
 
 // AuthCode creates an oidc authorization code callback handler which
 // uses a StateReader to read existing oidc.State(s) via the request's
-// oidc "state" parameter as a key for the lookup.
+// oidc "state" parameter as a key for the lookup.  In additional to the
+// typical authorization code flow, it also handles the authorization code flow
+// with PKCE.
 //
 // The SuccessResponseFunc is used to create a response when callback is
-// successful. The ErrorResponseFunc is to create a response when the callback
-// fails.
+// successful.
+//
+// The ErrorResponseFunc is to create a response when the callback fails.
 func AuthCode(ctx context.Context, p *oidc.Provider, rw StateReader, sFn SuccessResponseFunc, eFn ErrorResponseFunc) (http.HandlerFunc, error) {
 	const op = "callback.AuthCode"
 	if p == nil {
