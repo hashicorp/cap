@@ -152,22 +152,31 @@ func TestProvider_AuthURL(t *testing.T) {
 	require.NoError(t, err)
 
 	allOptsState, err := NewState(
-		1*time.Second,
+		1*time.Minute,
 		redirect,
 		WithAudiences("state-override"),
 		WithScopes("email", "profile"),
 	)
 	require.NoError(t, err)
 
+	verifier, err := NewCodeVerifier()
+	require.NoError(t, err)
+	stWithPKCE, err := NewState(
+		1*time.Minute,
+		redirect,
+		WithPKCE(verifier),
+	)
+	require.NoError(t, err)
+
 	stWithImplicitNoAccessToken, err := NewState(
-		1*time.Second,
+		1*time.Minute,
 		redirect,
 		WithImplicitFlow(),
 	)
 	require.NoError(t, err)
 
 	stWithImplicitWithAccessToken, err := NewState(
-		1*time.Second,
+		1*time.Minute,
 		redirect,
 		WithImplicitFlow(true),
 	)
@@ -200,6 +209,26 @@ func TestProvider_AuthURL(t *testing.T) {
 					validState.Nonce(),
 					redirectEncoded,
 					validState.ID(),
+				)
+			}(),
+		},
+		{
+			name: "valid-using-PKCE",
+			p:    p,
+			args: args{
+				ctx: ctx,
+				s:   stWithPKCE,
+			},
+			wantURL: func() string {
+				return fmt.Sprintf(
+					"%s/authorize?client_id=%s&code_challenge=%s&code_challenge_method=%s&nonce=%s&redirect_uri=%s&response_type=code&scope=openid&state=%s",
+					tp.Addr(),
+					clientID,
+					stWithPKCE.PKCEVerifier().Challenge(),
+					stWithPKCE.PKCEVerifier().Method(),
+					stWithPKCE.Nonce(),
+					redirectEncoded,
+					stWithPKCE.ID(),
 				)
 			}(),
 		},
@@ -256,6 +285,52 @@ func TestProvider_AuthURL(t *testing.T) {
 					stWithImplicitWithAccessToken.ID(),
 				)
 			}(),
+		},
+		{
+			name: "implicit-and-PKCE",
+			p:    p,
+			args: args{
+				ctx: ctx,
+				s: &St{
+					id:           "s_1234567890",
+					nonce:        "s_abcdefghigcklmnop",
+					expiration:   time.Now().Add(1 * time.Minute),
+					redirectURL:  "http://locahost",
+					withImplicit: &implicitFlow{},
+					withVerifier: verifier,
+				},
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidParameter,
+		},
+		{
+			name: "empty-redirectURL",
+			p:    p,
+			args: args{
+				ctx: ctx,
+				s: &St{
+					id:         "s_1234567890",
+					nonce:      "s_abcdefghigcklmnop",
+					expiration: time.Now().Add(1 * time.Minute),
+				},
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidParameter,
+		},
+		{
+			name: "bad-redirectURL",
+			p:    p,
+			args: args{
+				ctx: ctx,
+				s: &St{
+					id:          "s_1234567890",
+					nonce:       "s_abcdefghigcklmnop",
+					expiration:  time.Now().Add(1 * time.Minute),
+					redirectURL: "%%%%%%%%%%%",
+				},
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidParameter,
 		},
 		{
 			name: "empty-state-nonce",
@@ -335,6 +410,15 @@ func TestProvider_Exchange(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	verifier, err := NewCodeVerifier()
+	require.NoError(t, err)
+	stWithPKCE, err := NewState(
+		1*time.Minute,
+		redirect,
+		WithPKCE(verifier),
+	)
+	require.NoError(t, err)
+
 	type args struct {
 		ctx               context.Context
 		s                 State
@@ -367,6 +451,17 @@ func TestProvider_Exchange(t *testing.T) {
 				ctx:               ctx,
 				s:                 allOptsState,
 				authState:         allOptsState.ID(),
+				authCode:          "test-code",
+				expectedAudiences: []string{"state-override"},
+			},
+		},
+		{
+			name: "PKCE",
+			p:    p,
+			args: args{
+				ctx:               ctx,
+				s:                 stWithPKCE,
+				authState:         stWithPKCE.ID(),
 				authCode:          "test-code",
 				expectedAudiences: []string{"state-override"},
 			},
@@ -410,6 +505,9 @@ func TestProvider_Exchange(t *testing.T) {
 			// default to the state's nonce...
 			if tt.args.s != nil {
 				tp.SetExpectedAuthNonce(tt.args.s.Nonce())
+				if tt.args.s.PKCEVerifier() != nil {
+					tp.SetPKCEVerifier(tt.args.s.PKCEVerifier())
+				}
 			}
 			if tt.args.expectedNonce != "" {
 				tp.SetExpectedAuthNonce(tt.args.expectedNonce)

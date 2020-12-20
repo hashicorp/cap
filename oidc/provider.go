@@ -20,11 +20,11 @@ import (
 
 // Provider provides integration with an OIDC provider.
 //  It's primary capabilities include:
-//   * Kicking off a user authentication (authorization code flow and implicit
-//     flow) with p.AuthURL(...)
+//   * Kicking off a user authentication via either the authorization code flow
+//     (with optional PKCE) or implicit flow via the URL from p.AuthURL(...)
 //
-//   * The authorization code flow by exchanging an auth code for tokens in
-//     p.Exchange(...)
+//   * The authorization code flow (with optional PKCE) by exchanging an auth
+//     code for tokens in p.Exchange(...)
 //
 //   * Verifying an id_token issued by a provider with p.VerifyIDToken(...)
 //
@@ -115,7 +115,7 @@ func (p *Provider) Done() {
 }
 
 // AuthURL will generate a URL the caller can use to kick off an OIDC
-// authorization code or an implicit flow with an IdP.
+// authorization code (with optional PKCE) or an implicit flow with an IdP.
 //
 // See NewState() to create an oidc flow State with a valid ID and Nonce that
 // will uniquely identify the user's authentication attempt throughout the flow.
@@ -129,6 +129,10 @@ func (p *Provider) AuthURL(ctx context.Context, s State) (url string, e error) {
 	}
 	if s.ID() == s.Nonce() {
 		return "", fmt.Errorf("%s: state id and nonce cannot be equal: %w", op, ErrInvalidParameter)
+	}
+	withImplicit, withImplicitAccessToken := s.ImplicitFlow()
+	if s.PKCEVerifier() != nil && withImplicit {
+		return "", fmt.Errorf("%s: state requests both implicit flow and authorization code with PKCE: %w", op, ErrInvalidParameter)
 	}
 	if s.RedirectURL() == "" {
 		return "", fmt.Errorf("%s: state redirect URL is empty: %w", op, ErrInvalidParameter)
@@ -159,12 +163,15 @@ func (p *Provider) AuthURL(ctx context.Context, s State) (url string, e error) {
 	authCodeOpts := []oauth2.AuthCodeOption{
 		oidc.Nonce(s.Nonce()),
 	}
-	if withImplicit, withAccessToken := s.ImplicitFlow(); withImplicit {
+	if withImplicit {
 		reqTokens := []string{"id_token"}
-		if withAccessToken {
+		if withImplicitAccessToken {
 			reqTokens = append(reqTokens, "token")
 		}
 		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("response_mode", "form_post"), oauth2.SetAuthURLParam("response_type", strings.Join(reqTokens, " ")))
+	}
+	if s.PKCEVerifier() != nil {
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("code_challenge", s.PKCEVerifier().Challenge()), oauth2.SetAuthURLParam("code_challenge_method", string(s.PKCEVerifier().Method())))
 	}
 	return oauth2Config.AuthCodeURL(s.ID(), authCodeOpts...), nil
 }
@@ -231,8 +238,11 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 		Endpoint:     p.provider.Endpoint(),
 		Scopes:       scopes,
 	}
-
-	oauth2Token, err := oauth2Config.Exchange(oidcCtx, authorizationCode)
+	var authCodeOpts []oauth2.AuthCodeOption
+	if s.PKCEVerifier() != nil {
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("code_verifier", s.PKCEVerifier().Verifier()))
+	}
+	oauth2Token, err := oauth2Config.Exchange(oidcCtx, authorizationCode, authCodeOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to exchange auth code with provider: %w", op, p.convertError(err))
 	}
