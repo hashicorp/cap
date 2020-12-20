@@ -48,7 +48,7 @@ type S256Verifier struct {
 // min len of 43 chars per https://tools.ietf.org/html/rfc7636#section-4.1
 const verifierLen = 43
 
-// NewVerifier creates a new CodeVerifier (*S256Verifier).
+// NewCodeVerifier creates a new CodeVerifier (*S256Verifier).
 //
 // See: https://tools.ietf.org/html/rfc7636#section-4.1
 func NewCodeVerifier() (*S256Verifier, error) {
