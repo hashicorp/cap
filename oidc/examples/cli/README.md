@@ -2,7 +2,7 @@
 
 
 An example OIDC user authentication CLI that supports both the authorization
-code and implicit OIDC flows.
+code (with optional PKCE) and implicit OIDC flows.
 
 The example uses the `oidc` and `callback` packages to compose a solution. Among
 other things, it demonstrates how to configure and use an
@@ -22,7 +22,8 @@ CLI user successfully authenticated with the OIDC provider.
 ### Require environment variables
 
 * OIDC_CLIENT_ID: Your Relying Party client id.
-* OIDC_CLIENT_SECRET: Your Rely Party secret.
+* OIDC_CLIENT_SECRET: Your Rely Party secret (this is not required for implicit
+  flows or authorization code with PKCE flows)
 * OIDC_ISSUER: The OIDC issuer identifier (aka the discover URL)
 * OIDC_PORT: The port you'd like to use for your callback HTTP listener.
 ### OIDC Provider
