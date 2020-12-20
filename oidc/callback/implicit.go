@@ -13,6 +13,9 @@ import (
 // uses a StateReader to read existing oidc.State(s) via the request's
 // oidc "state" parameter as a key for the lookup.
 //
+//  It should be noted that if your OIDC provider supports PKCE, then
+// use it over the implicit flow
+//
 // The SuccessResponseFunc is used to create a response when callback is
 // successful. The ErrorResponseFunc is to create a response when the callback
 // fails.
