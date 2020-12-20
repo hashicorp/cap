@@ -244,6 +244,19 @@ func TestTestProvider_SetExpectedState(t *testing.T) {
 		assert.Equal("expected", tp.expectedState)
 	})
 }
+
+func TestTestProvider_SetPKCEVerifier(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		tp := StartTestProvider(t)
+		v, err := NewCodeVerifier()
+		require.NoError(err)
+		tp.SetPKCEVerifier(v)
+		assert.Equal(v, tp.pkceVerifier)
+		assert.Equal(v, tp.PKCEVerifier())
+	})
+}
+
 func TestTestProvider_writeJSON(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
