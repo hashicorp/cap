@@ -25,7 +25,7 @@ The oidc.callback package
 
 The callback package includes handlers (http.HandlerFunc) providers can redirect
 to after a user authenticates. Callback handlers for both the authorization code
-flow and the implicit flow are provided.
+flow (with optional PKCE) and the implicit flow are provided.
 
 Example apps
 
