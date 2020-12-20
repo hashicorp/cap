@@ -54,7 +54,7 @@ func (sc *stateCache) SetToken(id string, t oidc.Token) error {
 	if !ok {
 		return fmt.Errorf("%s, not an extended state", op)
 	}
-	sc.c.Set(id, &extendedState{State: extended.State, t: t}, exp.Sub(time.Now()))
+	sc.c.Set(id, &extendedState{State: extended.State, t: t}, time.Until(exp))
 	return nil
 }
 

@@ -26,11 +26,10 @@ const (
 	clientSecret = "OIDC_CLIENT_SECRET"
 	issuer       = "OIDC_ISSUER"
 	port         = "OIDC_PORT"
+	attemptExp   = "attemptExp"
 )
 
-const attemptExp = "attemptExp"
-
-func envConfig(useImplicit bool) (map[string]interface{}, error) {
+func envConfig(secretNotRequired bool) (map[string]interface{}, error) {
 	const op = "envConfig"
 	env := map[string]interface{}{
 		clientID:     os.Getenv("OIDC_CLIENT_ID"),
@@ -44,9 +43,10 @@ func envConfig(useImplicit bool) (map[string]interface{}, error) {
 		case string:
 			switch k {
 			case "OIDC_CLIENT_SECRET":
-				if !useImplicit && t == "" {
-					return nil, fmt.Errorf("%s: %s is empty", op, k)
+				if !secretNotRequired && t == "" {
+					return nil, fmt.Errorf("%s: %s is empty.\n\n   Did you intend to use -pkce or -implicit options?", op, k)
 				}
+				env[k] = "" // unsetting the secret which isn't required
 			default:
 				if t == "" {
 					return nil, fmt.Errorf("%s: %s is empty", op, k)
@@ -65,11 +65,17 @@ func envConfig(useImplicit bool) (map[string]interface{}, error) {
 
 func main() {
 	useImplicit := flag.Bool("implicit", false, "use the implicit flow")
-	flag.Parse()
+	usePKCE := flag.Bool("pkce", false, "use the implicit flow")
 
-	env, err := envConfig(*useImplicit)
+	flag.Parse()
+	if *useImplicit && *usePKCE {
+		fmt.Fprint(os.Stderr, "you can't request both: -implicit and -pkce")
+		return
+	}
+
+	env, err := envConfig(*useImplicit || *usePKCE)
 	if err != nil {
-		fmt.Fprint(os.Stderr, err)
+		fmt.Fprintf(os.Stderr, "%s\n\n", err)
 		return
 	}
 
@@ -95,11 +101,20 @@ func main() {
 	}
 	defer p.Done()
 
-	var stateOption oidc.Option
-	if *useImplicit {
-		stateOption = oidc.WithImplicitFlow()
+	var stateOptions []oidc.Option
+	switch {
+	case *useImplicit:
+		stateOptions = append(stateOptions, oidc.WithImplicitFlow())
+	case *usePKCE:
+		v, err := oidc.NewCodeVerifier()
+		if err != nil {
+			fmt.Fprint(os.Stderr, err.Error())
+			return
+		}
+		stateOptions = append(stateOptions, oidc.WithPKCE(v))
 	}
-	s, err := oidc.NewState(env[attemptExp].(time.Duration), redirectURL, stateOption)
+
+	s, err := oidc.NewState(env[attemptExp].(time.Duration), redirectURL, stateOptions...)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return

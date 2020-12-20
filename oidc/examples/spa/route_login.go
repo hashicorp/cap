@@ -10,14 +10,9 @@ import (
 	"github.com/hashicorp/cap/oidc"
 )
 
-func LoginHandler(ctx context.Context, p *oidc.Provider, sc *stateCache, timeout time.Duration, redirectURL string, withImplicit bool) http.HandlerFunc {
-	var stateOption oidc.Option
-	if withImplicit {
-		stateOption = oidc.WithImplicitFlow()
-	}
+func LoginHandler(ctx context.Context, p *oidc.Provider, sc *stateCache, timeout time.Duration, redirectURL string, stateOptions []oidc.Option) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		s, err := oidc.NewState(timeout, redirectURL, stateOption)
+		s, err := oidc.NewState(timeout, redirectURL, stateOptions...)
 		if err != nil {
 			fmt.Fprint(os.Stderr, err.Error())
 			return
