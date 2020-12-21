@@ -23,6 +23,12 @@ With the `-implicit` flag, the cli will invoke an implicit flow authentication.
 ```
 ./cli -implicit
 ```
+
+With the `-max-age` flag, the cli will require an authentication not older than
+the max-age specified in seconds. 
+```
+./cli -max-age <seconds>
+```
 ### Require environment variables
 
 * `OIDC_CLIENT_ID`: Your Relying Party client id.

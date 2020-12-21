@@ -66,6 +66,7 @@ func envConfig(secretNotRequired bool) (map[string]interface{}, error) {
 func main() {
 	useImplicit := flag.Bool("implicit", false, "use the implicit flow")
 	usePKCE := flag.Bool("pkce", false, "use the implicit flow")
+	maxAge := flag.Int("max-age", -1, "max age of user authentication")
 
 	flag.Parse()
 	if *useImplicit && *usePKCE {
@@ -115,6 +116,10 @@ func main() {
 			return
 		}
 		stateOptions = append(stateOptions, oidc.WithPKCE(v))
+	}
+
+	if *maxAge >= 0 {
+		stateOptions = append(stateOptions, oidc.WithMaxAge(uint(*maxAge)))
 	}
 
 	s, err := oidc.NewState(env[attemptExp].(time.Duration), redirectURL, stateOptions...)
