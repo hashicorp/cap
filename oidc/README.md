@@ -27,9 +27,10 @@ Primary types provided by the package:
   operation that raised the error, the kind of error, and any wrapped error
 
 #### [oidc.callback](callback/)
-The callback package includes the ability to create a `http.HandlerFunc` which can be used
-for the 3rd leg of the OIDC flow where the authorization code is exchanged for
-tokens.   
+ 
+The callback package includes handlers (http.HandlerFunc) which can be used
+for the callback leg an OIDC flow. Callback handlers for both the authorization
+code flow (with optional PKCE) and the implicit flow are provided.
 
 <hr>
 
