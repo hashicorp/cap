@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -173,6 +174,9 @@ func (p *Provider) AuthURL(ctx context.Context, s State) (url string, e error) {
 	if s.PKCEVerifier() != nil {
 		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("code_challenge", s.PKCEVerifier().Challenge()), oauth2.SetAuthURLParam("code_challenge_method", string(s.PKCEVerifier().Method())))
 	}
+	if secs, exp := s.MaxAge(); !exp.IsZero() {
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("max_age", strconv.Itoa(int(secs))))
+	}
 	return oauth2Config.AuthCodeURL(s.ID(), authCodeOpts...), nil
 }
 
@@ -323,6 +327,8 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource,
 //     must equal the client id
 //   * when there is a single audience (aud) and it is not equal to the client
 //     id, then the authorized party (azp) must equal the client id
+//   * when max_age was requested, the auth_time claim is verified (with a leeway
+//     of 1 min)
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
 func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, s State, opt ...Option) (map[string]interface{}, error) {
@@ -415,6 +421,18 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, s State, opt ..
 			p.config.ClientID,
 			ErrInvalidAuthorizedParty)
 	}
+
+	if secs, authAfter := s.MaxAge(); !authAfter.IsZero() {
+		atClaim, ok := claims["auth_time"].(float64)
+		if !ok {
+			return nil, fmt.Errorf("%s: missing auth_time claim when max age (%d) was requested: %w", op, secs, ErrMissingClaim)
+		}
+		authTime := time.Unix(int64(atClaim), 0)
+		if !authTime.Add(leeway).After(authAfter) {
+			return nil, fmt.Errorf("%s: auth_time (%s) is beyond max age (%d): %w", op, authTime, secs, ErrExpiredAuthTime)
+		}
+	}
+
 	return claims, nil
 }
 

@@ -737,7 +737,6 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 	defaultState, err := NewState(1*time.Minute, "http://localhost")
 	require.NoError(t, err)
 	defaultClaims := func() map[string]interface{} {
-
 		return map[string]interface{}{
 			"sub":   "alice@bob.com",
 			"aud":   []string{clientID},
@@ -984,6 +983,60 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 				}(),
 				state: defaultState,
 			},
+		},
+		{
+			name: "valid-auth_time",
+			p:    defaultProvider,
+			args: args{
+				keys: defaultKeys,
+				claims: func() map[string]interface{} {
+					c := defaultClaims()
+					c["auth_time"] = float64(time.Now().Unix())
+					return c
+				}(),
+				state: func() State {
+					s, err := NewState(1*time.Minute, "http://localhost", WithMaxAge(60*60))
+					s.nonce = defaultState.nonce
+					require.NoError(t, err)
+					return s
+				}(),
+			},
+		},
+		{
+			name: "exp-auth_time",
+			p:    defaultProvider,
+			args: args{
+				keys: defaultKeys,
+				claims: func() map[string]interface{} {
+					c := defaultClaims()
+					c["auth_time"] = float64(time.Now().Add(-1 * time.Hour).Unix())
+					return c
+				}(),
+				state: func() State {
+					s, err := NewState(1*time.Minute, "http://localhost", WithMaxAge(1))
+					s.nonce = defaultState.nonce
+					require.NoError(t, err)
+					return s
+				}(),
+			},
+			wantErr:   true,
+			wantIsErr: ErrExpiredAuthTime,
+		},
+		{
+			name: "missing-auth_time",
+			p:    defaultProvider,
+			args: args{
+				keys:   defaultKeys,
+				claims: defaultClaims(),
+				state: func() State {
+					s, err := NewState(1*time.Minute, "http://localhost", WithMaxAge(1))
+					s.nonce = defaultState.nonce
+					require.NoError(t, err)
+					return s
+				}(),
+			},
+			wantErr:   true,
+			wantIsErr: ErrMissingClaim,
 		},
 		{
 			name: "valid-ES384",
