@@ -1,31 +1,35 @@
 # cli
 
-
 An example OIDC user authentication CLI that supports both the authorization
 code (with optional PKCE) and implicit OIDC flows.
 
-The example uses the `oidc` and `callback` packages to compose a solution. Among
-other things, it demonstrates how to configure and use an
-`oidc.Provider` to implement a solution. 
-
-It combines `oidc.State`, `callback.SingleStateReader`, and
-the `callback.AuthCodeWithState()` function to compose a "one-time use" oidc
-authentication response callback that's tied to the CLI's authentication attempt.  
-
-It also shows example closures that meet the `callback.SuccessResponseFn` and
-`callback.ErrorResponseFn` interfaces and uses channels to communicate if the
-CLI user successfully authenticated with the OIDC provider. 
-
 <hr>
 
-## Setup
+## Running the CLI
+```
+go build
+```
+Without any flags, the cli will invoke an authorization code authentication. 
+```
+./cli
+```
+
+With the `-pkce` flag, the cli will invoke an authorization code with PKCE authentication. 
+```
+./cli -pkce
+```
+
+With the `-implicit` flag, the cli will invoke an implicit flow authentication. 
+```
+./cli -implicit
+```
 ### Require environment variables
 
-* OIDC_CLIENT_ID: Your Relying Party client id.
-* OIDC_CLIENT_SECRET: Your Rely Party secret (this is not required for implicit
+* `OIDC_CLIENT_ID`: Your Relying Party client id.
+* `OIDC_CLIENT_SECRET`: Your Rely Party secret (this is not required for implicit
   flows or authorization code with PKCE flows)
-* OIDC_ISSUER: The OIDC issuer identifier (aka the discover URL)
-* OIDC_PORT: The port you'd like to use for your callback HTTP listener.
+* `OIDC_ISSUER`: The OIDC issuer identifier (aka the discover URL)
+* `OIDC_PORT`: The port you'd like to use for your callback HTTP listener.
 
 <hr>
 

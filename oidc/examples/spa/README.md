@@ -4,20 +4,27 @@
 An example OIDC SPA (single page application) that supports both the authorization
 code (with optional PKCE) and implicit OIDC flows.
 
-The example uses the `oidc` and `callback` packages to compose a solution. Among
-other things, it demonstrates how to configure and use an
-`oidc.Provider` to implement a solution. 
-
-It extends `oidc.State` and `oidc.Token` in combination with a State cache to
-compose a solution.
-
-It also shows example closures that meet the `callback.SuccessResponseFn` and
-`callback.ErrorResponseFn` interfaces and uses the State cache to communicate if
-the user successfully authenticated with the OIDC provider.  
-
 <hr>
 
-## Setup
+
+## Running the example app
+```
+go build
+```
+Without any flags, the app will use the authorization code flow.
+```
+./spa
+```
+
+With the `-pkce` flag, the app will use the authorization code with PKCE flow. 
+```
+./spa -pkce
+```
+
+With the `-implicit` flag, the app will use the implicit flow. 
+```
+./spa -implicit
+```
 ### Require environment variables
 
 * OIDC_CLIENT_ID: Your Relying Party client id.
