@@ -436,6 +436,8 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, s State, opt ..
 	return claims, nil
 }
 
+// convertError is only used to convert errors from the core-os library calls of:
+// provider.Exchange and verifier.Verify.
 func (p *Provider) convertError(e error) error {
 	switch {
 	case strings.Contains(e.Error(), "id token issued by a different provider"):
