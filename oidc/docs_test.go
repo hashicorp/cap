@@ -211,4 +211,11 @@ func ExampleNewState() {
 	// implicit flow.
 	s, _ = oidc.NewState(ttl, "http://your_redirect_url/callback", oidc.WithImplicitFlow())
 	fmt.Println(s)
+
+	// Create a State for a user's authentication attempt that will use the
+	// authorization code flow and require a auth_time with a max_age of 0
+	// seconds.
+	ttl = 2 * time.Minute
+	s, _ = oidc.NewState(ttl, "http://your_redirect_url/callback", oidc.WithMaxAge(0))
+	fmt.Println(s)
 }
