@@ -43,7 +43,7 @@ type Config struct {
 
 	// Scopes is a list of default oidc scopes to request of the provider. The
 	// required "oidc" scope is requested by default, and does not need to be
-	// part of this optional list. If a State has audiences, they will override
+	// part of this optional list. If a State has scopes, they will override
 	// this configured list for a specific authentication attempt.
 	Scopes []string
 
