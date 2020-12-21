@@ -144,3 +144,24 @@ func Test_WithPKCE(t *testing.T) {
 		assert.Equal(opts, testOpts)
 	})
 }
+
+func Test_WithMaxAge(t *testing.T) {
+	t.Parallel()
+	t.Run("stOptions", func(t *testing.T) {
+		t.Parallel()
+		assert := assert.New(t)
+		opts := getStOpts()
+		testOpts := stDefaults()
+		assert.Equal(opts, testOpts)
+
+		opts = getStOpts(WithMaxAge(1))
+		testOpts = stDefaults()
+		// authAfter will be a zero value, since it's not set until the
+		// NewState() factory, when it can determine it's nowFunc
+		testOpts.withMaxAge = &maxAge{
+			seconds: 1,
+		}
+
+		assert.Equal(opts, testOpts)
+	})
+}

@@ -74,6 +74,12 @@ type State interface {
 	//
 	// See: https://tools.ietf.org/html/rfc7636
 	PKCEVerifier() CodeVerifier
+
+	// MaxAge: when authAfter is not a zero value (authTime.IsZero()) then the
+	// id_token's auth_time claim must be after the specified time.
+	//
+	// https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+	MaxAge() (seconds uint, authAfter time.Time)
 }
 
 // St represents the oidc state used for oidc flows and implements the State interface.
@@ -120,6 +126,11 @@ type St struct {
 	// withVerifier indicates whether or not to use the authorization code flow
 	// with PKCE.  It suppies the required CodeVerifier for PKCE.
 	withVerifier CodeVerifier
+
+	// withMaxAge: when withMaxAge.authAfter is not a zero value
+	// (authTime.IsZero()) then the id_token's auth_time claim must be after the
+	// specified time.
+	withMaxAge *maxAge
 }
 
 // ensure that St implements the State interface.
@@ -132,6 +143,7 @@ var _ State = (*St)(nil)
 //   * WithScopes
 //   * WithImplicit
 //   * WithPKCE
+//   * WithMaxAge
 func NewState(expireIn time.Duration, redirectURL string, opt ...Option) (*St, error) {
 	const op = "oidc.NewState"
 	opts := getStOpts(opt...)
@@ -165,15 +177,41 @@ func NewState(expireIn time.Duration, redirectURL string, opt ...Option) (*St, e
 		withVerifier: opts.withVerifier,
 	}
 	s.expiration = s.now().Add(expireIn)
+	if opts.withMaxAge != nil {
+		opts.withMaxAge.authAfter = s.now().Add(time.Duration(-opts.withMaxAge.seconds) * time.Second)
+		s.withMaxAge = opts.withMaxAge
+	}
 	return s, nil
 }
 
-func (s *St) ID() string                 { return s.id }           // ID implements the State.ID() interface function.
-func (s *St) Nonce() string              { return s.nonce }        // Nonce implements the State.Nonce() interface function.
-func (s *St) Audiences() []string        { return s.audiences }    // Audiences implements the State.Audiences() interface function.
-func (s *St) Scopes() []string           { return s.scopes }       // Scopes implements the State.Scopes() interface function.
-func (s *St) RedirectURL() string        { return s.redirectURL }  // RedirectURL implements the State.RedirectURL() interface function.
-func (s *St) PKCEVerifier() CodeVerifier { return s.withVerifier } // CodeVerifier implements the State.CodeVerifier() interface function.
+// ID implements the State.ID() interface function.
+func (s *St) ID() string { return s.id }
+
+// Nonce implements the State.Nonce() interface function.
+func (s *St) Nonce() string { return s.nonce }
+
+// Audiences implements the State.Audiences() interface function.
+func (s *St) Audiences() []string { return s.audiences }
+
+// Scopes implements the State.Scopes() interface function.
+func (s *St) Scopes() []string { return s.scopes }
+
+// RedirectURL implements the State.RedirectURL() interface function.
+func (s *St) RedirectURL() string { return s.redirectURL }
+
+// CodeVerifier implements the State.CodeVerifier() interface function.
+func (s *St) PKCEVerifier() CodeVerifier { return s.withVerifier }
+
+// MaxAge: when authAfter is not a zero value (authTime.IsZero()) then the
+// id_token's auth_time claim must be after the specified time.
+//
+// See: https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+func (s *St) MaxAge() (uint, time.Time) {
+	if s.withMaxAge == nil {
+		return 0, time.Time{}
+	}
+	return s.withMaxAge.seconds, s.withMaxAge.authAfter.Truncate(time.Second)
+}
 
 // ImplicitFlow indicates whether or not to use the implicit flow.  Getting
 // only an id_token for an implicit flow should be the default, but at times
@@ -213,6 +251,11 @@ type implicitFlow struct {
 	withAccessToken bool
 }
 
+type maxAge struct {
+	seconds   uint
+	authAfter time.Time
+}
+
 // stOptions is the set of available options for St functions
 type stOptions struct {
 	withNowFunc      func() time.Time
@@ -220,6 +263,7 @@ type stOptions struct {
 	withAudiences    []string
 	withImplicitFlow *implicitFlow
 	withVerifier     CodeVerifier
+	withMaxAge       *maxAge
 }
 
 // stDefaults is a handy way to get the defaults at runtime and during unit
@@ -254,8 +298,9 @@ func getStOpts(opt ...Option) stOptions {
 // optionally passing a true bool will request an access_token as well during
 // the flow.  You cannot use WithImplicit and WithPKCE together.  It is
 // recommend to not request access_tokens during the implicit flow.  If you need
-// an access_token, then use the authorization code flows. Option is valid for:
-// St
+// an access_token, then use the authorization code flows.
+//
+// Option is valid for: St
 func WithImplicitFlow(args ...interface{}) Option {
 	withoutAccessToken := false
 	for _, arg := range args {
@@ -277,6 +322,7 @@ func WithImplicitFlow(args ...interface{}) Option {
 
 // WithPKCE provides an option to use a CodeVerifier with the authorization
 // code flow with PKCE.  You cannot use WithImplicit and WithPKCE together.
+//
 // Option is valid for: St
 //
 // See: https://tools.ietf.org/html/rfc7636
@@ -284,6 +330,28 @@ func WithPKCE(v CodeVerifier) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*stOptions); ok {
 			o.withVerifier = v
+		}
+	}
+}
+
+// WithMaxAge provides an optional maximum authentication age, which is the
+// allowable elapsed time in seconds since the last time the user was actively
+// authenticated by the provider.  When a max age is specified, the provider
+// must include a auth_time claim in the returned id_token.  This makes it
+// preferable to prompt=login, where you have no way to verify when an
+// authentication took place.
+//
+// Option is valid for: St
+//
+// See: https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+func WithMaxAge(seconds uint) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*stOptions); ok {
+			// authAfter will be a zero value, since it's not set until the
+			// NewState() factory, when it can determine it's nowFunc
+			o.withMaxAge = &maxAge{
+				seconds: seconds,
+			}
 		}
 	}
 }
