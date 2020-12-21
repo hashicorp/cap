@@ -50,7 +50,7 @@ tokens.
 		"your_client_id",
 		"your_client_secret",
 		[]oidc.Alg{oidc.RS256},
-		[]string{"http://your_redirect_url"},
+		[]string{"http://your_redirect_url/callback"},
 	)
 
 	// Create a provider
@@ -62,7 +62,7 @@ tokens.
 	// authorization code flow.  (See NewState(...) using the WithPKCE and
 	// WithImplicit options for creating a State that uses those flows.)	
   ttl := 2 * time.Minute
-	s, _ := oidc.NewState(ttl, "http://your_redirect_url")
+	s, _ := oidc.NewState(ttl, "http://your_redirect_url/callback")
 
 	// Create an auth URL
 	authURL, _ := p.AuthURL(context.Background(), s)

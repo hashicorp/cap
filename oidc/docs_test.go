@@ -17,7 +17,7 @@ func Example() {
 		"your_client_id",
 		"your_client_secret",
 		[]oidc.Alg{oidc.RS256},
-		[]string{"http://your_redirect_url"},
+		[]string{"http://your_redirect_url/callback"},
 	)
 
 	// Create a provider
@@ -28,7 +28,7 @@ func Example() {
 	// authorization code flow.  (See NewState(...) using the WithPKCE and
 	// WithImplicit options for creating a State that uses those flows.)
 	ttl := 2 * time.Minute
-	s, _ := oidc.NewState(ttl, "http://your_redirect_url")
+	s, _ := oidc.NewState(ttl, "http://your_redirect_url/callback")
 
 	// Create an auth URL
 	authURL, _ := p.AuthURL(context.Background(), s)
@@ -84,12 +84,12 @@ func ExampleNewConfig() {
 		"your_client_id",
 		"your_client_secret",
 		[]oidc.Alg{oidc.RS256},
-		[]string{"http://your_redirect_url"},
+		[]string{"http://your_redirect_url/callback"},
 	)
 	fmt.Println(pc)
 
 	// Output:
-	// &{your_client_id [REDACTED: client secret] [openid] http://your_issuer/ [RS256] [http://your_redirect_url] []  <nil>}
+	// &{your_client_id [REDACTED: client secret] [openid] http://your_issuer/ [RS256] [http://your_redirect_url/callback] []  <nil>}
 }
 
 func ExampleNewProvider() {
@@ -99,7 +99,7 @@ func ExampleNewProvider() {
 		"your_client_id",
 		"your_client_secret",
 		[]oidc.Alg{oidc.RS256},
-		[]string{"http://your_redirect_url"},
+		[]string{"http://your_redirect_url/callback"},
 	)
 
 	// Create a provider
@@ -114,7 +114,7 @@ func ExampleProvider_AuthURL() {
 		"your_client_id",
 		"your_client_secret",
 		[]oidc.Alg{oidc.RS256},
-		[]string{"http://your_redirect_url"},
+		[]string{"http://your_redirect_url/callback"},
 	)
 
 	// Create a provider
@@ -125,7 +125,7 @@ func ExampleProvider_AuthURL() {
 	// authorization code flow.  (See NewState(...) using the WithPKCE and
 	// WithImplicit options for creating a State that uses those flows.)
 	ttl := 2 * time.Minute
-	s, _ := oidc.NewState(ttl, "http://your_redirect_url")
+	s, _ := oidc.NewState(ttl, "http://your_redirect_url/callback")
 
 	// Create an auth URL
 	authURL, _ := p.AuthURL(context.Background(), s)
@@ -139,7 +139,7 @@ func ExampleProvider_Exchange() {
 		"your_client_id",
 		"your_client_secret",
 		[]oidc.Alg{oidc.RS256},
-		[]string{"http://your_redirect_url"},
+		[]string{"http://your_redirect_url/callback"},
 	)
 
 	// Create a provider
@@ -150,7 +150,7 @@ func ExampleProvider_Exchange() {
 	// authorization code flow.  (See NewState(...) using the WithPKCE and
 	// WithImplicit options for creating a State that uses those flows.)
 	ttl := 2 * time.Minute
-	s, _ := oidc.NewState(ttl, "http://your_redirect_url")
+	s, _ := oidc.NewState(ttl, "http://your_redirect_url/callback")
 
 	// Create an auth URL
 	authURL, _ := p.AuthURL(context.Background(), s)
@@ -170,7 +170,7 @@ func ExampleProvider_UserInfo() {
 		"your_client_id",
 		"your_client_secret",
 		[]oidc.Alg{oidc.RS256},
-		[]string{"http://your_redirect_url"},
+		[]string{"http://your_redirect_url/callback"},
 	)
 
 	// Create a provider
@@ -181,7 +181,7 @@ func ExampleProvider_UserInfo() {
 	// authorization code flow.  (See NewState(...) using the WithPKCE and
 	// WithImplicit options for creating a State that uses those flows.)
 	ttl := 2 * time.Minute
-	s, _ := oidc.NewState(ttl, "http://your_redirect_url")
+	s, _ := oidc.NewState(ttl, "http://your_redirect_url/callback")
 
 	// Exchange a successful authentication's authorization code and
 	// authorization state (received in a callback) for a verified Token.
@@ -198,17 +198,17 @@ func ExampleNewState() {
 	// authorization code flow.  (See NewState(...) using the WithPKCE and
 	// WithImplicit options for creating a State that uses those flows.)
 	ttl := 2 * time.Minute
-	s, _ := oidc.NewState(ttl, "http://your_redirect_url")
+	s, _ := oidc.NewState(ttl, "http://your_redirect_url/callback")
 	fmt.Println(s)
 
 	// Create a State for a user's authentication attempt that will use the
 	// authorization code flow with PKCE
 	v, _ := oidc.NewCodeVerifier()
-	s, _ = oidc.NewState(ttl, "http://your_redirect_url", oidc.WithPKCE(v))
+	s, _ = oidc.NewState(ttl, "http://your_redirect_url/callback", oidc.WithPKCE(v))
 	fmt.Println(s)
 
 	// Create a State for a user's authentication attempt that will use the
 	// implicit flow.
-	s, _ = oidc.NewState(ttl, "http://your_redirect_url", oidc.WithImplicitFlow())
+	s, _ = oidc.NewState(ttl, "http://your_redirect_url/callback", oidc.WithImplicitFlow())
 	fmt.Println(s)
 }
