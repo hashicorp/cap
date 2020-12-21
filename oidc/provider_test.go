@@ -572,7 +572,7 @@ func TestProvider_Exchange(t *testing.T) {
 }
 
 func TestHTTPClient(t *testing.T) {
-	// HTTPClientContext if mostly covered by other tests, but we need to make
+	// HTTPClient if mostly covered by other tests, but we need to make
 	// sure we handle nil configs and invalid CA certs
 	t.Parallel()
 	t.Run("nil-config", func(t *testing.T) {
@@ -592,6 +592,17 @@ func TestHTTPClient(t *testing.T) {
 		require.Error(t, err)
 		assert.Truef(t, errors.Is(err, ErrInvalidCACert), "wanted \"%s\" but got \"%s\"", ErrInvalidCACert, err)
 		assert.Empty(t, c)
+	})
+	t.Run("check-transport", func(t *testing.T) {
+		_, testCaPem := TestGenerateCA(t, []string{"localhost"})
+		p := &Provider{
+			config: &Config{
+				ProviderCA: testCaPem,
+			},
+		}
+		c, err := p.HTTPClient()
+		require.NoError(t, err)
+		assert.Equal(t, c.Transport, p.client.Transport)
 	})
 }
 
