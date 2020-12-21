@@ -34,4 +34,6 @@ var (
 	ErrUnauthorizedRedirectURI    = errors.New("unauthorized redirect_uri")
 	ErrInvalidFlow                = errors.New("invalid OIDC flow")
 	ErrUnsupportedChallengeMethod = errors.New("unsupported PKCE challenge method")
+	ErrExpiredAuthTime            = errors.New("expired auth_time")
+	ErrMissingClaim               = errors.New("missing required claim")
 )
