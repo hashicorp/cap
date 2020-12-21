@@ -62,7 +62,7 @@ code flow (with optional PKCE) and the implicit flow are provided.
 	// Create a State for a user's authentication attempt that will use the
 	// authorization code flow.  (See NewState(...) using the WithPKCE and
 	// WithImplicit options for creating a State that uses those flows.)	
-  ttl := 2 * time.Minute
+  	ttl := 2 * time.Minute
 	s, _ := oidc.NewState(ttl, "http://your_redirect_url/callback")
 
 	// Create an auth URL
