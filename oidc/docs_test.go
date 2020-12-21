@@ -24,7 +24,9 @@ func Example() {
 	p, _ := oidc.NewProvider(pc)
 	defer p.Done()
 
-	// Create a State for a user's authentication attempt
+	// Create a State for a user's authentication attempt that will use the
+	// authorization code flow.  (See NewState(...) using the WithPKCE and
+	// WithImplicit options for creating a State that uses those flows.)
 	ttl := 2 * time.Minute
 	s, _ := oidc.NewState(ttl, "http://your_redirect_url")
 
@@ -38,12 +40,25 @@ func Example() {
 	fmt.Printf("id_token: %v\n", string(t.IDToken()))
 
 	// Create an authorization code flow callback
-	successFn := func(stateID string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
+	// A function to handle successful attempts.
+	successFn := func(
+		stateID string,
+		t oidc.Token,
+		w http.ResponseWriter,
+		req *http.Request,
+	) {
 		w.WriteHeader(http.StatusOK)
 		printableToken := fmt.Sprintf("id_token: %s", string(t.IDToken()))
 		_, _ = w.Write([]byte(printableToken))
 	}
-	errorFn := func(stateID string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
+	// A function to handle errors and failed attempts.
+	errorFn := func(
+		stateID string,
+		r *callback.AuthenErrorResponse,
+		e error,
+		w http.ResponseWriter,
+		req *http.Request,
+	) {
 		if e != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(e.Error()))
@@ -51,6 +66,7 @@ func Example() {
 		}
 		w.WriteHeader(http.StatusUnauthorized)
 	}
+	// create the callback and register it for use.
 	callback, _ := callback.AuthCode(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
 	http.HandleFunc("/callback", callback)
 
@@ -105,7 +121,9 @@ func ExampleProvider_AuthURL() {
 	p, _ := oidc.NewProvider(pc)
 	defer p.Done()
 
-	// Create a State for a user's authentication attempt
+	// Create a State for a user's authentication attempt that will use the
+	// authorization code flow.  (See NewState(...) using the WithPKCE and
+	// WithImplicit options for creating a State that uses those flows.)
 	ttl := 2 * time.Minute
 	s, _ := oidc.NewState(ttl, "http://your_redirect_url")
 
@@ -128,7 +146,9 @@ func ExampleProvider_Exchange() {
 	p, _ := oidc.NewProvider(pc)
 	defer p.Done()
 
-	// Create a State for a user's authentication attempt
+	// Create a State for a user's authentication attempt that will use the
+	// authorization code flow.  (See NewState(...) using the WithPKCE and
+	// WithImplicit options for creating a State that uses those flows.)
 	ttl := 2 * time.Minute
 	s, _ := oidc.NewState(ttl, "http://your_redirect_url")
 
@@ -157,7 +177,9 @@ func ExampleProvider_UserInfo() {
 	p, _ := oidc.NewProvider(pc)
 	defer p.Done()
 
-	// Create a State for a user's authentication attempt
+	// Create a State for a user's authentication attempt that will use the
+	// authorization code flow.  (See NewState(...) using the WithPKCE and
+	// WithImplicit options for creating a State that uses those flows.)
 	ttl := 2 * time.Minute
 	s, _ := oidc.NewState(ttl, "http://your_redirect_url")
 
@@ -169,4 +191,24 @@ func ExampleProvider_UserInfo() {
 	var infoClaims map[string]interface{}
 	_ = p.UserInfo(context.Background(), t.StaticTokenSource(), &infoClaims)
 	fmt.Println("UserInfo claims: ", infoClaims)
+}
+
+func ExampleNewState() {
+	// Create a State for a user's authentication attempt that will use the
+	// authorization code flow.  (See NewState(...) using the WithPKCE and
+	// WithImplicit options for creating a State that uses those flows.)
+	ttl := 2 * time.Minute
+	s, _ := oidc.NewState(ttl, "http://your_redirect_url")
+	fmt.Println(s)
+
+	// Create a State for a user's authentication attempt that will use the
+	// authorization code flow with PKCE
+	v, _ := oidc.NewCodeVerifier()
+	s, _ = oidc.NewState(ttl, "http://your_redirect_url", oidc.WithPKCE(v))
+	fmt.Println(s)
+
+	// Create a State for a user's authentication attempt that will use the
+	// implicit flow.
+	s, _ = oidc.NewState(ttl, "http://your_redirect_url", oidc.WithImplicitFlow())
+	fmt.Println(s)
 }

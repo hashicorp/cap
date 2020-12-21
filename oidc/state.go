@@ -278,6 +278,7 @@ func WithImplicitFlow(args ...interface{}) Option {
 // WithPKCE provides an option to use a CodeVerifier with the authorization
 // code flow with PKCE.  You cannot use WithImplicit and WithPKCE together.
 // Option is valid for: St
+//
 // See: https://tools.ietf.org/html/rfc7636
 func WithPKCE(v CodeVerifier) Option {
 	return func(o interface{}) {
