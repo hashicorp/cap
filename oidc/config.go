@@ -7,6 +7,8 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/url"
+	"strings"
+	"time"
 
 	"github.com/coreos/go-oidc"
 	"github.com/hashicorp/cap/oidc/internal/strutils"
@@ -28,7 +30,7 @@ func (t ClientSecret) MarshalJSON() ([]byte, error) {
 	return json.Marshal(RedactedClientSecret)
 }
 
-// Config represents the configuration for OIDC provider used by a relying
+// Config represents the configuration for an OIDC provider used by a relying
 // party.
 type Config struct {
 	// ClientID is the relying party ID.
@@ -38,8 +40,9 @@ type Config struct {
 	ClientSecret ClientSecret
 
 	// Scopes is a list of default oidc scopes to request of the provider. The
-	// required "oidc" scope is requested by default, and should be part of this
-	// optional list.
+	// required "oidc" scope is requested by default, and does not need to be
+	// part of this optional list. If a State has audiences, they will override
+	// this configured list for a specific authentication attempt.
 	Scopes []string
 
 	// Issuer is a case-sensitive URL string using the https scheme that
@@ -59,26 +62,34 @@ type Config struct {
 	// access_token, etc.
 	SupportedSigningAlgs []Alg
 
-	// RedirectURL is the URL where the provider will send responses to
-	// authentication requests.
-	RedirectURL string
+	// AllowedRedirectURLs is a list of allowed URLs for the provider to
+	// redirect to after a user authenticates.
+	AllowedRedirectURLs []string
 
-	// Audiences is a list optional case-sensitive strings used when verifying
-	// an id_token's "aud" claim (which is also a list) If provided, the
-	// audiences of an id_token must match one of the configured audiences.
+	// Audiences is an optional default list of case-sensitive strings to use when
+	// verifying an id_token's "aud" claim (which is also a list) If provided,
+	// the audiences of an id_token must match one of the configured audiences.
+	// If a State has audiences, they will override this configured list for a
+	// specific authentication attempt.
 	Audiences []string
 
 	// ProviderCA is an optional CA certs (PEM encoded) to use when sending
 	// requests to the provider. If you have a list of *x509.Certificates, then
 	// see EncodeCertificates(...) to PEM encode them.
 	ProviderCA string
+
+	// NowFunc is a time func that returns the current time.
+	NowFunc func() time.Time
 }
 
-// NewConfig composes a new config for a provider.  The "oidc" scope will always
-// be added the new configuration's Scopes, regardless of what additional scopes
-// are requested via the WithScopes option and duplicate scopes are allowed.
-// Supported options: WithProviderCA, WithScopes, WithAudiences
-func NewConfig(issuer string, clientID string, clientSecret ClientSecret, supported []Alg, redirectURL string, opt ...Option) (*Config, error) {
+// NewConfig composes a new config for a provider.
+//
+// The "oidc" scope will always be added to the new configuration's Scopes,
+// regardless of what additional scopes are requested via the WithScopes option
+// and duplicate scopes are allowed.
+//
+// Supported options: WithProviderCA, WithScopes, WithAudiences, WithNow
+func NewConfig(issuer string, clientID string, clientSecret ClientSecret, supported []Alg, allowedRedirectURLs []string, opt ...Option) (*Config, error) {
 	const op = "NewConfig"
 	opts := getConfigOpts(opt...)
 	c := &Config{
@@ -86,10 +97,11 @@ func NewConfig(issuer string, clientID string, clientSecret ClientSecret, suppor
 		ClientID:             clientID,
 		ClientSecret:         clientSecret,
 		SupportedSigningAlgs: supported,
-		RedirectURL:          redirectURL,
 		Scopes:               opts.withScopes,
 		ProviderCA:           opts.withProviderCA,
 		Audiences:            opts.withAudiences,
+		NowFunc:              opts.withNowFunc,
+		AllowedRedirectURLs:  allowedRedirectURLs,
 	}
 	if err := c.Validate(); err != nil {
 		return nil, fmt.Errorf("%s: invalid provider config: %w", op, err)
@@ -116,9 +128,19 @@ func (c *Config) Validate() error {
 	if c.Issuer == "" {
 		return fmt.Errorf("%s: discovery URL is empty: %w", op, ErrInvalidParameter)
 	}
-	if c.RedirectURL == "" {
-		return fmt.Errorf("%s: redirect URL is empty: %w", op, ErrInvalidParameter)
+	if len(c.AllowedRedirectURLs) == 0 {
+		return fmt.Errorf("%s: allowed redirect URLs is empty: %w", op, ErrInvalidParameter)
 	}
+	var invalidURLs []string
+	for _, allowed := range c.AllowedRedirectURLs {
+		if _, err := url.Parse(allowed); err != nil {
+			invalidURLs = append(invalidURLs, allowed)
+		}
+	}
+	if len(invalidURLs) > 0 {
+		return fmt.Errorf("Invalid AllowedRedirectURLs provided %s: %w", strings.Join(invalidURLs, ", "), ErrInvalidParameter)
+	}
+
 	u, err := url.Parse(c.Issuer)
 	if err != nil {
 		return fmt.Errorf("%s: issuer %s is invalid (%s): %w", op, c.Issuer, err, ErrInvalidIssuer)
@@ -143,11 +165,20 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// configOptions is the set of available options.
+// Now will return the current time which can be overridden by the NowFunc
+func (c *Config) Now() time.Time {
+	if c.NowFunc != nil {
+		return c.NowFunc()
+	}
+	return time.Now() // fallback to this default
+}
+
+// configOptions is the set of available options
 type configOptions struct {
 	withScopes     []string
 	withAudiences  []string
 	withProviderCA string
+	withNowFunc    func() time.Time
 }
 
 // configDefaults is a handy way to get the defaults at runtime and
@@ -166,27 +197,11 @@ func getConfigOpts(opt ...Option) configOptions {
 	return opts
 }
 
-// WithScopes provides an optional list of scopes for the provider's config.
-func WithScopes(scopes ...string) Option {
-	return func(o interface{}) {
-		if o, ok := o.(*configOptions); ok {
-			o.withScopes = append(o.withScopes, scopes...)
-		}
-	}
-}
-
-// WithAudiences provides an optional list of audiences for the provider's config.
-func WithAudiences(auds ...string) Option {
-	return func(o interface{}) {
-		if o, ok := o.(*configOptions); ok {
-			o.withAudiences = append(o.withAudiences, auds...)
-		}
-	}
-}
-
 // WithProviderCA provides optional CA certs (PEM encoded) for the provider's
 // config.  These certs will can be used when making http requests to the
-// provider. See EncodeCertificates(...) to PEM encode a number of certs.
+// provider. Valid for: Config
+//
+// See EncodeCertificates(...) to PEM encode a number of certs.
 func WithProviderCA(cert string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*configOptions); ok {
