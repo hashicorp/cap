@@ -12,6 +12,7 @@ var (
 	ErrExpiredState               = errors.New("state is expired")
 	ErrResponseStateInvalid       = errors.New("invalid response state")
 	ErrInvalidSignature           = errors.New("invalid signature")
+	ErrInvalidSubject             = errors.New("invalid subject")
 	ErrInvalidAudience            = errors.New("invalid audience")
 	ErrInvalidNonce               = errors.New("invalid nonce")
 	ErrInvalidNotBefore           = errors.New("invalid not before")
