@@ -425,7 +425,7 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, s State, opt ..
 	if secs, authAfter := s.MaxAge(); !authAfter.IsZero() {
 		atClaim, ok := claims["auth_time"].(float64)
 		if !ok {
-			return nil, fmt.Errorf("%s: missing auth_time claim when max age (%d) was requested: %w", op, secs, ErrMissingClaim)
+			return nil, fmt.Errorf("%s: missing auth_time claim when max age was requested: %w", op, ErrMissingClaim)
 		}
 		authTime := time.Unix(int64(atClaim), 0)
 		if !authTime.Add(leeway).After(authAfter) {
