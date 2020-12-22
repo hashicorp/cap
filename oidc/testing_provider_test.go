@@ -257,6 +257,19 @@ func TestTestProvider_SetPKCEVerifier(t *testing.T) {
 	})
 }
 
+func TestTestProvider_SetUserInfoReply(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		assert := assert.New(t)
+		tp := StartTestProvider(t)
+		reply := map[string]interface{}{
+			"sub": "alice",
+		}
+		tp.SetUserInfoReply(reply)
+		assert.Equal(reply, tp.replyUserinfo)
+		assert.Equal(reply, tp.UserInfoReply())
+	})
+}
+
 func TestTestProvider_writeJSON(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)

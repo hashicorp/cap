@@ -114,6 +114,9 @@ import (
 //
 //  * PKCE verifier: SetPKCEVerifier(oidc.CodeVerifier) sets the PKCE code_verifier
 //  and PKCEVerifier() returns the current verifier.
+//
+//  * UserInfo: SetUserInfoReply sets the UserInfo endpoint response and
+//  UserInfoReply() returns the current response.
 type TestProvider struct {
 	httpServer *httptest.Server
 	caCert     string
@@ -121,7 +124,7 @@ type TestProvider struct {
 	jwks                *jose.JSONWebKeySet
 	allowedRedirectURIs []string
 	replySubject        string
-	replyUserinfo       map[string]interface{}
+	replyUserinfo       interface{}
 	replyExpiry         time.Duration
 
 	mu                sync.Mutex
@@ -185,6 +188,7 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 		},
 		replySubject: "alice@example.com",
 		replyUserinfo: map[string]interface{}{
+			"sub":           "alice@example.com",
 			"dob":           "1978",
 			"friend":        "bob",
 			"nickname":      "A",
@@ -464,6 +468,20 @@ func (p *TestProvider) PKCEVerifier() CodeVerifier {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.pkceVerifier
+}
+
+// SetUserInfoReply sets the UserInfo endpoint response.
+func (p *TestProvider) SetUserInfoReply(resp interface{}) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.replyUserinfo = resp
+}
+
+// SetUserInfoReply sets the UserInfo endpoint response.
+func (p *TestProvider) UserInfoReply() interface{} {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.replyUserinfo
 }
 
 // Addr returns the current base URL for the test provider's running webserver,
