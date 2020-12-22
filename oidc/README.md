@@ -106,7 +106,8 @@ code flow (with optional PKCE) and the implicit flow are provided.
 	http.HandleFunc("/callback", callback)
 
 	// Get the user's claims via the provider's UserInfo endpoint
+	idTokenSubject := "alice"
 	var infoClaims map[string]interface{}
-	_ = p.UserInfo(context.Background(), t.StaticTokenSource(), &infoClaims)
+	_ = p.UserInfo(context.Background(), t.StaticTokenSource(), idTokenSubject, &infoClaims)
 	fmt.Println("UserInfo claims: ", infoClaims)
 ```
