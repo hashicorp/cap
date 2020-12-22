@@ -234,7 +234,6 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 	}
 	// Add the "openid" scope, which is a required scope for oidc flows
 	scopes = append([]string{oidc.ScopeOpenID}, scopes...)
-
 	var oauth2Config = oauth2.Config{
 		ClientID:     p.config.ClientID,
 		ClientSecret: string(p.config.ClientSecret),
@@ -281,11 +280,21 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 }
 
 // UserInfo gets the UserInfo claims from the provider using the token produced
-// by the tokenSource.
-func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource, claims interface{}) error {
-	// TODO: make sure we follow the spec for validating the response.
-	// https://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponseValidation
+// by the tokenSource.  Only JSON user info responses are supported (signed JWT
+// responses are not).  The WithAudiences option is supported to specify
+// optional audiences to verify when the aud claim is present in the response.
+//
+//  It verifies:
+//   * sub (sub) is required and must match
+//   * issuer (iss) - if the iss claim is included in returned claims
+//   * audiences (aud) - if the aud claim is included in returned claims and
+//     WithAudiences option is provided.
+//
+// See: https://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse
+func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource, validSubject string, claims interface{}, opt ...Option) error {
 	const op = "Provider.UserInfo"
+	opts := getUserInfoOpts(opt...)
+
 	if tokenSource == nil {
 		return fmt.Errorf("%s: token source is nil: %w", op, ErrNilParameter)
 	}
@@ -302,13 +311,58 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource,
 
 	userinfo, err := p.provider.UserInfo(oidcCtx, tokenSource)
 	if err != nil {
-		return fmt.Errorf("%s: provider UserInfo request failed: %w", op, err)
+		return fmt.Errorf("%s: provider UserInfo request failed: %w", op, p.convertError(err))
 	}
+	type verifyClaims struct {
+		Sub string
+		Iss string
+		Aud []string
+	}
+	var vc verifyClaims
+	err = userinfo.Claims(&vc)
+	if err != nil {
+		return fmt.Errorf("%s: failed to parse claims for UserInfo verification: %w", op, err)
+	}
+	// Subject is required to match
+	if vc.Sub != validSubject {
+		return fmt.Errorf("%s: %w", op, ErrInvalidSubject)
+	}
+	// optional issuer check...
+	if vc.Iss != "" && vc.Iss != p.config.Issuer {
+		return fmt.Errorf("%s: %w", op, ErrInvalidIssuer)
+	}
+	// optional audiences check...
+	if len(opts.withAudiences) > 0 {
+		if err := p.verifyAudience(opts.withAudiences, vc.Aud); err != nil {
+			return fmt.Errorf("%s: %w", op, ErrInvalidAudience)
+		}
+	}
+
 	err = userinfo.Claims(&claims)
 	if err != nil {
 		return fmt.Errorf("%s: failed to get UserInfo claims: %w", op, err)
 	}
 	return nil
+}
+
+// userInfoOptions is the set of available options for the Provider.UserInfo
+// function
+type userInfoOptions struct {
+	withAudiences []string
+}
+
+// userInfoDefaults is a handy way to get the defaults at runtime and during unit
+// tests.
+func userInfoDefaults() userInfoOptions {
+	return userInfoOptions{}
+}
+
+// getUserInfoOpts gets the provider.UserInfo defaults and applies the opt
+// overrides passed in
+func getUserInfoOpts(opt ...Option) userInfoOptions {
+	opts := userInfoDefaults()
+	ApplyOpts(&opts, opt...)
+	return opts
 }
 
 // VerifyIDToken will verify the inbound IDToken and return its claims.
@@ -380,17 +434,7 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, s State, opt ..
 	default:
 		audiences = p.config.Audiences
 	}
-	if err := func() error {
-		if len(audiences) > 0 {
-			for _, v := range audiences {
-				if strutils.StrListContains(oidcIDToken.Audience, v) {
-					return nil
-				}
-			}
-			return ErrInvalidAudience
-		}
-		return nil
-	}(); err != nil {
+	if err := p.verifyAudience(audiences, oidcIDToken.Audience); err != nil {
 		return nil, fmt.Errorf("%s: invalid id_token audiences: %w", op, err)
 	}
 	if len(oidcIDToken.Audience) > 1 && !strutils.StrListContains(oidcIDToken.Audience, p.config.ClientID) {
@@ -436,8 +480,27 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, s State, opt ..
 	return claims, nil
 }
 
+// verifyAudience simply verified that the aud claim against the allowed
+// audiences.
+func (p *Provider) verifyAudience(allowedAudiences, audienceClaim []string) error {
+	const op = "verifyAudiences"
+	if len(allowedAudiences) > 0 {
+		found := false
+		for _, v := range allowedAudiences {
+			if strutils.StrListContains(audienceClaim, v) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("%s: invalid id_token audiences: %w", op, ErrInvalidAudience)
+		}
+	}
+	return nil
+}
+
 // convertError is only used to convert errors from the core-os library calls of:
-// provider.Exchange and verifier.Verify.
+// provider.Exchange, verifier.Verify and provider.UserInfo
 func (p *Provider) convertError(e error) error {
 	switch {
 	case strings.Contains(e.Error(), "id token issued by a different provider"):
@@ -458,6 +521,8 @@ func (p *Provider) convertError(e error) error {
 		return fmt.Errorf("%s: %w", e.Error(), ErrInvalidJWKs)
 	case strings.Contains(e.Error(), "server response missing access_token"):
 		return fmt.Errorf("%s: %w", e.Error(), ErrMissingAccessToken)
+	case strings.Contains(e.Error(), "404 Not Found"):
+		return fmt.Errorf("%s: %w", e.Error(), ErrNotFound)
 	default:
 		return e
 	}

@@ -616,17 +616,31 @@ func TestProvider_UserInfo(t *testing.T) {
 	tp.SetAllowedRedirectURIs([]string{redirect})
 	p := testNewProvider(t, clientID, clientSecret, redirect, tp)
 
+	defaultClaims := func() map[string]interface{} {
+		return map[string]interface{}{
+			"sub":           "alice@example.com",
+			"advisor":       "Faythe",
+			"dob":           "1978",
+			"friend":        "bob",
+			"nickname":      "A",
+			"nosy-neighbor": "Eve",
+		}
+	}
+	defaultSub := "alice@example.com"
 	type args struct {
 		tokenSource oauth2.TokenSource
 		claims      interface{}
+		sub         string
+		opt         []Option
 	}
 	tests := []struct {
-		name       string
-		p          *Provider
-		args       args
-		wantClaims interface{}
-		wantErr    bool
-		wantIsErr  error
+		name           string
+		p              *Provider
+		args           args
+		providerClaims map[string]interface{}
+		wantClaims     interface{}
+		wantErr        bool
+		wantIsErr      error
 	}{
 		{
 			name: "valid",
@@ -637,14 +651,69 @@ func TestProvider_UserInfo(t *testing.T) {
 					Expiry:      time.Now().Add(10 * time.Second),
 				}),
 				claims: &map[string]interface{}{},
+				sub:    defaultSub,
+				opt:    []Option{WithAudiences(clientID)},
 			},
-			wantClaims: &map[string]interface{}{
-				"advisor":       "Faythe",
-				"dob":           "1978",
-				"friend":        "bob",
-				"nickname":      "A",
-				"nosy-neighbor": "Eve",
+			providerClaims: func() map[string]interface{} {
+				c := defaultClaims()
+				c["iss"] = tp.Addr()
+				c["aud"] = []string{clientID}
+				return c
+			}(),
+			wantClaims: func() *map[string]interface{} {
+				c := defaultClaims()
+				c["iss"] = tp.Addr()
+				c["aud"] = []interface{}{clientID}
+				return &c
+			}(),
+		},
+		{
+			name: "invalid-audiences",
+			p:    p,
+			args: args{
+				tokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+					AccessToken: "dummy_access_token",
+					Expiry:      time.Now().Add(10 * time.Second),
+				}),
+				claims: &map[string]interface{}{},
+				sub:    defaultSub,
+				opt:    []Option{WithAudiences(tp.Addr())},
 			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidAudience,
+		},
+		{
+			name: "invalid-iss",
+			p:    p,
+			args: args{
+				tokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+					AccessToken: "dummy_access_token",
+					Expiry:      time.Now().Add(10 * time.Second),
+				}),
+				claims: &map[string]interface{}{},
+				sub:    defaultSub,
+			},
+			providerClaims: func() map[string]interface{} {
+				c := defaultClaims()
+				c["iss"] = "bad-issuer"
+				return c
+			}(),
+			wantErr:   true,
+			wantIsErr: ErrInvalidIssuer,
+		},
+		{
+			name: "invalid-sub",
+			p:    p,
+			args: args{
+				tokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+					AccessToken: "dummy_access_token",
+					Expiry:      time.Now().Add(10 * time.Second),
+				}),
+				claims: &map[string]interface{}{},
+				sub:    "nobody",
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidSubject,
 		},
 		{
 			name: "nil-tokensource",
@@ -686,7 +755,12 @@ func TestProvider_UserInfo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			err := p.UserInfo(ctx, tt.args.tokenSource, tt.args.claims)
+			if tt.providerClaims != nil {
+				current := tp.UserInfoReply()
+				tp.SetUserInfoReply(tt.providerClaims)
+				defer tp.SetUserInfoReply(current)
+			}
+			err := p.UserInfo(ctx, tt.args.tokenSource, tt.args.sub, tt.args.claims, tt.args.opt...)
 			if tt.wantErr {
 				require.Error(err)
 				assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)
@@ -705,9 +779,10 @@ func TestProvider_UserInfo(t *testing.T) {
 		})
 		tp.SetDisableUserInfo(true)
 		var claims interface{}
-		err := p.UserInfo(ctx, tokenSource, &claims)
+		err := p.UserInfo(ctx, tokenSource, "alice@example.com", &claims)
 		require.Error(err)
 		assert.Empty(claims)
+		assert.True(errors.Is(err, ErrNotFound))
 	})
 }
 
