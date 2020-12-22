@@ -43,10 +43,12 @@ func envConfig(secretNotRequired bool) (map[string]interface{}, error) {
 		case string:
 			switch k {
 			case "OIDC_CLIENT_SECRET":
-				if !secretNotRequired && t == "" {
+				switch {
+				case secretNotRequired:
+					env[k] = "" // unsetting the secret which isn't required
+				case t == "":
 					return nil, fmt.Errorf("%s: %s is empty.\n\n   Did you intend to use -pkce or -implicit options?", op, k)
 				}
-				env[k] = "" // unsetting the secret which isn't required
 			default:
 				if t == "" {
 					return nil, fmt.Errorf("%s: %s is empty", op, k)
@@ -316,15 +318,22 @@ func printClaims(t oidc.IDToken) {
 
 func printUserInfo(ctx context.Context, p *oidc.Provider, t oidc.Token) {
 	const op = "printUserInfo"
-	if t, ok := t.(interface {
+	if ts, ok := t.(interface {
 		StaticTokenSource() oauth2.TokenSource
 	}); ok {
-		if t.StaticTokenSource() == nil {
+		if ts.StaticTokenSource() == nil {
 			fmt.Fprintf(os.Stderr, "%s: no access_token received, so we're unable to get UserInfo claims", op)
 			return
 		}
+		vc := struct {
+			Sub string
+		}{}
+		if err := t.IDToken().Claims(&vc); err != nil {
+			fmt.Fprintf(os.Stderr, "%s: channel received success, but error getting UserInfo claims: %s", op, err)
+			return
+		}
 		var infoClaims map[string]interface{}
-		err := p.UserInfo(ctx, t.StaticTokenSource(), &infoClaims)
+		err := p.UserInfo(ctx, ts.StaticTokenSource(), vc.Sub, &infoClaims)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s: channel received success, but error getting UserInfo claims: %s", op, err)
 			return
