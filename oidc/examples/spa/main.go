@@ -36,10 +36,12 @@ func envConfig(secretNotRequired bool) (map[string]interface{}, error) {
 		case string:
 			switch k {
 			case "OIDC_CLIENT_SECRET":
-				if !secretNotRequired && t == "" {
+				switch {
+				case secretNotRequired:
+					env[k] = "" // unsetting the secret which isn't required
+				case t == "":
 					return nil, fmt.Errorf("%s: %s is empty.\n\n   Did you intend to use -pkce or -implicit options?", op, k)
 				}
-				env[k] = "" // unsetting the secret which isn't required
 			default:
 				if t == "" {
 					return nil, fmt.Errorf("%s: %s is empty", op, k)
