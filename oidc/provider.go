@@ -360,18 +360,18 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, s State, opt ..
 	default:
 		audiences = p.config.Audiences
 	}
-	if err := func() error {
-		if len(audiences) > 0 {
-			for _, v := range audiences {
-				if strutils.StrListContains(oidcIDToken.Audience, v) {
-					return nil
-				}
+	if len(audiences) > 0 {
+		found := false
+		for _, v := range audiences {
+			if strutils.StrListContains(oidcIDToken.Audience, v) {
+				found = true
+				break
 			}
-			return ErrInvalidAudience
 		}
-		return nil
-	}(); err != nil {
-		return nil, fmt.Errorf("%s: invalid id_token audiences: %w", op, err)
+
+		if !found {
+			return nil, fmt.Errorf("%s: invalid id_token audiences: %w", op, ErrInvalidAudience)
+		}
 	}
 	if len(oidcIDToken.Audience) > 1 && !strutils.StrListContains(oidcIDToken.Audience, p.config.ClientID) {
 		return nil, fmt.Errorf("%s: invalid id_token: multiple audiences (%s) and one of them is not equal client_id (%s): %w", op, oidcIDToken.Audience, p.config.ClientID, ErrInvalidAudience)
