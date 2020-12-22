@@ -26,11 +26,10 @@ const (
 	clientSecret = "OIDC_CLIENT_SECRET"
 	issuer       = "OIDC_ISSUER"
 	port         = "OIDC_PORT"
+	attemptExp   = "attemptExp"
 )
 
-const attemptExp = "attemptExp"
-
-func envConfig() (map[string]interface{}, error) {
+func envConfig(secretNotRequired bool) (map[string]interface{}, error) {
 	const op = "envConfig"
 	env := map[string]interface{}{
 		clientID:     os.Getenv("OIDC_CLIENT_ID"),
@@ -42,8 +41,18 @@ func envConfig() (map[string]interface{}, error) {
 	for k, v := range env {
 		switch t := v.(type) {
 		case string:
-			if t == "" {
-				return nil, fmt.Errorf("%s: %s is empty", op, k)
+			switch k {
+			case "OIDC_CLIENT_SECRET":
+				switch {
+				case secretNotRequired:
+					env[k] = "" // unsetting the secret which isn't required
+				case t == "":
+					return nil, fmt.Errorf("%s: %s is empty.\n\n   Did you intend to use -pkce or -implicit options?", op, k)
+				}
+			default:
+				if t == "" {
+					return nil, fmt.Errorf("%s: %s is empty", op, k)
+				}
 			}
 		case time.Duration:
 			if t == 0 {
@@ -58,11 +67,18 @@ func envConfig() (map[string]interface{}, error) {
 
 func main() {
 	useImplicit := flag.Bool("implicit", false, "use the implicit flow")
-	flag.Parse()
+	usePKCE := flag.Bool("pkce", false, "use the implicit flow")
+	maxAge := flag.Int("max-age", -1, "max age of user authentication")
 
-	env, err := envConfig()
+	flag.Parse()
+	if *useImplicit && *usePKCE {
+		fmt.Fprint(os.Stderr, "you can't request both: -implicit and -pkce")
+		return
+	}
+
+	env, err := envConfig(*useImplicit || *usePKCE)
 	if err != nil {
-		fmt.Fprint(os.Stderr, err)
+		fmt.Fprintf(os.Stderr, "%s\n\n", err)
 		return
 	}
 
@@ -70,6 +86,9 @@ func main() {
 	sigintCh := make(chan os.Signal, 1)
 	signal.Notify(sigintCh, os.Interrupt)
 	defer signal.Stop(sigintCh)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	issuer := env[issuer].(string)
 	clientID := env[clientID].(string)
@@ -88,7 +107,24 @@ func main() {
 	}
 	defer p.Done()
 
-	s, err := oidc.NewState(env[attemptExp].(time.Duration), redirectURL)
+	var stateOptions []oidc.Option
+	switch {
+	case *useImplicit:
+		stateOptions = append(stateOptions, oidc.WithImplicitFlow())
+	case *usePKCE:
+		v, err := oidc.NewCodeVerifier()
+		if err != nil {
+			fmt.Fprint(os.Stderr, err.Error())
+			return
+		}
+		stateOptions = append(stateOptions, oidc.WithPKCE(v))
+	}
+
+	if *maxAge >= 0 {
+		stateOptions = append(stateOptions, oidc.WithMaxAge(uint(*maxAge)))
+	}
+
+	s, err := oidc.NewState(env[attemptExp].(time.Duration), redirectURL, stateOptions...)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return
@@ -98,23 +134,21 @@ func main() {
 	errorFn, failedCh := failed()
 
 	var handler http.HandlerFunc
-	var urlOption oidc.Option
 	if *useImplicit {
-		urlOption = oidc.WithImplicitFlow()
-		handler, err = callback.Implicit(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
+		handler, err = callback.Implicit(ctx, p, &callback.SingleStateReader{State: s}, successFn, errorFn)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error creating callback handler: %s", err)
 			return
 		}
 	} else {
-		handler, err = callback.AuthCode(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
+		handler, err = callback.AuthCode(ctx, p, &callback.SingleStateReader{State: s}, successFn, errorFn)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error creating auth code handler: %s", err)
 			return
 		}
 	}
 
-	authURL, err := p.AuthURL(context.Background(), s, urlOption)
+	authURL, err := p.AuthURL(ctx, s)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error getting auth url: %s", err)
 		return
@@ -157,7 +191,7 @@ func main() {
 		}
 		printToken(resp.Token)
 		printClaims(resp.Token.IDToken())
-		printUserInfo(p, resp.Token)
+		printUserInfo(ctx, p, resp.Token)
 		return
 	case err := <-failedCh:
 		if err != nil {
@@ -282,17 +316,24 @@ func printClaims(t oidc.IDToken) {
 	}
 }
 
-func printUserInfo(p *oidc.Provider, t oidc.Token) {
+func printUserInfo(ctx context.Context, p *oidc.Provider, t oidc.Token) {
 	const op = "printUserInfo"
-	if t, ok := t.(interface {
+	if ts, ok := t.(interface {
 		StaticTokenSource() oauth2.TokenSource
 	}); ok {
-		if t.StaticTokenSource() == nil {
+		if ts.StaticTokenSource() == nil {
 			fmt.Fprintf(os.Stderr, "%s: no access_token received, so we're unable to get UserInfo claims", op)
 			return
 		}
+		vc := struct {
+			Sub string
+		}{}
+		if err := t.IDToken().Claims(&vc); err != nil {
+			fmt.Fprintf(os.Stderr, "%s: channel received success, but error getting UserInfo claims: %s", op, err)
+			return
+		}
 		var infoClaims map[string]interface{}
-		err := p.UserInfo(context.Background(), t.StaticTokenSource(), &infoClaims)
+		err := p.UserInfo(ctx, ts.StaticTokenSource(), vc.Sub, &infoClaims)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s: channel received success, but error getting UserInfo claims: %s", op, err)
 			return

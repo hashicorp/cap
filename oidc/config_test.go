@@ -148,18 +148,6 @@ func TestNewConfig(t *testing.T) {
 			wantIsErr: ErrInvalidParameter,
 		},
 		{
-			name: "empty-client-secret",
-			args: args{
-				issuer:              "http://your_issuer/",
-				clientID:            "your_client_id",
-				clientSecret:        "",
-				supported:           []Alg{RS512},
-				allowedRedirectURLs: []string{"http://your_redirect_url"},
-			},
-			wantErr:   true,
-			wantIsErr: ErrInvalidParameter,
-		},
-		{
 			name: "empty-algs",
 			args: args{
 				issuer:              "http://your_issuer/",

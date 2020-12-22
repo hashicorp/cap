@@ -111,6 +111,12 @@ import (
 //
 //  * Implicit Flow Responses: SetDisableImplicit disables implicit flow responses,
 //  causing them to return a 401 http status.
+//
+//  * PKCE verifier: SetPKCEVerifier(oidc.CodeVerifier) sets the PKCE code_verifier
+//  and PKCEVerifier() returns the current verifier.
+//
+//  * UserInfo: SetUserInfoReply sets the UserInfo endpoint response and
+//  UserInfoReply() returns the current response.
 type TestProvider struct {
 	httpServer *httptest.Server
 	caCert     string
@@ -118,7 +124,7 @@ type TestProvider struct {
 	jwks                *jose.JSONWebKeySet
 	allowedRedirectURIs []string
 	replySubject        string
-	replyUserinfo       map[string]interface{}
+	replyUserinfo       interface{}
 	replyExpiry         time.Duration
 
 	mu                sync.Mutex
@@ -138,6 +144,7 @@ type TestProvider struct {
 	disableImplicit   bool
 	invalidJWKs       bool
 	nowFunc           func() time.Time
+	pkceVerifier      CodeVerifier
 
 	// privKey *ecdsa.PrivateKey
 	privKey crypto.PrivateKey
@@ -167,9 +174,12 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 	require := require.New(t)
 	opts := getTestProviderOpts(opt...)
 
+	v, err := NewCodeVerifier()
+	require.NoError(err)
 	p := &TestProvider{
 		t:            t,
 		nowFunc:      time.Now,
+		pkceVerifier: v,
 		customClaims: map[string]interface{}{},
 		replyExpiry:  5 * time.Second,
 
@@ -178,6 +188,7 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 		},
 		replySubject: "alice@example.com",
 		replyUserinfo: map[string]interface{}{
+			"sub":           "alice@example.com",
 			"dob":           "1978",
 			"friend":        "bob",
 			"nickname":      "A",
@@ -441,6 +452,36 @@ func (p *TestProvider) SetDisableImplicit(disable bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.disableImplicit = disable
+}
+
+// SetPKCEVerifier sets the PKCE oidc.CodeVerifier
+func (p *TestProvider) SetPKCEVerifier(verifier CodeVerifier) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.t.Helper()
+	require.NotNil(p.t, verifier)
+	p.pkceVerifier = verifier
+}
+
+// PKCEVerifier returns the PKCE oidc.CodeVerifier
+func (p *TestProvider) PKCEVerifier() CodeVerifier {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.pkceVerifier
+}
+
+// SetUserInfoReply sets the UserInfo endpoint response.
+func (p *TestProvider) SetUserInfoReply(resp interface{}) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.replyUserinfo = resp
+}
+
+// SetUserInfoReply sets the UserInfo endpoint response.
+func (p *TestProvider) UserInfoReply() interface{} {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.replyUserinfo
 }
 
 // Addr returns the current base URL for the test provider's running webserver,
@@ -791,6 +832,9 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		case req.FormValue("code") != p.expectedAuthCode:
 			_ = p.writeTokenErrorResponse(w, http.StatusUnauthorized, "invalid_grant", "unexpected auth code")
+			return
+		case req.FormValue("code_verifier") != "" && req.FormValue("code_verifier") != p.pkceVerifier.Verifier():
+			_ = p.writeTokenErrorResponse(w, http.StatusUnauthorized, "invalid_verifier", "unexpected verifier")
 			return
 		}
 

@@ -19,11 +19,10 @@ const (
 	clientSecret = "OIDC_CLIENT_SECRET"
 	issuer       = "OIDC_ISSUER"
 	port         = "OIDC_PORT"
+	attemptExp   = "attemptExp"
 )
 
-const attemptExp = "attemptExp"
-
-func envConfig() (map[string]interface{}, error) {
+func envConfig(secretNotRequired bool) (map[string]interface{}, error) {
 	const op = "envConfig"
 	env := map[string]interface{}{
 		clientID:     os.Getenv("OIDC_CLIENT_ID"),
@@ -35,8 +34,18 @@ func envConfig() (map[string]interface{}, error) {
 	for k, v := range env {
 		switch t := v.(type) {
 		case string:
-			if t == "" {
-				return nil, fmt.Errorf("%s: %s is empty", op, k)
+			switch k {
+			case "OIDC_CLIENT_SECRET":
+				switch {
+				case secretNotRequired:
+					env[k] = "" // unsetting the secret which isn't required
+				case t == "":
+					return nil, fmt.Errorf("%s: %s is empty.\n\n   Did you intend to use -pkce or -implicit options?", op, k)
+				}
+			default:
+				if t == "" {
+					return nil, fmt.Errorf("%s: %s is empty", op, k)
+				}
 			}
 		case time.Duration:
 			if t == 0 {
@@ -51,11 +60,18 @@ func envConfig() (map[string]interface{}, error) {
 
 func main() {
 	useImplicit := flag.Bool("implicit", false, "use the implicit flow")
-	flag.Parse()
+	usePKCE := flag.Bool("pkce", false, "use the implicit flow")
+	maxAge := flag.Int("max-age", -1, "max age of user authentication")
 
-	env, err := envConfig()
+	flag.Parse()
+	if *useImplicit && *usePKCE {
+		fmt.Fprint(os.Stderr, "you can't request both: -implicit and -pkce")
+		return
+	}
+
+	env, err := envConfig(*useImplicit || *usePKCE)
 	if err != nil {
-		fmt.Fprint(os.Stderr, err)
+		fmt.Fprintf(os.Stderr, "%s\n\n", err)
 		return
 	}
 
@@ -63,6 +79,9 @@ func main() {
 	sigintCh := make(chan os.Signal, 1)
 	signal.Notify(sigintCh, os.Interrupt)
 	defer signal.Stop(sigintCh)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	issuer := env[issuer].(string)
 	clientID := env[clientID].(string)
@@ -90,15 +109,32 @@ func main() {
 		return
 	}
 
-	callback, err := CallbackHandler(context.Background(), p, sc, *useImplicit)
+	callback, err := CallbackHandler(ctx, p, sc, *useImplicit)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error creating callback handler: %s", err)
 		return
 	}
+
+	var stateOptions []oidc.Option
+	switch {
+	case *useImplicit:
+		stateOptions = append(stateOptions, oidc.WithImplicitFlow())
+	case *usePKCE:
+		v, err := oidc.NewCodeVerifier()
+		if err != nil {
+			fmt.Fprint(os.Stderr, err.Error())
+			return
+		}
+		stateOptions = append(stateOptions, oidc.WithPKCE(v))
+	}
+	if *maxAge >= 0 {
+		stateOptions = append(stateOptions, oidc.WithMaxAge(uint(*maxAge)))
+	}
+
 	// Set up callback handler
 	http.HandleFunc("/callback", callback)
-	http.HandleFunc("/login", LoginHandler(context.Background(), p, sc, timeout, redirectURL, *useImplicit))
-	http.HandleFunc("/success", SuccessHandler(context.Background(), sc))
+	http.HandleFunc("/login", LoginHandler(ctx, p, sc, timeout, redirectURL, stateOptions))
+	http.HandleFunc("/success", SuccessHandler(ctx, sc))
 
 	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", env[port]))
 	if err != nil {
@@ -110,6 +146,7 @@ func main() {
 	srvCh := make(chan error)
 	// Start local server
 	go func() {
+		fmt.Fprintf(os.Stderr, "Complete the login via your OIDC provider. Launching browser to:\n\n    http://localhost:%s/login\n\n\n", env[port])
 		err := http.Serve(listener, nil)
 		if err != nil && err != http.ErrServerClosed {
 			srvCh <- err
