@@ -71,8 +71,9 @@ func Example() {
 	http.HandleFunc("/callback", callback)
 
 	// Get the user's claims via the provider's UserInfo endpoint
+	idTokenSubject := "alice"
 	var infoClaims map[string]interface{}
-	_ = p.UserInfo(context.Background(), t.StaticTokenSource(), &infoClaims)
+	_ = p.UserInfo(context.Background(), t.StaticTokenSource(), idTokenSubject, &infoClaims)
 	fmt.Println("UserInfo claims: ", infoClaims)
 
 }
@@ -188,8 +189,9 @@ func ExampleProvider_UserInfo() {
 	t, _ := p.Exchange(context.Background(), s, "authorization-state", "authorization-code")
 
 	// Get the UserInfo claims
+	idTokenSubject := "alice"
 	var infoClaims map[string]interface{}
-	_ = p.UserInfo(context.Background(), t.StaticTokenSource(), &infoClaims)
+	_ = p.UserInfo(context.Background(), t.StaticTokenSource(), idTokenSubject, &infoClaims)
 	fmt.Println("UserInfo claims: ", infoClaims)
 }
 
