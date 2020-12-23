@@ -34,7 +34,7 @@ code flow (with optional PKCE) and the implicit flow are provided.
 
 <hr>
 
-### Examples apps:
+### Examples:
 
 * [CLI example](examples/cli/) which implements an OIDC
   user authentication CLI.  
@@ -42,72 +42,79 @@ code flow (with optional PKCE) and the implicit flow are provided.
 * [SPA example](examples/spa) which implements an OIDC user
   authentication SPA (single page app). 
 
-### Example snippets...
+<hr>
+
+Example of a provider using an authorization code flow:
 
 ```go
-	// Create a new Config
-	pc, _ := oidc.NewConfig(
-		"http://your-issuer.com/",
-		"your_client_id",
-		"your_client_secret",
-		[]oidc.Alg{oidc.RS256},
-		[]string{"http://your_redirect_url/callback"},
-	)
+// Create a new provider config
+pc, err := oidc.NewConfig(
+    Issuer:                 "http://your-issuer.com/",
+    ClientID:               "your_client_id",
+    ClientSecret:           "your_client_secret",
+    SupportedSigningAlgs:   []oidc.Alg{oidc.RS256},
+    AllowedRedirectURLs:    []string{"http://your_redirect_url"},
+)
+if err != nil {
+    // handle error
+}
 
-	// Create a provider
-	p, _ := oidc.NewProvider(pc)
-	defer p.Done()
+// Create a provider
+p, err := oidc.NewProvider(pc)
+if err != nil {
+    // handle error
+}
+defer p.Done()
 
 	
-	// Create a State for a user's authentication attempt that will use the
-	// authorization code flow.  (See NewState(...) using the WithPKCE and
-	// WithImplicit options for creating a State that uses those flows.)	
-  	ttl := 2 * time.Minute
-	s, _ := oidc.NewState(ttl, "http://your_redirect_url/callback")
+// Create a State for a user's authentication attempt that will use the
+// authorization code flow.  (See NewState(...) using the WithPKCE and
+// WithImplicit options for creating a State that uses those flows.)	
+s, err := oidc.NewState(2 * time.Minute, "http://your_redirect_url/callback")
+if err != nil {
+    // handle error
+}
 
-	// Create an auth URL
-	authURL, _ := p.AuthURL(context.Background(), s)
-	fmt.Println("open url to kick-off authentication: ", authURL)
-
-	// Exchange a successful authentication's authorization code and
-	// authorization state (received in a callback) for a verified Token.
-	t, _ := p.Exchange(context.Background(), s, "authorization-state", "authorization-code")
-	fmt.Printf("id_token: %v\n", string(t.IDToken()))
-
-	// Create an authorization code flow callback
-	// A function to handle successful attempts.
-	successFn := func(
-		stateID string,
-		t oidc.Token,
-		w http.ResponseWriter,
-		req *http.Request,
-	) {
-		w.WriteHeader(http.StatusOK)
-		printableToken := fmt.Sprintf("id_token: %s", string(t.IDToken()))
-		_, _ = w.Write([]byte(printableToken))
-	}
-	// A function to handle errors and failed attempts.
-	errorFn := func(
-		stateID string,
-		r *callback.AuthenErrorResponse,
-		e error,
-		w http.ResponseWriter,
-		req *http.Request,
-	) {
-		if e != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte(e.Error()))
-			return
-		}
-		w.WriteHeader(http.StatusUnauthorized)
-	}
-	// create the callback and register it for use.
-	callback, _ := callback.AuthCode(context.Background(), p, &callback.SingleStateReader{State: s}, successFn, errorFn)
-	http.HandleFunc("/callback", callback)
-
-	// Get the user's claims via the provider's UserInfo endpoint
-	idTokenSubject := "alice"
-	var infoClaims map[string]interface{}
-	_ = p.UserInfo(context.Background(), t.StaticTokenSource(), idTokenSubject, &infoClaims)
-	fmt.Println("UserInfo claims: ", infoClaims)
+// Create an auth URL
+authURL, err := p.AuthURL(context.Background(), s)
+if err != nil {
+    // handle error
+}
+fmt.Println("open url to kick-off authentication: ", authURL)
 ```
+
+Create a http.Handler for OIDC authentication response redirects.
+
+```go
+func NewHandler(ctx context.Context, p *oidc.Provider, rw callback.StateReader) (http.HandlerFunc, error)
+    if p == nil { 
+        // handle error
+    }
+    if rw == nil {
+        // handle error
+    }
+    return func(w http.ResponseWriter, r *http.Request) {
+       state, err := rw.Read(ctx, req.FormValue("state"))
+       if err != nil {
+           // handle error
+       }
+       // Exchange(...) will verify the tokens before returning. 
+       token, err := p.Exchange(ctx, state, req.FormValue("state"), req.FormValue("code"))
+       if err != nil {
+           // handle error
+       }
+       var claims map[string]interface{}
+       if err := t.IDToken().Claims(&claims); err != nil {
+           // handle error
+       }
+
+       // Get the user's claims via the provider's UserInfo endpoint
+       var infoClaims map[string]interface{}
+       err = p.UserInfo(ctx, token.StaticTokenSource(), claims["sub"].(string), &infoClaims)
+       if err != nil {
+           // handle error
+       }
+}
+```
+  
+ 
