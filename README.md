@@ -98,6 +98,6 @@ func NewHandler(ctx context.Context, p *oidc.Provider, rw callback.StateReader) 
            // handle error
        }
 }
-````
+```
   
  
