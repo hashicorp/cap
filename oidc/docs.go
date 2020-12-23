@@ -32,16 +32,10 @@ Example apps
 Complete concise example solutions:
 
 * OIDC authentication CLI:
-https://github.com/hashicorp/cap/tree/jimlambrt-initial/oidc/examples/cli/
+https://github.com/hashicorp/cap/tree/main/oidc/examples/cli/
 
 * OIDC authentication SPA:
-https://github.com/hashicorp/cap/tree/jimlambrt-initial/oidc/examples/spa/
-
-
-Package examples
-
-Concise snippets with error handling omitted:
-
+https://github.com/hashicorp/cap/tree/main/oidc/examples/spa/
 
 */
 package oidc
