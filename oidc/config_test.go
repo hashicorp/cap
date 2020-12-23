@@ -88,6 +88,22 @@ func TestNewConfig(t *testing.T) {
 			},
 		},
 		{
+			name: "valid-empty-redirect",
+			args: args{
+				issuer:       "http://your_issuer/",
+				clientID:     "your_client_id",
+				clientSecret: "your_client_secret",
+				supported:    []Alg{RS512},
+			},
+			want: &Config{
+				Issuer:               "http://your_issuer/",
+				ClientID:             "your_client_id",
+				ClientSecret:         "your_client_secret",
+				SupportedSigningAlgs: []Alg{RS512},
+				Scopes:               []string{oidc.ScopeOpenID},
+			},
+		},
+		{
 			name: "invalid-redirects",
 			args: args{
 				issuer:              "http://your_issuer/",
@@ -160,17 +176,6 @@ func TestNewConfig(t *testing.T) {
 			wantIsErr: ErrInvalidParameter,
 		},
 		{
-			name: "empty-redirect",
-			args: args{
-				issuer:       "http://your_issuer/",
-				clientID:     "your_client_id",
-				clientSecret: "your_client_secret",
-				supported:    []Alg{RS512},
-			},
-			wantErr:   true,
-			wantIsErr: ErrInvalidParameter,
-		},
-		{
 			name: "invalid-providerCA",
 			args: args{
 				issuer:              "http://your_issuer/",
@@ -208,6 +213,7 @@ func TestNewConfig(t *testing.T) {
 				return
 			}
 			require.NoError(err)
+			require.NotNil(tt.want)
 			assert.Equalf(tt.want.ClientID, got.ClientID, "ClientID = %v, want %v", got.ClientID, tt.want.ClientID)
 			assert.Equalf(tt.want.ClientSecret, got.ClientSecret, "ClientSecret = %v, want %v", got.ClientSecret, tt.want.ClientSecret)
 			assert.Equalf(tt.want.Scopes, got.Scopes, "Scopes = %v, want %v", got.Scopes, tt.want.Scopes)
@@ -230,14 +236,6 @@ func TestConfig_Validate(t *testing.T) {
 		var c *Config
 		err := c.Validate()
 		assert.Truef(errors.Is(err, ErrNilParameter), "Config.Validate() = %v, want %v", err, ErrNilParameter)
-	})
-	t.Run("missing-default-redirect", func(t *testing.T) {
-		assert, require := assert.New(t), require.New(t)
-		c, err := NewConfig("https://example.com/", "test-id", "test-secret", []Alg{ES384}, []string{"https://example.com/callback"})
-		require.NoError(err)
-		c.AllowedRedirectURLs = []string{}
-		err = c.Validate()
-		assert.Truef(errors.Is(err, ErrInvalidParameter), "Config.Validate() = %v, want %v", err, ErrInvalidParameter)
 	})
 }
 

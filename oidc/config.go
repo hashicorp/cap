@@ -65,7 +65,10 @@ type Config struct {
 	SupportedSigningAlgs []Alg
 
 	// AllowedRedirectURLs is a list of allowed URLs for the provider to
-	// redirect to after a user authenticates.
+	// redirect to after a user authenticates.  If AllowedRedirects is empty,
+	// the package will not check the State.RedirectURL() to see if it's
+	// allowed, and the check will be left to the OIDC provider's /authorize
+	// endpoint.
 	AllowedRedirectURLs []string
 
 	// Audiences is an optional default list of case-sensitive strings to use when
@@ -130,17 +133,16 @@ func (c *Config) Validate() error {
 	if c.Issuer == "" {
 		return fmt.Errorf("%s: discovery URL is empty: %w", op, ErrInvalidParameter)
 	}
-	if len(c.AllowedRedirectURLs) == 0 {
-		return fmt.Errorf("%s: allowed redirect URLs is empty: %w", op, ErrInvalidParameter)
-	}
-	var invalidURLs []string
-	for _, allowed := range c.AllowedRedirectURLs {
-		if _, err := url.Parse(allowed); err != nil {
-			invalidURLs = append(invalidURLs, allowed)
+	if len(c.AllowedRedirectURLs) > 0 {
+		var invalidURLs []string
+		for _, allowed := range c.AllowedRedirectURLs {
+			if _, err := url.Parse(allowed); err != nil {
+				invalidURLs = append(invalidURLs, allowed)
+			}
 		}
-	}
-	if len(invalidURLs) > 0 {
-		return fmt.Errorf("Invalid AllowedRedirectURLs provided %s: %w", strings.Join(invalidURLs, ", "), ErrInvalidParameter)
+		if len(invalidURLs) > 0 {
+			return fmt.Errorf("Invalid AllowedRedirectURLs provided %s: %w", strings.Join(invalidURLs, ", "), ErrInvalidParameter)
+		}
 	}
 
 	u, err := url.Parse(c.Issuer)

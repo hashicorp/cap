@@ -1357,9 +1357,9 @@ func TestProvider_validRedirect(t *testing.T) {
 		{"https://127.0.0.1:9000", []string{"a", "b", "https://127.0.0.1:5000"}, nil},
 		{"https://[::1]:9000", []string{"a", "b", "https://[::1]:5000"}, nil},
 		{"https://[::1]:9000/x/y?r=42", []string{"a", "b", "https://[::1]:5000/x/y?r=42"}, nil},
+		{"https://example.com", []string{}, nil},
 
 		// invalid
-		{"https://example.com", []string{}, ErrUnauthorizedRedirectURI},
 		{"http://example.com", []string{"a", "b", "https://example.com"}, ErrUnauthorizedRedirectURI},
 		{"https://example.com:9000", []string{"a", "b", "https://example.com:5000"}, ErrUnauthorizedRedirectURI},
 		{"https://[::2]:9000", []string{"a", "b", "https://[::2]:5000"}, ErrUnauthorizedRedirectURI},

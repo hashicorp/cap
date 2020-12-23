@@ -590,6 +590,10 @@ func (p *Provider) validRedirect(uri string) error {
 		return fmt.Errorf("redirect URI %s is an invalid URI %s: %w", uri, err.Error(), ErrInvalidParameter)
 	}
 
+	if len(p.config.AllowedRedirectURLs) == 0 {
+		return nil
+	}
+
 	// if uri isn't a loopback, just string search the allowed list
 	if !strutils.StrListContains([]string{"localhost", "127.0.0.1", "::1"}, inputURI.Hostname()) {
 		if !strutils.StrListContains(p.config.AllowedRedirectURLs, uri) {
