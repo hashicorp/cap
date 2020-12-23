@@ -38,7 +38,7 @@ import (
 // design/implementation comes from Consul's oauthtest package. A big thanks to
 // the original package's contributors.
 //
-// It's important to remember that the TestProvider is stateful (see any of it's
+// It's important to remember that the TestProvider is stateful (see any of its
 // receiver functions that begin with Set*).
 //
 // Once you've started a TestProvider http server with StartTestProvider(...),
@@ -46,9 +46,10 @@ import (
 //
 //    * GET /.well-known/openid-configuration    OIDC Discovery
 //
-//    * GET or POST  /authorize                  OIDC authorization (supporting both
-//                                               the authorization code flow and the implicit
-//                                               flow with form_post):
+//    * GET or POST  /authorize                  OIDC authorization supporting both
+//                                               the authorization code flow (with
+//                                               optional PKCE) and the implicit
+//                                               flow with form_post.
 //
 //    * POST /token                              OIDC token
 //

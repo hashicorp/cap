@@ -11,6 +11,7 @@ import (
 )
 
 func Example() {
+	ctx := context.Background()
 	// Create a new Config
 	pc, err := oidc.NewConfig(
 		"http://your-issuer.com/",
@@ -39,7 +40,7 @@ func Example() {
 	}
 
 	// Create an auth URL
-	authURL, err := p.AuthURL(context.Background(), state)
+	authURL, err := p.AuthURL(ctx, state)
 	if err != nil {
 		// handle error
 	}
@@ -49,7 +50,7 @@ func Example() {
 	callbackHandler := func(w http.ResponseWriter, r *http.Request) {
 		// Exchange a successful authentication's authorization code and
 		// authorization state (received in a callback) for a verified Token.
-		t, err := p.Exchange(context.Background(), state, "authorization-state", "authorization-code")
+		t, err := p.Exchange(ctx, state, r.FormValue("state"), r.FormValue("code"))
 		if err != nil {
 			// handle error
 		}
@@ -60,7 +61,7 @@ func Example() {
 
 		// Get the user's claims via the provider's UserInfo endpoint
 		var infoClaims map[string]interface{}
-		err = p.UserInfo(context.Background(), t.StaticTokenSource(), claims["sub"].(string), &infoClaims)
+		err = p.UserInfo(ctx, t.StaticTokenSource(), claims["sub"].(string), &infoClaims)
 		if err != nil {
 			// handle error
 		}
@@ -116,6 +117,7 @@ func ExampleNewProvider() {
 }
 
 func ExampleProvider_AuthURL() {
+	ctx := context.Background()
 	// Create a new Config
 	pc, err := oidc.NewConfig(
 		"http://your_issuer/",
@@ -144,7 +146,7 @@ func ExampleProvider_AuthURL() {
 	}
 
 	// Create an auth URL
-	authURL, err := p.AuthURL(context.Background(), s)
+	authURL, err := p.AuthURL(ctx, s)
 	if err != nil {
 		// handle error
 	}
@@ -152,6 +154,8 @@ func ExampleProvider_AuthURL() {
 }
 
 func ExampleProvider_Exchange() {
+	ctx := context.Background()
+
 	// Create a new Config
 	pc, err := oidc.NewConfig(
 		"http://your-issuer.com/",
@@ -180,7 +184,7 @@ func ExampleProvider_Exchange() {
 	}
 
 	// Create an auth URL
-	authURL, err := p.AuthURL(context.Background(), state)
+	authURL, err := p.AuthURL(ctx, state)
 	if err != nil {
 		// handle error
 	}
@@ -190,7 +194,7 @@ func ExampleProvider_Exchange() {
 	callbackHandler := func(w http.ResponseWriter, r *http.Request) {
 		// Exchange a successful authentication's authorization code and
 		// authorization state (received in a callback) for a verified Token.
-		t, err := p.Exchange(context.Background(), state, "authorization-state", "authorization-code")
+		t, err := p.Exchange(ctx, state, r.FormValue("state"), r.FormValue("code"))
 		if err != nil {
 			// handle error
 		}
@@ -201,7 +205,7 @@ func ExampleProvider_Exchange() {
 
 		// Get the user's claims via the provider's UserInfo endpoint
 		var infoClaims map[string]interface{}
-		err = p.UserInfo(context.Background(), t.StaticTokenSource(), claims["sub"].(string), &infoClaims)
+		err = p.UserInfo(ctx, t.StaticTokenSource(), claims["sub"].(string), &infoClaims)
 		if err != nil {
 			// handle error
 		}
@@ -218,6 +222,8 @@ func ExampleProvider_Exchange() {
 }
 
 func ExampleProvider_UserInfo() {
+	ctx := context.Background()
+
 	// Create a new Config
 	pc, err := oidc.NewConfig(
 		"http://your-issuer.com/",
@@ -246,7 +252,7 @@ func ExampleProvider_UserInfo() {
 	}
 
 	// Create an auth URL
-	authURL, err := p.AuthURL(context.Background(), state)
+	authURL, err := p.AuthURL(ctx, state)
 	if err != nil {
 		// handle error
 	}
@@ -256,7 +262,7 @@ func ExampleProvider_UserInfo() {
 	callbackHandler := func(w http.ResponseWriter, r *http.Request) {
 		// Exchange a successful authentication's authorization code and
 		// authorization state (received in a callback) for a verified Token.
-		t, err := p.Exchange(context.Background(), state, "authorization-state", "authorization-code")
+		t, err := p.Exchange(ctx, state, r.FormValue("state"), r.FormValue("code"))
 		if err != nil {
 			// handle error
 		}
@@ -267,7 +273,7 @@ func ExampleProvider_UserInfo() {
 
 		// Get the user's claims via the provider's UserInfo endpoint
 		var infoClaims map[string]interface{}
-		err = p.UserInfo(context.Background(), t.StaticTokenSource(), claims["sub"].(string), &infoClaims)
+		err = p.UserInfo(ctx, t.StaticTokenSource(), claims["sub"].(string), &infoClaims)
 		if err != nil {
 			// handle error
 		}

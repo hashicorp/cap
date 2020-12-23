@@ -60,7 +60,7 @@ if err != nil {
 
 
 // Create an auth URL
-authURL, err := p.AuthURL(context.Background(), s)
+authURL, err := p.AuthURL(ctx, s)
 if err != nil {
     // handle error
 }

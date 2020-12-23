@@ -184,19 +184,26 @@ func (p *Provider) AuthURL(ctx context.Context, s State) (url string, e error) {
 // authorizationCode and authorizationState it received in an earlier successful
 // oidc authentication response.
 //
+// Exchange will use PKCE when the user's State specifies its use.
+//
 // It will also validate the authorizationState it receives against the
 // existing State for the user's oidc authentication flow.
 //
 // On success, the Token returned will include an IDToken and may
 // include an AccessToken and RefreshToken.
 //
-// See Provider.VerifyIDToken for info about id_token verification.
+// Any tokens returned will have been verified.
+// See: Provider.VerifyIDToken for info about id_token verification.
 //
-// The id_token at_hash claim is verified when present. (see
+// When present, the id_token at_hash claim is verified  against the
+// access_token. (see:
 // https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowTokenValidation)
 //
 // The id_token c_hash claim is verified when present.
-func (p *Provider) Exchange(ctx context.Context, s State, authorizationState string, authorizationCode string) (*Tk, error) {
+func (p *Provider) Exchange(
+	ctx context.Context, s State, authorizationState string,
+	authorizationCode string,
+) (*Tk, error) {
 	const op = "Provider.Exchange"
 	if p.config == nil {
 		return nil, fmt.Errorf("%s: provider config is nil: %w", op, ErrNilParameter)

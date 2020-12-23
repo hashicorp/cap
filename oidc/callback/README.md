@@ -9,6 +9,7 @@ code flow (with optional PKCE) and the implicit flow are provided.
 ### Example snippets...
 
 ```go
+	ctx := context.Background()
 	// Create a new Config
 	pc, err := oidc.NewConfig(
 		"http://your-issuer.com/",
@@ -73,14 +74,14 @@ code flow (with optional PKCE) and the implicit flow are provided.
 	}
 
 	// create the authorization code callback and register it for use.
-    authCodeCallback, err := AuthCode(context.Background(), p, &SingleStateReader{State: authCodeAttempt}, successFn, errorFn)
+    authCodeCallback, err := AuthCode(ctx, p, &SingleStateReader{State: authCodeAttempt}, successFn, errorFn)
 	if err != nil {
 		// handle error
 	}
 	http.HandleFunc("/auth-code-callback", authCodeCallback)
 
 	// create an implicit flow callback and register it for use.
-    implicitCallback, err := Implicit(context.Background(), p, &SingleStateReader{State: implicitAttempt}, successFn, errorFn)
+    implicitCallback, err := Implicit(ctx, p, &SingleStateReader{State: implicitAttempt}, successFn, errorFn)
 	if err != nil {
 		// handle error
 	}

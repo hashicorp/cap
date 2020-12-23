@@ -11,6 +11,8 @@ import (
 )
 
 func Example_oidc() {
+	ctx := context.Background()
+
 	// Create a new Config
 	pc, err := oidc.NewConfig(
 		"http://your-issuer.com/",
@@ -39,7 +41,7 @@ func Example_oidc() {
 	}
 
 	// Create an auth URL
-	authURL, err := p.AuthURL(context.Background(), state)
+	authURL, err := p.AuthURL(ctx, state)
 	if err != nil {
 		// handle error
 	}
@@ -49,7 +51,7 @@ func Example_oidc() {
 	callbackHandler := func(w http.ResponseWriter, r *http.Request) {
 		// Exchange a successful authentication's authorization code and
 		// authorization state (received in a callback) for a verified Token.
-		t, err := p.Exchange(context.Background(), state, "authorization-state", "authorization-code")
+		t, err := p.Exchange(ctx, state, r.FormValue("state"), r.FormValue("code"))
 		if err != nil {
 			// handle error
 		}
@@ -60,7 +62,7 @@ func Example_oidc() {
 
 		// Get the user's claims via the provider's UserInfo endpoint
 		var infoClaims map[string]interface{}
-		err = p.UserInfo(context.Background(), t.StaticTokenSource(), claims["sub"].(string), &infoClaims)
+		err = p.UserInfo(ctx, t.StaticTokenSource(), claims["sub"].(string), &infoClaims)
 		if err != nil {
 			// handle error
 		}
