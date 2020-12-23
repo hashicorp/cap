@@ -1,5 +1,5 @@
-// The `cap` provides a collection authentication packages.
-// 	* oidc: with initial support for the authorization code flow.
+// cap (collection of authentication packages) provides a collection of related
+// packages which enable support for OIDC, JWT Verification and Distributed Claims.
 //
 // See README.md
 package cap

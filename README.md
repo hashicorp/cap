@@ -33,11 +33,11 @@ Example of a provider using an authorization code flow:
 ```go
 // Create a new provider config
 pc, err := oidc.NewConfig(
-    Issuer:                 "http://your-issuer.com/",
-    ClientID:               "your_client_id",
-    ClientSecret:           "your_client_secret",
-    SupportedSigningAlgs:   []oidc.Alg{oidc.RS256},
-    AllowedRedirectURLs:    []string{"http://your_redirect_url"},
+    "http://your-issuer.com/",
+    "your_client_id",
+    "your_client_secret",
+    []oidc.Alg{oidc.RS256},
+    []string{"http://your_redirect_url"},
 )
 if err != nil {
     // handle error
