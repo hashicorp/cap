@@ -2,6 +2,7 @@ package oidc_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -63,8 +64,14 @@ func Example() {
 		if err != nil {
 			// handle error
 		}
-		fmt.Println("id_token claims: ", claims)
-		fmt.Println("UserInfo claims: ", infoClaims)
+		resp := struct {
+			IDTokenClaims  map[string]interface{}
+			UserInfoClaims map[string]interface{}
+		}{claims, infoClaims}
+		enc := json.NewEncoder(w)
+		if err := enc.Encode(resp); err != nil {
+			// handle error
+		}
 	}
 	http.HandleFunc("/callback", callbackHandler)
 }
@@ -198,8 +205,14 @@ func ExampleProvider_Exchange() {
 		if err != nil {
 			// handle error
 		}
-		fmt.Println("id_token claims: ", claims)
-		fmt.Println("UserInfo claims: ", infoClaims)
+		resp := struct {
+			IDTokenClaims  map[string]interface{}
+			UserInfoClaims map[string]interface{}
+		}{claims, infoClaims}
+		enc := json.NewEncoder(w)
+		if err := enc.Encode(resp); err != nil {
+			// handle error
+		}
 	}
 	http.HandleFunc("/callback", callbackHandler)
 }
@@ -258,8 +271,14 @@ func ExampleProvider_UserInfo() {
 		if err != nil {
 			// handle error
 		}
-		fmt.Println("id_token claims: ", claims)
-		fmt.Println("UserInfo claims: ", infoClaims)
+		resp := struct {
+			IDTokenClaims  map[string]interface{}
+			UserInfoClaims map[string]interface{}
+		}{claims, infoClaims}
+		enc := json.NewEncoder(w)
+		if err := enc.Encode(resp); err != nil {
+			// handle error
+		}
 	}
 	http.HandleFunc("/callback", callbackHandler)
 }

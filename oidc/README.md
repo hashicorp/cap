@@ -49,20 +49,20 @@ Example of a provider using an authorization code flow:
 ```go
 // Create a new provider config
 pc, err := oidc.NewConfig(
-    "http://your-issuer.com/",
-    "your_client_id",
-    "your_client_secret",
-    []oidc.Alg{oidc.RS256},
-    []string{"http://your_redirect_url"},
+  "http://your-issuer.com/",
+  "your_client_id",
+  "your_client_secret",
+  []oidc.Alg{oidc.RS256},
+  []string{"http://your_redirect_url"},
 )
 if err != nil {
-    // handle error
+  // handle error
 }
 
 // Create a provider
 p, err := oidc.NewProvider(pc)
 if err != nil {
-    // handle error
+  // handle error
 }
 defer p.Done()
 
@@ -72,13 +72,13 @@ defer p.Done()
 // WithImplicit options for creating a State that uses those flows.)	
 s, err := oidc.NewState(2 * time.Minute, "http://your_redirect_url/callback")
 if err != nil {
-    // handle error
+  // handle error
 }
 
 // Create an auth URL
 authURL, err := p.AuthURL(context.Background(), s)
 if err != nil {
-    // handle error
+  // handle error
 }
 fmt.Println("open url to kick-off authentication: ", authURL)
 ```
@@ -87,33 +87,42 @@ Create a http.Handler for OIDC authentication response redirects.
 
 ```go
 func NewHandler(ctx context.Context, p *oidc.Provider, rw callback.StateReader) (http.HandlerFunc, error)
-    if p == nil { 
-        // handle error
+  if p == nil { 
+    // handle error
+  }
+  if rw == nil {
+    // handle error
+  }
+  return func(w http.ResponseWriter, r *http.Request) {
+    state, err := rw.Read(ctx, req.FormValue("state"))
+    if err != nil {
+      // handle error
     }
-    if rw == nil {
-        // handle error
+    // Exchange(...) will verify the tokens before returning. 
+    token, err := p.Exchange(ctx, state, req.FormValue("state"), req.FormValue("code"))
+    if err != nil {
+      // handle error
     }
-    return func(w http.ResponseWriter, r *http.Request) {
-       state, err := rw.Read(ctx, req.FormValue("state"))
-       if err != nil {
-           // handle error
-       }
-       // Exchange(...) will verify the tokens before returning. 
-       token, err := p.Exchange(ctx, state, req.FormValue("state"), req.FormValue("code"))
-       if err != nil {
-           // handle error
-       }
-       var claims map[string]interface{}
-       if err := t.IDToken().Claims(&claims); err != nil {
-           // handle error
-       }
+    var claims map[string]interface{}
+    if err := t.IDToken().Claims(&claims); err != nil {
+      // handle error
+    }
 
-       // Get the user's claims via the provider's UserInfo endpoint
-       var infoClaims map[string]interface{}
-       err = p.UserInfo(ctx, token.StaticTokenSource(), claims["sub"].(string), &infoClaims)
-       if err != nil {
-           // handle error
-       }
+    // Get the user's claims via the provider's UserInfo endpoint
+    var infoClaims map[string]interface{}
+    err = p.UserInfo(ctx, token.StaticTokenSource(), claims["sub"].(string), &infoClaims)
+    if err != nil {
+      // handle error
+    }
+    resp := struct {
+	  IDTokenClaims  map[string]interface{}
+	  UserInfoClaims map[string]interface{}
+    }{claims, infoClaims}
+    enc := json.NewEncoder(w)
+    if err := enc.Encode(resp); err != nil {
+	    // handle error
+    }
+  }
 }
 ```
   

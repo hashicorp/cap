@@ -2,6 +2,7 @@ package cap_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -63,8 +64,14 @@ func Example_oidc() {
 		if err != nil {
 			// handle error
 		}
-		fmt.Println("id_token claims: ", claims)
-		fmt.Println("UserInfo claims: ", infoClaims)
+		resp := struct {
+			IDTokenClaims  map[string]interface{}
+			UserInfoClaims map[string]interface{}
+		}{claims, infoClaims}
+		enc := json.NewEncoder(w)
+		if err := enc.Encode(resp); err != nil {
+			// handle error
+		}
 	}
 	http.HandleFunc("/callback", callbackHandler)
 }

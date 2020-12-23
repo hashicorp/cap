@@ -77,26 +77,35 @@ func NewHandler(ctx context.Context, p *oidc.Provider, rw callback.StateReader) 
         // handle error
     }
     return func(w http.ResponseWriter, r *http.Request) {
-       state, err := rw.Read(ctx, req.FormValue("state"))
-       if err != nil {
-           // handle error
-       }
-       // Exchange(...) will verify the tokens before returning. 
-       token, err := p.Exchange(ctx, state, req.FormValue("state"), req.FormValue("code"))
-       if err != nil {
-           // handle error
-       }
-       var claims map[string]interface{}
-       if err := t.IDToken().Claims(&claims); err != nil {
-           // handle error
-       }
+        state, err := rw.Read(ctx, req.FormValue("state"))
+        if err != nil {
+            // handle error
+        }
+        // Exchange(...) will verify the tokens before returning. 
+        token, err := p.Exchange(ctx, state, req.FormValue("state"), req.FormValue("code"))
+        if err != nil {
+            // handle error
+        }
+        var claims map[string]interface{}
+        if err := t.IDToken().Claims(&claims); err != nil {
+            // handle error
+        }
 
-       // Get the user's claims via the provider's UserInfo endpoint
-       var infoClaims map[string]interface{}
-       err = p.UserInfo(ctx, token.StaticTokenSource(), claims["sub"].(string), &infoClaims)
-       if err != nil {
-           // handle error
-       }
+        // Get the user's claims via the provider's UserInfo endpoint
+        var infoClaims map[string]interface{}
+        err = p.UserInfo(ctx, token.StaticTokenSource(), claims["sub"].(string), &infoClaims)
+        if err != nil {
+            // handle error
+        }
+        resp := struct {
+			IDTokenClaims  map[string]interface{}
+			UserInfoClaims map[string]interface{}
+		}{claims, infoClaims}
+		enc := json.NewEncoder(w)
+		if err := enc.Encode(resp); err != nil {
+			// handle error
+        }
+    }
 }
 ```
   
