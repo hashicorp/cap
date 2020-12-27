@@ -177,6 +177,26 @@ func (p *Provider) AuthURL(ctx context.Context, s State) (url string, e error) {
 	if secs, exp := s.MaxAge(); !exp.IsZero() {
 		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("max_age", strconv.Itoa(int(secs))))
 	}
+	if len(s.Prompts()) > 0 {
+		prompts := make([]string, 0, len(s.Prompts()))
+		for _, v := range s.Prompts() {
+			prompts = append(prompts, string(v))
+		}
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("prompt", strings.Join(prompts, " ")))
+	}
+	if s.Display() != "" {
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("display", string(s.Display())))
+	}
+	if len(s.UILocales()) > 0 {
+		locales := make([]string, 0, len(s.UILocales()))
+		for _, l := range s.UILocales() {
+			locales = append(locales, string(l.String()))
+		}
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("ui_locales", strings.Join(locales, " ")))
+	}
+	if len(s.RequestClaims()) > 0 {
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("claims", string(s.RequestClaims())))
+	}
 	return oauth2Config.AuthCodeURL(s.ID(), authCodeOpts...), nil
 }
 

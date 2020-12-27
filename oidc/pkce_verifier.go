@@ -35,6 +35,9 @@ type CodeVerifier interface {
 	// Method returns the code verifier's challenge method (see
 	// https://tools.ietf.org/html/rfc7636#section-4.2)
 	Method() ChallengeMethod
+
+	// Copy returns a copy of the verifier
+	Copy() CodeVerifier
 }
 
 // S256Verifier represents an OAuth PKCE code verifier that uses the S256
@@ -70,6 +73,15 @@ func NewCodeVerifier() (*S256Verifier, error) {
 func (v *S256Verifier) Verifier() string        { return v.verifier }  // Verifier implements the CodeVerifier.Verifier() interface function.
 func (v *S256Verifier) Challenge() string       { return v.challenge } // Challenge implements the CodeVerifier.Challenge() interface function.
 func (v *S256Verifier) Method() ChallengeMethod { return v.method }    // Method implements the CodeVerifier.Method() interface function.
+
+// Copy returns a copy of the verifier.
+func (v *S256Verifier) Copy() CodeVerifier {
+	return &S256Verifier{
+		verifier:  v.verifier,
+		challenge: v.challenge,
+		method:    v.method,
+	}
+}
 
 // CreateCodeChallenge creates a code challenge from the verifier, using the
 // specified challengeMethod. Supported ChallengeMethods: S256

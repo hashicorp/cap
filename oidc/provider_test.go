@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
+	"golang.org/x/text/language"
 )
 
 // TestNewProvider does not repeat all the Config unit tests.  It just focuses
@@ -151,11 +152,24 @@ func TestProvider_AuthURL(t *testing.T) {
 	validState, err := NewState(1*time.Second, redirect)
 	require.NoError(t, err)
 
+	const reqClaims = `
+	{
+		"id_token":
+		 {
+		  "auth_time": {"essential": true},
+		  "acr": {"values": ["urn:mace:incommon:iap:silver"] }
+		 }
+	   }
+	   `
 	allOptsState, err := NewState(
 		1*time.Minute,
 		redirect,
 		WithAudiences("state-override"),
 		WithScopes("email", "profile"),
+		WithDisplay(WAP),
+		WithPrompts(Login, Consent, SelectAccount),
+		WithUILocales(language.AmericanEnglish, language.Spanish),
+		WithRequestClaims([]byte(reqClaims)),
 	)
 	require.NoError(t, err)
 
@@ -259,12 +273,17 @@ func TestProvider_AuthURL(t *testing.T) {
 			},
 			wantURL: func() string {
 				return fmt.Sprintf(
-					"%s/authorize?client_id=%s&nonce=%s&redirect_uri=%s&response_type=code&scope=openid+email+profile&state=%s",
+					"%s/authorize?claims=%s&client_id=%s&display=%s&nonce=%s&prompt=%s&redirect_uri=%s&response_type=code&scope=openid+email+profile&state=%s&ui_locales=%s",
 					tp.Addr(),
+					// s.RequestClaims()
+					`%0A%09%7B%0A%09%09%22id_token%22%3A%0A%09%09+%7B%0A%09%09++%22auth_time%22%3A+%7B%22essential%22%3A+true%7D%2C%0A%09%09++%22acr%22%3A+%7B%22values%22%3A+%5B%22urn%3Amace%3Aincommon%3Aiap%3Asilver%22%5D+%7D%0A%09%09+%7D%0A%09+++%7D%0A%09+++`,
 					clientID,
+					"wap", // s.Display()
 					allOptsState.Nonce(),
+					"login+consent+select_account", // s.Prompts()
 					redirectEncoded,
 					allOptsState.ID(),
+					"en-US+es", // s.UILocales()
 				)
 			}(),
 		},

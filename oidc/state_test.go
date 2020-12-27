@@ -8,6 +8,7 @@ import (
 	"github.com/coreos/go-oidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/text/language"
 )
 
 func TestNewState(t *testing.T) {
@@ -162,6 +163,100 @@ func Test_WithMaxAge(t *testing.T) {
 			seconds: 1,
 		}
 
+		assert.Equal(opts, testOpts)
+	})
+}
+
+func Test_WithPrompts(t *testing.T) {
+	t.Parallel()
+	t.Run("stOptions", func(t *testing.T) {
+		t.Parallel()
+		assert := assert.New(t)
+		opts := getStOpts()
+		testOpts := stDefaults()
+		assert.Equal(opts, testOpts)
+
+		opts = getStOpts(WithPrompts(Login, SelectAccount))
+		testOpts = stDefaults()
+
+		testOpts.withPrompts = []Prompt{
+			Login, SelectAccount,
+		}
+
+		assert.Equal(opts, testOpts)
+	})
+}
+
+func Test_WithDisplay(t *testing.T) {
+	t.Parallel()
+	t.Run("stOptions", func(t *testing.T) {
+		t.Parallel()
+		assert := assert.New(t)
+		opts := getStOpts()
+		testOpts := stDefaults()
+		assert.Equal(opts, testOpts)
+
+		opts = getStOpts(WithDisplay(WAP))
+		testOpts = stDefaults()
+
+		testOpts.withDisplay = WAP
+
+		assert.Equal(opts, testOpts)
+	})
+}
+
+func Test_WithUILocales(t *testing.T) {
+	t.Parallel()
+	t.Run("stOptions", func(t *testing.T) {
+		t.Parallel()
+		assert := assert.New(t)
+		opts := getStOpts()
+		testOpts := stDefaults()
+		assert.Equal(opts, testOpts)
+
+		opts = getStOpts(WithUILocales(language.AmericanEnglish, language.German))
+		testOpts = stDefaults()
+
+		testOpts.withUILocales = []language.Tag{
+			language.AmericanEnglish, language.German,
+		}
+
+		assert.Equal(opts, testOpts)
+	})
+}
+
+func Test_WithRequestClaims(t *testing.T) {
+	t.Parallel()
+	t.Run("stOptions", func(t *testing.T) {
+		t.Parallel()
+		assert := assert.New(t)
+		opts := getStOpts()
+		testOpts := stDefaults()
+		assert.Equal(opts, testOpts)
+
+		const reqClaims = `
+		{
+			"userinfo":
+			 {
+			  "given_name": {"essential": true},
+			  "nickname": null,
+			  "email": {"essential": true},
+			  "email_verified": {"essential": true},
+			  "picture": null,
+			  "http://example.info/claims/groups": null
+			 },
+			"id_token":
+			 {
+			  "auth_time": {"essential": true},
+			  "acr": {"values": ["urn:mace:incommon:iap:silver"] }
+			 }
+		   }
+		   `
+
+		opts = getStOpts(WithRequestClaims([]byte(reqClaims)))
+		testOpts = stDefaults()
+
+		testOpts.withRequestClaims = []byte(reqClaims)
 		assert.Equal(opts, testOpts)
 	})
 }

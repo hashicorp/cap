@@ -15,6 +15,7 @@ require (
 	github.com/yhat/scrape v0.0.0-20161128144610-24b7890b0945
 	golang.org/x/net v0.0.0-20200822124328-c89045814202
 	golang.org/x/oauth2 v0.0.0-20201208152858-08078c50e5b5
+	golang.org/x/text v0.3.3
 	gopkg.in/square/go-jose.v2 v2.5.1
 
 )
