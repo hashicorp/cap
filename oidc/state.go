@@ -3,6 +3,8 @@ package oidc
 import (
 	"fmt"
 	"time"
+
+	"golang.org/x/text/language"
 )
 
 // State basically represents one OIDC authentication flow for a user. It
@@ -80,6 +82,33 @@ type State interface {
 	//
 	// https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
 	MaxAge() (seconds uint, authAfter time.Time)
+
+	// Prompts optionally defines a list of values that specifies whether the
+	// Authorization Server prompts the End-User for reauthentication and
+	// consent.  See MaxAge() if wish to specify an allowable elapsed time in
+	// seconds since the last time the End-User was actively authenticated by
+	// the OP.
+	//
+	// https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+	Prompts() []Prompt
+
+	// Display optionally specifies how the Authorization Server displays the
+	// authentication and consent user interface pages to the End-User.
+	//
+	// https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+	Display() Display
+
+	// UILocales optionally specifies End-User's preferred languages via
+	// language Tags, ordered by preference.
+	//
+	// https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+	UILocales() []language.Tag
+
+	// RequestClaims optionally requests that specific claims be returned using
+	// the claims parameter.
+	//
+	// https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter
+	RequestClaims() []byte
 }
 
 // St represents the oidc state used for oidc flows and implements the State interface.
@@ -131,6 +160,23 @@ type St struct {
 	// (authTime.IsZero()) then the id_token's auth_time claim must be after the
 	// specified time.
 	withMaxAge *maxAge
+
+	// withPrompts optionally defines a list of values that specifies whether
+	// the Authorization Server prompts the End-User for reauthentication and
+	// consent.
+	withPrompts []Prompt
+
+	// withDisplay optionally specifies how the Authorization Server displays the
+	// authentication and consent user interface pages to the End-User.
+	withDisplay Display
+
+	// withUILocales optionally specifies End-User's preferred languages via
+	// language Tags, ordered by preference.
+	withUILocales []language.Tag
+
+	// withRequestClaims optionally requests that specific claims be returned
+	// using the claims parameter.
+	withRequestClaims []byte
 }
 
 // ensure that St implements the State interface.
@@ -144,6 +190,10 @@ var _ State = (*St)(nil)
 //   * WithImplicit
 //   * WithPKCE
 //   * WithMaxAge
+//   * WithPrompts
+//   * WithDisplay
+//   * WithUILocales
+//   * WithRequestClaims
 func NewState(expireIn time.Duration, redirectURL string, opt ...Option) (*St, error) {
 	const op = "oidc.NewState"
 	opts := getStOpts(opt...)
@@ -167,14 +217,18 @@ func NewState(expireIn time.Duration, redirectURL string, opt ...Option) (*St, e
 
 	}
 	s := &St{
-		id:           id,
-		nonce:        nonce,
-		redirectURL:  redirectURL,
-		nowFunc:      opts.withNowFunc,
-		audiences:    opts.withAudiences,
-		scopes:       opts.withScopes,
-		withImplicit: opts.withImplicitFlow,
-		withVerifier: opts.withVerifier,
+		id:                id,
+		nonce:             nonce,
+		redirectURL:       redirectURL,
+		nowFunc:           opts.withNowFunc,
+		audiences:         opts.withAudiences,
+		scopes:            opts.withScopes,
+		withImplicit:      opts.withImplicitFlow,
+		withVerifier:      opts.withVerifier,
+		withPrompts:       opts.withPrompts,
+		withDisplay:       opts.withDisplay,
+		withUILocales:     opts.withUILocales,
+		withRequestClaims: opts.withRequestClaims,
 	}
 	s.expiration = s.now().Add(expireIn)
 	if opts.withMaxAge != nil {
@@ -190,17 +244,75 @@ func (s *St) ID() string { return s.id }
 // Nonce implements the State.Nonce() interface function.
 func (s *St) Nonce() string { return s.nonce }
 
-// Audiences implements the State.Audiences() interface function.
-func (s *St) Audiences() []string { return s.audiences }
+// Audiences implements the State.Audiences() interface function and returns a
+// copy of the audiences.
+func (s *St) Audiences() []string {
+	if s.audiences == nil {
+		return nil
+	}
+	cp := make([]string, len(s.audiences))
+	copy(cp, s.audiences)
+	return cp
+}
 
-// Scopes implements the State.Scopes() interface function.
-func (s *St) Scopes() []string { return s.scopes }
+// Scopes implements the State.Scopes() interface function and returns a copy of
+// the scopes.
+func (s *St) Scopes() []string {
+	if s.scopes == nil {
+		return nil
+	}
+	cp := make([]string, len(s.scopes))
+	copy(cp, s.scopes)
+	return cp
+}
 
 // RedirectURL implements the State.RedirectURL() interface function.
 func (s *St) RedirectURL() string { return s.redirectURL }
 
-// CodeVerifier implements the State.CodeVerifier() interface function.
-func (s *St) PKCEVerifier() CodeVerifier { return s.withVerifier }
+// PKCEVerifier implements the State.PKCEVerifier() interface function and
+// returns a copy of the CodeVerifier
+func (s *St) PKCEVerifier() CodeVerifier {
+	if s.withVerifier == nil {
+		return nil
+	}
+	return s.withVerifier.Copy()
+}
+
+// Prompts() implements the State.Prompts() interface function and returns a
+// copy of the prompts.
+func (s *St) Prompts() []Prompt {
+	if s.withPrompts == nil {
+		return nil
+	}
+	cp := make([]Prompt, len(s.withPrompts))
+	copy(cp, s.withPrompts)
+	return cp
+}
+
+// Display() implements the State.Display() interface function.
+func (s *St) Display() Display { return s.withDisplay }
+
+// UILocales() implements the State.UILocales() interface function and returns a
+// copy of the UILocales
+func (s *St) UILocales() []language.Tag {
+	if s.withUILocales == nil {
+		return nil
+	}
+	cp := make([]language.Tag, len(s.withUILocales))
+	copy(cp, s.withUILocales)
+	return cp
+}
+
+// RequestClaims() implements the State.RequestClaims() interface function
+// and returns a copy of the claims request.
+func (s *St) RequestClaims() []byte {
+	if s.withRequestClaims == nil {
+		return nil
+	}
+	cp := make([]byte, len(s.withRequestClaims))
+	copy(cp, s.withRequestClaims)
+	return cp
+}
 
 // MaxAge: when authAfter is not a zero value (authTime.IsZero()) then the
 // id_token's auth_time claim must be after the specified time.
@@ -258,12 +370,16 @@ type maxAge struct {
 
 // stOptions is the set of available options for St functions
 type stOptions struct {
-	withNowFunc      func() time.Time
-	withScopes       []string
-	withAudiences    []string
-	withImplicitFlow *implicitFlow
-	withVerifier     CodeVerifier
-	withMaxAge       *maxAge
+	withNowFunc       func() time.Time
+	withScopes        []string
+	withAudiences     []string
+	withImplicitFlow  *implicitFlow
+	withVerifier      CodeVerifier
+	withMaxAge        *maxAge
+	withPrompts       []Prompt
+	withDisplay       Display
+	withUILocales     []language.Tag
+	withRequestClaims []byte
 }
 
 // stDefaults is a handy way to get the defaults at runtime and during unit
@@ -352,6 +468,57 @@ func WithMaxAge(seconds uint) Option {
 			o.withMaxAge = &maxAge{
 				seconds: seconds,
 			}
+		}
+	}
+}
+
+// WithPrompts provides an optional list of values that specifies whether the
+// Authorization Server prompts the End-User for reauthentication and consent.
+//
+// See MaxAge() if wish to specify an allowable elapsed time in seconds since
+// the last time the End-User was actively authenticated by the OP.
+//
+// https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+func WithPrompts(prompts ...Prompt) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*stOptions); ok {
+			o.withPrompts = prompts
+		}
+	}
+}
+
+// WithDisplay optionally specifies how the Authorization Server displays the
+// authentication and consent user interface pages to the End-User.
+//
+// https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+func WithDisplay(d Display) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*stOptions); ok {
+			o.withDisplay = d
+		}
+	}
+}
+
+// WithUILocales optionally specifies End-User's preferred languages via
+// language Tags, ordered by preference.
+//
+// https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+func WithUILocales(locales ...language.Tag) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*stOptions); ok {
+			o.withUILocales = locales
+		}
+	}
+}
+
+// WithRequestClaims optionally requests that specific claims be returned using
+// the claims parameter.
+//
+// https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter
+func WithRequestClaims(json []byte) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*stOptions); ok {
+			o.withRequestClaims = json
 		}
 	}
 }
