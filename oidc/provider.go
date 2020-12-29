@@ -197,6 +197,9 @@ func (p *Provider) AuthURL(ctx context.Context, s State) (url string, e error) {
 	if len(s.RequestClaims()) > 0 {
 		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("claims", string(s.RequestClaims())))
 	}
+	if len(s.ACRValues()) > 0 {
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("acr_values", strings.Join(s.ACRValues(), " ")))
+	}
 	return oauth2Config.AuthCodeURL(s.ID(), authCodeOpts...), nil
 }
 

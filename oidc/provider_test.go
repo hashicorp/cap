@@ -170,6 +170,7 @@ func TestProvider_AuthURL(t *testing.T) {
 		WithPrompts(Login, Consent, SelectAccount),
 		WithUILocales(language.AmericanEnglish, language.Spanish),
 		WithRequestClaims([]byte(reqClaims)),
+		WithACRValues("phr", "phrh"),
 	)
 	require.NoError(t, err)
 
@@ -273,17 +274,18 @@ func TestProvider_AuthURL(t *testing.T) {
 			},
 			wantURL: func() string {
 				return fmt.Sprintf(
-					"%s/authorize?claims=%s&client_id=%s&display=%s&nonce=%s&prompt=%s&redirect_uri=%s&response_type=code&scope=openid+email+profile&state=%s&ui_locales=%s",
+					"%s/authorize?acr_values=%s&claims=%s&client_id=%s&display=%s&nonce=%s&prompt=%s&redirect_uri=%s&response_type=code&scope=openid+email+profile&state=%s&ui_locales=%s",
 					tp.Addr(),
-					// s.RequestClaims()
+					"phr+phrh", // s.ACRValues() encoded
+					// s.RequestClaims() encoded
 					`%0A%09%7B%0A%09%09%22id_token%22%3A%0A%09%09+%7B%0A%09%09++%22auth_time%22%3A+%7B%22essential%22%3A+true%7D%2C%0A%09%09++%22acr%22%3A+%7B%22values%22%3A+%5B%22urn%3Amace%3Aincommon%3Aiap%3Asilver%22%5D+%7D%0A%09%09+%7D%0A%09+++%7D%0A%09+++`,
 					clientID,
 					"wap", // s.Display()
 					allOptsState.Nonce(),
-					"login+consent+select_account", // s.Prompts()
+					"login+consent+select_account", // s.Prompts() encoded
 					redirectEncoded,
 					allOptsState.ID(),
-					"en-US+es", // s.UILocales()
+					"en-US+es", // s.UILocales() encoded
 				)
 			}(),
 		},

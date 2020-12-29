@@ -109,6 +109,19 @@ type State interface {
 	//
 	// https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter
 	RequestClaims() []byte
+
+	// ACRValues() optionally specifies the acr values that the Authorization
+	// Server is being requested to use for processing this Authentication
+	// Request, with the values appearing in order of preference.
+	//
+	// NOTE: Requested acr_values are not verified by the Provider.Exchange(...)
+	// or Provider.VerifyIDToken() functions, since the request/return values
+	// are determined by the provider's implementation. You'll need to verify
+	// the claims returned yourself based on values provided by you OIDC
+	// Provider's documentation.
+	//
+	// https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+	ACRValues() []string
 }
 
 // St represents the oidc state used for oidc flows and implements the State interface.
@@ -177,6 +190,11 @@ type St struct {
 	// withRequestClaims optionally requests that specific claims be returned
 	// using the claims parameter.
 	withRequestClaims []byte
+
+	// withACRValues() optionally specifies the acr values that the Authorization
+	// Server is being requested to use for processing this Authentication
+	// Request, with the values appearing in order of preference.
+	withACRValues []string
 }
 
 // ensure that St implements the State interface.
@@ -229,6 +247,7 @@ func NewState(expireIn time.Duration, redirectURL string, opt ...Option) (*St, e
 		withDisplay:       opts.withDisplay,
 		withUILocales:     opts.withUILocales,
 		withRequestClaims: opts.withRequestClaims,
+		withACRValues:     opts.withACRValues,
 	}
 	s.expiration = s.now().Add(expireIn)
 	if opts.withMaxAge != nil {
@@ -314,6 +333,17 @@ func (s *St) RequestClaims() []byte {
 	return cp
 }
 
+// ACRValues() implements the State.ARCValues() interface function and returns a
+// copy of the acr values
+func (s *St) ACRValues() []string {
+	if len(s.withACRValues) == 0 {
+		return nil
+	}
+	cp := make([]string, len(s.withACRValues))
+	copy(cp, s.withACRValues)
+	return cp
+}
+
 // MaxAge: when authAfter is not a zero value (authTime.IsZero()) then the
 // id_token's auth_time claim must be after the specified time.
 //
@@ -380,6 +410,7 @@ type stOptions struct {
 	withDisplay       Display
 	withUILocales     []language.Tag
 	withRequestClaims []byte
+	withACRValues     []string
 }
 
 // stDefaults is a handy way to get the defaults at runtime and during unit
@@ -519,6 +550,25 @@ func WithRequestClaims(json []byte) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*stOptions); ok {
 			o.withRequestClaims = json
+		}
+	}
+}
+
+// WithACRValues optionally specifies the acr values that the Authorization
+// Server is being requested to use for processing this Authentication
+// Request, with the values appearing in order of preference.
+//
+// NOTE: Requested acr_values are not verified by the Provider.Exchange(...)
+// or Provider.VerifyIDToken() functions, since the request/return values
+// are determined by the provider's implementation. You'll need to verify
+// the claims returned yourself based on values provided by you OIDC
+// Provider's documentation.
+//
+// https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+func WithACRValues(values ...string) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*stOptions); ok {
+			o.withACRValues = values
 		}
 	}
 }

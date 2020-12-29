@@ -260,3 +260,22 @@ func Test_WithRequestClaims(t *testing.T) {
 		assert.Equal(opts, testOpts)
 	})
 }
+
+func Test_WithACRValues(t *testing.T) {
+	t.Parallel()
+	t.Run("stOptions", func(t *testing.T) {
+		t.Parallel()
+		assert := assert.New(t)
+		opts := getStOpts()
+		testOpts := stDefaults()
+		assert.Equal(opts, testOpts)
+
+		// https://openid.net/specs/openid-connect-eap-acr-values-1_0.html#acrValues
+		opts = getStOpts(WithACRValues("phr", "phrh"))
+		testOpts = stDefaults()
+
+		testOpts.withACRValues = []string{"phr", "phrh"}
+
+		assert.Equal(opts, testOpts)
+	})
+}
