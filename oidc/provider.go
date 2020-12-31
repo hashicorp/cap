@@ -576,6 +576,12 @@ func (p *Provider) HTTPClient() (*http.Client, error) {
 		return nil, fmt.Errorf("%s: the provider's config is nil %w", op, ErrNilParameter)
 	}
 
+	// use the cleanhttp package to create a "pooled" transport that's better
+	// configured for requests that re-use the same provider host.  Among other
+	// things, this transport supports better concurrency when making requests
+	// to the same host.  On the downside, this transport can leak file
+	// descriptors over time, so we'll be sure to call
+	// client.CloseIdleConnections() in the Provider.Done() to stave that off.
 	tr := cleanhttp.DefaultPooledTransport()
 
 	if p.config.ProviderCA != "" {

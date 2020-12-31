@@ -292,6 +292,12 @@ func (p *TestProvider) HTTPClient() *http.Client {
 	p.t.Helper()
 	require := require.New(p.t)
 
+	// use the cleanhttp package to create a "pooled" transport that's better
+	// configured for requests that re-use the same provider host.  Among other
+	// things, this transport supports better concurrency when making requests
+	// to the same host.  On the downside, this transport can leak file
+	// descriptors over time, so we'll be sure to call
+	// client.CloseIdleConnections() in the TestProvider.Done() to stave that off.
 	tr := cleanhttp.DefaultPooledTransport()
 
 	certPool := x509.NewCertPool()
