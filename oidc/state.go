@@ -426,19 +426,6 @@ func getStOpts(opt ...Option) stOptions {
 	return opts
 }
 
-// ImplicitFlow indicates whether or not to use the implicit flow with form
-// post.  It should be noted that if your OIDC provider supports PKCE, then
-// use it over the implicit flow. Getting only an id_token for an implicit
-// flow is the default, but at times it's necessary to also request an
-// access_token, so includeAccessToken allows for those scenarios. It is
-// recommend to not request access_tokens during the implicit flow.  If you
-// need an access_token, then use the authorization code flows and if you
-// can't secure a client secret then use the authorization code flow with
-// PKCE.
-//
-// See: https://openid.net/specs/openid-connect-core-1_0.html#ImplicitFlowAuth
-// See: https://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html
-
 // WithImplicitFlow provides an option to use an OIDC implicit flow with form
 // post. It should be noted that if your OIDC provider supports PKCE, then use
 // it over the implicit flow.  Getting only an id_token is the default, and
@@ -448,20 +435,23 @@ func getStOpts(opt ...Option) stOptions {
 // an access_token, then use the authorization code flows.
 //
 // Option is valid for: St
+//
+// See: https://openid.net/specs/openid-connect-core-1_0.html#ImplicitFlowAuth
+// See: https://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html
 func WithImplicitFlow(args ...interface{}) Option {
-	withoutAccessToken := false
+	withAccessToken := false
 	for _, arg := range args {
 		switch arg := arg.(type) {
 		case bool:
 			if arg {
-				withoutAccessToken = true
+				withAccessToken = true
 			}
 		}
 	}
 	return func(o interface{}) {
 		if o, ok := o.(*stOptions); ok {
 			o.withImplicitFlow = &implicitFlow{
-				withAccessToken: withoutAccessToken,
+				withAccessToken: withAccessToken,
 			}
 		}
 	}
