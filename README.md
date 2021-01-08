@@ -11,7 +11,7 @@ contacting us at  security@hashicorp.com.
 ## Contributing
 
 Thank you for your interest in contributing! Please refer to
-[CONTRIBUTING.md](https://github.com/hashicorp/waypoint/blob/master/.github/CONTRIBUTING.md)
+[CONTRIBUTING.md](https://github.com/hashicorp/cap/blob/main/CONTRIBUTING.md)
 for guidance. 
 
 <hr>
