@@ -3,10 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"time"
+	"sync"
 
 	"github.com/hashicorp/cap/oidc"
-	"github.com/patrickmn/go-cache"
 )
 
 type extendedState struct {
@@ -15,12 +14,13 @@ type extendedState struct {
 }
 
 type stateCache struct {
-	c *cache.Cache
+	m sync.Mutex
+	c map[string]extendedState
 }
 
-func newStateCache(entryTimeout time.Duration, cleanupInterval time.Duration) *stateCache {
+func newStateCache() *stateCache {
 	return &stateCache{
-		c: cache.New(entryTimeout, cleanupInterval),
+		c: map[string]extendedState{},
 	}
 
 }
@@ -29,35 +29,34 @@ func newStateCache(entryTimeout time.Duration, cleanupInterval time.Duration) *s
 // before returning.
 func (sc *stateCache) Read(ctx context.Context, stateID string) (oidc.State, error) {
 	const op = "stateCache.Read"
-	if stateRaw, ok := sc.c.Get(stateID); ok {
-		if extended, ok := stateRaw.(*extendedState); ok {
-			return extended, nil
+	if s, ok := sc.c[stateID]; ok {
+		if s.IsExpired() {
+			delete(sc.c, stateID)
+			return nil, fmt.Errorf("%s: state %s not found", op, stateID)
 		}
-		return nil, fmt.Errorf("%s: not an extended state", op)
-
+		return s, nil
 	}
 	return nil, fmt.Errorf("%s: state %s not found", op, stateID)
 }
 
 func (sc *stateCache) Add(s oidc.State) {
-	extended := extendedState{State: s}
-	sc.c.SetDefault(s.ID(), &extended)
+	sc.c[s.ID()] = extendedState{State: s}
 }
 
 func (sc *stateCache) SetToken(id string, t oidc.Token) error {
 	const op = "stateCache.SetToken"
-	s, exp, ok := sc.c.GetWithExpiration(id)
-	if !ok {
-		return fmt.Errorf("%s: %s not found", op, id)
+	if s, ok := sc.c[id]; ok {
+		if s.IsExpired() {
+			delete(sc.c, id)
+			return fmt.Errorf("%s: state %s not found (expired)", op, id)
+		}
+		sc.c[id] = extendedState{State: s.State, t: t}
+		return nil
 	}
-	extended, ok := s.(*extendedState)
-	if !ok {
-		return fmt.Errorf("%s, not an extended state", op)
-	}
-	sc.c.Set(id, &extendedState{State: extended.State, t: t}, time.Until(exp))
-	return nil
+	return fmt.Errorf("%s: %s not found", op, id)
+
 }
 
 func (sc *stateCache) Delete(id string) {
-	sc.c.Delete(id)
+	delete(sc.c, id)
 }

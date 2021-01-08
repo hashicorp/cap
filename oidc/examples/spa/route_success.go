@@ -22,7 +22,7 @@ func SuccessHandler(ctx context.Context, sc *stateCache) http.HandlerFunc {
 			return
 		}
 		defer sc.Delete(stateID)
-		extended, ok := s.(*extendedState)
+		extended, ok := s.(extendedState)
 		if !ok {
 			err := fmt.Errorf("%s: not an extended state", op)
 			fmt.Fprint(os.Stderr, err)

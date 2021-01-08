@@ -89,7 +89,7 @@ func main() {
 	redirectURL := fmt.Sprintf("http://localhost:%s/callback", env[port].(string))
 	timeout := env[attemptExp].(time.Duration)
 
-	sc := newStateCache(env[attemptExp].(time.Duration), timeout)
+	sc := newStateCache()
 
 	pc, err := oidc.NewConfig(issuer, clientID, clientSecret, []oidc.Alg{oidc.RS256}, []string{redirectURL})
 	if err != nil {
