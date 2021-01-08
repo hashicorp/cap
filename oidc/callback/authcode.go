@@ -76,7 +76,7 @@ func AuthCode(ctx context.Context, p *oidc.Provider, rw StateReader, sFn Success
 			// the stateReadWriter didn't return the correct state for the key
 			// given... this is an internal sort of error on the part of the
 			// reader.
-			responseErr := fmt.Errorf("%s: authen state and response state are not equal: %w", op, oidc.ErrResponseStateInvalid)
+			responseErr := fmt.Errorf("%s: authentication state and response state are not equal: %w", op, oidc.ErrResponseStateInvalid)
 			eFn(reqState, nil, responseErr, w, req)
 			return
 		}
