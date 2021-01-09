@@ -182,6 +182,10 @@ func (p *Provider) AuthURL(ctx context.Context, s State) (url string, e error) {
 		for _, v := range s.Prompts() {
 			prompts = append(prompts, string(v))
 		}
+		prompts = strutils.RemoveDuplicatesStable(prompts, false)
+		if strutils.StrListContains(prompts, string(None)) && len(prompts) > 1 {
+			return "", fmt.Errorf(`%s: prompts (%s) includes "none" with other values: %w`, op, prompts, ErrInvalidParameter)
+		}
 		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("prompt", strings.Join(prompts, " ")))
 	}
 	if s.Display() != "" {

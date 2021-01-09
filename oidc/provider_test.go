@@ -197,6 +197,13 @@ func TestProvider_AuthURL(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	stWithBadPrompts, err := NewState(
+		1*time.Minute,
+		redirect,
+		WithPrompts(None, Login),
+	)
+	require.NoError(t, err)
+
 	type args struct {
 		ctx context.Context
 		s   State
@@ -386,6 +393,16 @@ func TestProvider_AuthURL(t *testing.T) {
 					id:    "s_1234567890",
 					nonce: "s_1234567890",
 				},
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidParameter,
+		},
+		{
+			name: "bad-prompts",
+			p:    p,
+			args: args{
+				ctx: ctx,
+				s:   stWithBadPrompts,
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidParameter,
