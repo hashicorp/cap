@@ -76,7 +76,7 @@ func NewHandler(ctx context.Context, p *oidc.Provider, r callback.StateReader) (
     if rw == nil {
         // handle error
     }
-    return func(w http.ResponseWriter, r *http.Request) {
+    return func(w http.ResponseWriter, req *http.Request) {
         state, err := rw.Read(ctx, req.FormValue("state"))
         if err != nil {
             // handle error
