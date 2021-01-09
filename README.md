@@ -37,7 +37,7 @@ pc, err := oidc.NewConfig(
     "your_client_id",
     "your_client_secret",
     []oidc.Alg{oidc.RS256},
-    []string{"http://your_redirect_url"},
+    []string{"https://your_redirect_url"},
 )
 if err != nil {
     // handle error
@@ -53,7 +53,7 @@ defer p.Done()
 
 // Create a State for a user's authorization code flow authentication attempt, 
 // with a 2 min timeout for  completion. 
-s, err := oidc.NewState(2 * time.Minute, "http://your_redirect_url")
+s, err := oidc.NewState(2 * time.Minute, "https://your_redirect_url")
 if err != nil {
     // handle error
 }
@@ -69,14 +69,14 @@ fmt.Println("open url to kick-off authentication: ", authURL)
 
 Create a http.Handler for OIDC authentication response redirects.
 ```go
-func NewHandler(ctx context.Context, p *oidc.Provider, rw callback.StateReader) (http.HandlerFunc, error)
+func NewHandler(ctx context.Context, p *oidc.Provider, r callback.StateReader) (http.HandlerFunc, error)
     if p == nil { 
         // handle error
     }
     if rw == nil {
         // handle error
     }
-    return func(w http.ResponseWriter, r *http.Request) {
+    return func(w http.ResponseWriter, req *http.Request) {
         state, err := rw.Read(ctx, req.FormValue("state"))
         if err != nil {
             // handle error
@@ -87,7 +87,7 @@ func NewHandler(ctx context.Context, p *oidc.Provider, rw callback.StateReader) 
             // handle error
         }
         var claims map[string]interface{}
-        if err := t.IDToken().Claims(&claims); err != nil {
+        if err := token.IDToken().Claims(&claims); err != nil {
             // handle error
         }
 
