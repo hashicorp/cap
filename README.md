@@ -98,8 +98,8 @@ func NewHandler(ctx context.Context, p *oidc.Provider, rw callback.StateReader) 
             // handle error
         }
         resp := struct {
-			IDTokenClaims  map[string]interface{}
-			UserInfoClaims map[string]interface{}
+		    IDTokenClaims  map[string]interface{}
+		    UserInfoClaims map[string]interface{}
 		}{claims, infoClaims}
 		enc := json.NewEncoder(w)
 		if err := enc.Encode(resp); err != nil {
