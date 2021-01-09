@@ -223,10 +223,7 @@ func (p *Provider) AuthURL(ctx context.Context, s State) (url string, e error) {
 // https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowTokenValidation)
 //
 // The id_token c_hash claim is verified when present.
-func (p *Provider) Exchange(
-	ctx context.Context, s State, authorizationState string,
-	authorizationCode string,
-) (*Tk, error) {
+func (p *Provider) Exchange(ctx context.Context, s State, authorizationState string, authorizationCode string) (*Tk, error) {
 	const op = "Provider.Exchange"
 	if p.config == nil {
 		return nil, fmt.Errorf("%s: provider config is nil: %w", op, ErrNilParameter)
