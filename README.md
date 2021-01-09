@@ -69,7 +69,7 @@ fmt.Println("open url to kick-off authentication: ", authURL)
 
 Create a http.Handler for OIDC authentication response redirects.
 ```go
-func NewHandler(ctx context.Context, p *oidc.Provider, rw callback.StateReader) (http.HandlerFunc, error)
+func NewHandler(ctx context.Context, p *oidc.Provider, r callback.StateReader) (http.HandlerFunc, error)
     if p == nil { 
         // handle error
     }
