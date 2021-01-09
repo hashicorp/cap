@@ -55,14 +55,17 @@ type State interface {
 	RedirectURL() string
 
 	// ImplicitFlow indicates whether or not to use the implicit flow with form
-	// post.  It should be noted that if your OIDC provider supports PKCE, then
-	// use it over the implicit flow. Getting only an id_token for an implicit
-	// flow is the default, but at times it's necessary to also request an
-	// access_token, so includeAccessToken allows for those scenarios. It is
-	// recommend to not request access_tokens during the implicit flow.  If you
-	// need an access_token, then use the authorization code flows and if you
-	// can't secure a client secret then use the authorization code flow with
-	// PKCE.
+	// post. Getting only an id_token for an implicit flow should be the
+	// default for implementations, but at times it's necessary to also request
+	// an access_token, so this function and the WithImplicitFlow(...) option
+	// allows for those scenarios. Overall, it is recommend to not request
+	// access_tokens during the implicit flow.  If you need an access_token,
+	// then use the authorization code flows and if you can't secure a client
+	// secret then use the authorization code flow with PKCE.
+	//
+	// The first returned bool represents if the implicit flow has been requested.
+	// The second returned bool represents if an access token has been requested
+	// during the implicit flow.
 	//
 	// See: https://openid.net/specs/openid-connect-core-1_0.html#ImplicitFlowAuth
 	// See: https://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html
@@ -356,11 +359,16 @@ func (s *St) MaxAge() (uint, time.Time) {
 }
 
 // ImplicitFlow indicates whether or not to use the implicit flow.  Getting
-// only an id_token for an implicit flow should be the default, but at times
-// it's necessary to also request an access_token, so includeAccessToken
-// allows for those scenarios. It is recommend to not request access_tokens
-// during the implicit flow.  If you need an access_token, then use the
-// authorization code flows.
+// only an id_token for an implicit flow is the default, but at times
+// it's necessary to also request an access_token, so this function and the
+// WithImplicitFlow(...) option allows for those scenarios. Overall, it is
+// recommend to not request access_tokens during the implicit flow.  If you need
+// an access_token, then use the authorization code flows and if you can't
+// secure a client secret then use the authorization code flow with PKCE.
+//
+// The first returned bool represents if the implicit flow has been requested.
+// The second returned bool represents if an access token has been requested
+// during the implicit flow.
 func (s *St) ImplicitFlow() (bool, bool) {
 	if s.withImplicit == nil {
 		return false, false
