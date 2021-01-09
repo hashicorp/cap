@@ -1,6 +1,6 @@
 package oidc
 
-// Display is a string values that specifies how the Authorization Server
+// Display is a string value that specifies how the Authorization Server
 // displays the authentication and consent user interface pages to the End-User.
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
