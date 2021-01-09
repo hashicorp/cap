@@ -526,8 +526,8 @@ func (p *Provider) verifyAudience(allowedAudiences, audienceClaim []string) erro
 	return nil
 }
 
-// convertError is only used to convert errors from the core-os library calls of:
-// provider.Exchange, verifier.Verify and provider.UserInfo
+// convertError is used to convert errors from the core-os and oauth2 library
+// calls of: provider.Exchange, verifier.Verify and provider.UserInfo
 func (p *Provider) convertError(e error) error {
 	switch {
 	case strings.Contains(e.Error(), "id token issued by a different provider"):
