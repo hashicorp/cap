@@ -87,7 +87,7 @@ func NewHandler(ctx context.Context, p *oidc.Provider, r callback.StateReader) (
             // handle error
         }
         var claims map[string]interface{}
-        if err := t.IDToken().Claims(&claims); err != nil {
+        if err := token.IDToken().Claims(&claims); err != nil {
             // handle error
         }
 
