@@ -618,13 +618,13 @@ func (p *Provider) HTTPClientContext(ctx context.Context) (context.Context, erro
 // loopback uris. Ref: https://tools.ietf.org/html/rfc8252#section-7.3
 func (p *Provider) validRedirect(uri string) error {
 	const op = "Provider.validRedirect"
+	if len(p.config.AllowedRedirectURLs) == 0 {
+		return nil
+	}
+
 	inputURI, err := url.Parse(uri)
 	if err != nil {
 		return fmt.Errorf("redirect URI %s is an invalid URI %s: %w", uri, err.Error(), ErrInvalidParameter)
-	}
-
-	if len(p.config.AllowedRedirectURLs) == 0 {
-		return nil
 	}
 
 	// if uri isn't a loopback, just string search the allowed list

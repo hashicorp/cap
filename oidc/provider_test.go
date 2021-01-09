@@ -1390,7 +1390,7 @@ func TestProvider_validRedirect(t *testing.T) {
 		{"https://[::1]:5000/x/y?r=42", []string{"a", "b", "https://[::1]:5000/x/y?r=43"}, ErrUnauthorizedRedirectURI},
 
 		// extra invalid
-		{"%%%%%%%%%%%", []string{}, ErrInvalidParameter},
+		{"%%%%%%%%%%%", []string{"%%%%%%%%%%%"}, ErrInvalidParameter},
 	}
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("uri=%q allowed=%#v", tt.uri, tt.allowed), func(t *testing.T) {
