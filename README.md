@@ -37,7 +37,7 @@ pc, err := oidc.NewConfig(
     "your_client_id",
     "your_client_secret",
     []oidc.Alg{oidc.RS256},
-    []string{"http://your_redirect_url"},
+    []string{"https://your_redirect_url"},
 )
 if err != nil {
     // handle error
