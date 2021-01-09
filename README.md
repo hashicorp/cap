@@ -53,7 +53,7 @@ defer p.Done()
 
 // Create a State for a user's authorization code flow authentication attempt, 
 // with a 2 min timeout for  completion. 
-s, err := oidc.NewState(2 * time.Minute, "http://your_redirect_url")
+s, err := oidc.NewState(2 * time.Minute, "https://your_redirect_url")
 if err != nil {
     // handle error
 }
