@@ -162,7 +162,7 @@ type St struct {
 
 	// withImplicit indicates whether or not to use the implicit flow.  Getting
 	// only an id_token for an implicit flow is the default. If an access_token
-	// is also required, then withImplicit.includeAccessToken will be true. It
+	// is also required, then withImplicit.withAccessToken will be true. It
 	// is recommend to not request access_tokens during the implicit flow.  If
 	// you need an access_token, then use the authorization code flows (with
 	// optional PKCE).
