@@ -64,7 +64,7 @@ func NewCodeVerifier() (*S256Verifier, error) {
 		verifier: data, // no need to encode it, since bas62.Random uses a limited set of characters.
 		method:   S256,
 	}
-	if v.challenge, err = CreateCodeChallenge(S256, v); err != nil {
+	if v.challenge, err = CreateCodeChallenge(v); err != nil {
 		return nil, fmt.Errorf("%s: unable to create code challenge: %w", op, err)
 	}
 	return v, nil
@@ -83,14 +83,14 @@ func (v *S256Verifier) Copy() CodeVerifier {
 	}
 }
 
-// CreateCodeChallenge creates a code challenge from the verifier, using the
-// specified challengeMethod. Supported ChallengeMethods: S256
+// CreateCodeChallenge creates a code challenge from the verifier. Supported
+// ChallengeMethods: S256
 //
 // See: https://tools.ietf.org/html/rfc7636#section-4.2
-func CreateCodeChallenge(method ChallengeMethod, v CodeVerifier) (string, error) {
+func CreateCodeChallenge(v CodeVerifier) (string, error) {
 	// currently, we only support S256
-	if method != S256 {
-		return "", fmt.Errorf("CreateCodeChallenge: %s is invalid: %w", method, ErrUnsupportedChallengeMethod)
+	if v.Method() != S256 {
+		return "", fmt.Errorf("CreateCodeChallenge: %s is invalid: %w", v.Method(), ErrUnsupportedChallengeMethod)
 	}
 	h := sha256.New()
 	_, _ = h.Write([]byte(v.Verifier())) // hash documents that Write will never return an Error
