@@ -1,5 +1,7 @@
 /*
-oidc is a package for writing OIDC Provider integrations using OIDC flows
+oidc is a package for writing clients that integrate with OIDC Providers using
+OIDC flows.
+
 
 Primary types provided by the package:
 

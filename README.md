@@ -17,7 +17,7 @@ for guidance.
 <hr>
 
 ### [`oidc package`](./oidc) 
- A package for writing OIDC Provider integrations. Primary types provided by the
+ A package for writing clients that integrate with OIDC Providers. Primary types provided by the
  package are: 
  1. State
  2. Token
