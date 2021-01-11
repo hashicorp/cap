@@ -235,7 +235,6 @@ func NewState(expireIn time.Duration, redirectURL string, opt ...Option) (*St, e
 	}
 	if opts.withVerifier != nil && opts.withImplicitFlow != nil {
 		return nil, fmt.Errorf("%s: requested both implicit flow and authorization code with PKCE: %w", op, ErrInvalidParameter)
-
 	}
 	s := &St{
 		id:                id,

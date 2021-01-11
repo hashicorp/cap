@@ -234,7 +234,6 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 	}
 	if s == nil {
 		return nil, fmt.Errorf("%s: state is nil: %w", op, ErrNilParameter)
-
 	}
 	if withImplicit, _ := s.ImplicitFlow(); withImplicit {
 		return nil, fmt.Errorf("%s: state (%s) should not be using the implicit flow: %w", op, s.ID(), ErrInvalidFlow)
