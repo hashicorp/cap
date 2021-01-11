@@ -29,6 +29,8 @@ func newStateCache() *stateCache {
 // before returning.
 func (sc *stateCache) Read(ctx context.Context, stateID string) (oidc.State, error) {
 	const op = "stateCache.Read"
+	sc.m.Lock()
+	defer sc.m.Unlock()
 	if s, ok := sc.c[stateID]; ok {
 		if s.IsExpired() {
 			delete(sc.c, stateID)
@@ -40,11 +42,15 @@ func (sc *stateCache) Read(ctx context.Context, stateID string) (oidc.State, err
 }
 
 func (sc *stateCache) Add(s oidc.State) {
+	sc.m.Lock()
+	defer sc.m.Unlock()
 	sc.c[s.ID()] = extendedState{State: s}
 }
 
 func (sc *stateCache) SetToken(id string, t oidc.Token) error {
 	const op = "stateCache.SetToken"
+	sc.m.Lock()
+	defer sc.m.Unlock()
 	if s, ok := sc.c[id]; ok {
 		if s.IsExpired() {
 			delete(sc.c, id)
@@ -58,5 +64,7 @@ func (sc *stateCache) SetToken(id string, t oidc.Token) error {
 }
 
 func (sc *stateCache) Delete(id string) {
+	sc.m.Lock()
+	defer sc.m.Unlock()
 	delete(sc.c, id)
 }
