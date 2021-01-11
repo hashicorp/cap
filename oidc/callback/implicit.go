@@ -86,7 +86,7 @@ func Implicit(ctx context.Context, p *oidc.Provider, rw StateReader, sFn Success
 			// the stateReadWriter didn't return the correct state for the key
 			// given... this is an internal sort of error on the part of the
 			// reader.
-			responseErr := fmt.Errorf("%s: authen state (%s) and response state (%s) are not equal: %w", op, state.ID(), reqState, oidc.ErrResponseStateInvalid)
+			responseErr := fmt.Errorf("%s: authen state (%s) and response state (%s) are not equal: %w", op, state.ID(), reqState, oidc.ErrInvalidResponseState)
 			eFn(reqState, nil, responseErr, w, req)
 			return
 		}

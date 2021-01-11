@@ -10,7 +10,7 @@ var (
 	ErrInvalidCACert              = errors.New("invalid CA certificate")
 	ErrInvalidIssuer              = errors.New("invalid issuer")
 	ErrExpiredState               = errors.New("state is expired")
-	ErrResponseStateInvalid       = errors.New("invalid response state")
+	ErrInvalidResponseState       = errors.New("invalid response state")
 	ErrInvalidSignature           = errors.New("invalid signature")
 	ErrInvalidSubject             = errors.New("invalid subject")
 	ErrInvalidAudience            = errors.New("invalid audience")
