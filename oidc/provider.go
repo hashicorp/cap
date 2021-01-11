@@ -627,13 +627,13 @@ func (p *Provider) validRedirect(uri string) error {
 
 	inputURI, err := url.Parse(uri)
 	if err != nil {
-		return fmt.Errorf("redirect URI %s is an invalid URI %s: %w", uri, err.Error(), ErrInvalidParameter)
+		return fmt.Errorf("%s: redirect URI %s is an invalid URI %s: %w", op, uri, err.Error(), ErrInvalidParameter)
 	}
 
 	// if uri isn't a loopback, just string search the allowed list
 	if !strutils.StrListContains([]string{"localhost", "127.0.0.1", "::1"}, inputURI.Hostname()) {
 		if !strutils.StrListContains(p.config.AllowedRedirectURLs, uri) {
-			return fmt.Errorf("redirect URI %s: %w", uri, ErrUnauthorizedRedirectURI)
+			return fmt.Errorf("%s: redirect URI %s: %w", op, uri, ErrUnauthorizedRedirectURI)
 		}
 	}
 
@@ -643,7 +643,7 @@ func (p *Provider) validRedirect(uri string) error {
 	for _, a := range p.config.AllowedRedirectURLs {
 		allowedURI, err := url.Parse(a)
 		if err != nil {
-			return fmt.Errorf("allowed redirect URI %s is an invalid URI %s: %w", allowedURI, err.Error(), ErrInvalidParameter)
+			return fmt.Errorf("%s: allowed redirect URI %s is an invalid URI %s: %w", op, allowedURI, err.Error(), ErrInvalidParameter)
 		}
 		allowedURI.Host = allowedURI.Hostname()
 
@@ -651,5 +651,5 @@ func (p *Provider) validRedirect(uri string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("redirect URI %s: %w", uri, ErrUnauthorizedRedirectURI)
+	return fmt.Errorf("%s: redirect URI %s: %w", op, uri, ErrUnauthorizedRedirectURI)
 }

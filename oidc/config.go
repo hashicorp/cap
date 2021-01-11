@@ -141,7 +141,7 @@ func (c *Config) Validate() error {
 			}
 		}
 		if len(invalidURLs) > 0 {
-			return fmt.Errorf("Invalid AllowedRedirectURLs provided %s: %w", strings.Join(invalidURLs, ", "), ErrInvalidParameter)
+			return fmt.Errorf("%s: Invalid AllowedRedirectURLs provided %s: %w", op, strings.Join(invalidURLs, ", "), ErrInvalidParameter)
 		}
 	}
 
