@@ -69,11 +69,17 @@ func main() {
 	useImplicit := flag.Bool("implicit", false, "use the implicit flow")
 	usePKCE := flag.Bool("pkce", false, "use the implicit flow")
 	maxAge := flag.Int("max-age", -1, "max age of user authentication")
+	scopes := flag.String("scopes", "", "comma separated list of additional scopes to requests")
 
 	flag.Parse()
 	if *useImplicit && *usePKCE {
 		fmt.Fprint(os.Stderr, "you can't request both: -implicit and -pkce")
 		return
+	}
+
+	optScopes := strings.Split(*scopes, ",")
+	for i := range optScopes {
+		optScopes[i] = strings.TrimSpace(optScopes[i])
 	}
 
 	env, err := envConfig(*useImplicit || *usePKCE)
@@ -123,6 +129,8 @@ func main() {
 	if *maxAge >= 0 {
 		stateOptions = append(stateOptions, oidc.WithMaxAge(uint(*maxAge)))
 	}
+
+	stateOptions = append(stateOptions, oidc.WithScopes(optScopes...))
 
 	s, err := oidc.NewState(env[attemptExp].(time.Duration), redirectURL, stateOptions...)
 	if err != nil {
