@@ -6,13 +6,20 @@ import (
 	"github.com/hashicorp/cap/oidc/internal/base62"
 )
 
-// defaultIDLength is the default length for generated IDs
-const defaultIDLength = 10
+// DefaultIDLength is the default length for generated IDs, which are used for
+// state and nonce parameters during OIDC flows.
+//
+// For ID length requirements see:
+// https://tools.ietf.org/html/rfc6749#section-10.10
+const DefaultIDLength = 20
 
 // NewID generates a ID with an optional prefix.   The ID generated is suitable
-// for a State's ID or Nonce. The ID length will be 10, unless an optional
-// prefix is provided which will add the prefix's length + an underscore.  The
-// WithPrefix option is supported.
+// for a State's ID or Nonce. The ID length will be DefaultIDLen, unless an
+// optional prefix is provided which will add the prefix's length + an
+// underscore.  The WithPrefix, WithLen options are supported.
+//
+// For ID length requirements see:
+// https://tools.ietf.org/html/rfc6749#section-10.10
 func NewID(opt ...Option) (string, error) {
 	const op = "NewID"
 	opts := getIDOpts(opt...)
@@ -38,7 +45,7 @@ type idOptions struct {
 // during unit tests.
 func idDefaults() idOptions {
 	return idOptions{
-		withLen: defaultIDLength,
+		withLen: DefaultIDLength,
 	}
 }
 

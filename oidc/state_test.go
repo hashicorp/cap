@@ -8,6 +8,7 @@ import (
 	"github.com/coreos/go-oidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/text/language"
 )
 
 func TestNewState(t *testing.T) {
@@ -17,6 +18,10 @@ func TestNewState(t *testing.T) {
 	testNow := func() time.Time {
 		return time.Now().Add(-1 * time.Minute)
 	}
+
+	testVerifier, err := NewCodeVerifier()
+	require.NoError(t, err)
+
 	tests := []struct {
 		name            string
 		expireIn        time.Duration
@@ -26,6 +31,7 @@ func TestNewState(t *testing.T) {
 		wantRedirectURL string
 		wantAudiences   []string
 		wantScopes      []string
+		wantVerifier    CodeVerifier
 		wantErr         bool
 		wantIsErr       error
 	}{
@@ -37,11 +43,13 @@ func TestNewState(t *testing.T) {
 				WithNow(testNow),
 				WithAudiences("bob", "alice"),
 				WithScopes("email", "profile"),
+				WithPKCE(testVerifier),
 			},
 			wantNowFunc:     testNow,
 			wantRedirectURL: "https://bob.com",
 			wantAudiences:   []string{"bob", "alice"},
 			wantScopes:      []string{oidc.ScopeOpenID, "email", "profile"},
+			wantVerifier:    testVerifier,
 		},
 		{
 			name:            "valid-no-opt",
@@ -76,6 +84,7 @@ func TestNewState(t *testing.T) {
 			assert.Equalf(got.RedirectURL(), tt.wantRedirectURL, "wanted \"%s\" but got \"%s\"", tt.wantRedirectURL, got.RedirectURL())
 			assert.Equalf(got.Audiences(), tt.wantAudiences, "wanted \"%s\" but got \"%s\"", tt.wantAudiences, got.Audiences())
 			assert.Equalf(got.Scopes(), tt.wantScopes, "wanted \"%s\" but got \"%s\"", tt.wantScopes, got.Scopes())
+			assert.Equalf(got.PKCEVerifier(), tt.wantVerifier, "wanted \"%s\" but got \"%s\"", tt.wantVerifier, got.PKCEVerifier())
 		})
 	}
 }
@@ -95,4 +104,178 @@ func TestState_IsExpired(t *testing.T) {
 		assert.True(s.IsExpired())
 	})
 
+}
+
+func Test_WithImplicit(t *testing.T) {
+	t.Parallel()
+	t.Run("stOptions", func(t *testing.T) {
+		t.Parallel()
+		assert := assert.New(t)
+		opts := getStOpts()
+		testOpts := stDefaults()
+		assert.Equal(opts, testOpts)
+
+		opts = getStOpts(WithImplicitFlow())
+		testOpts = stDefaults()
+		testOpts.withImplicitFlow = &implicitFlow{}
+		assert.Equal(opts, testOpts)
+
+		opts = getStOpts(WithImplicitFlow(true))
+		testOpts = stDefaults()
+		testOpts.withImplicitFlow = &implicitFlow{true}
+		assert.Equal(opts, testOpts)
+	})
+}
+
+func Test_WithPKCE(t *testing.T) {
+	t.Parallel()
+	t.Run("stOptions", func(t *testing.T) {
+		t.Parallel()
+		assert, require := assert.New(t), require.New(t)
+		opts := getStOpts()
+		testOpts := stDefaults()
+		assert.Equal(opts, testOpts)
+		assert.Nil(testOpts.withVerifier)
+
+		v, err := NewCodeVerifier()
+		require.NoError(err)
+		opts = getStOpts(WithPKCE(v))
+		testOpts = stDefaults()
+		testOpts.withVerifier = v
+		assert.Equal(opts, testOpts)
+	})
+}
+
+func Test_WithMaxAge(t *testing.T) {
+	t.Parallel()
+	t.Run("stOptions", func(t *testing.T) {
+		t.Parallel()
+		assert := assert.New(t)
+		opts := getStOpts()
+		testOpts := stDefaults()
+		assert.Equal(opts, testOpts)
+
+		opts = getStOpts(WithMaxAge(1))
+		testOpts = stDefaults()
+		// authAfter will be a zero value, since it's not set until the
+		// NewState() factory, when it can determine it's nowFunc
+		testOpts.withMaxAge = &maxAge{
+			seconds: 1,
+		}
+
+		assert.Equal(opts, testOpts)
+	})
+}
+
+func Test_WithPrompts(t *testing.T) {
+	t.Parallel()
+	t.Run("stOptions", func(t *testing.T) {
+		t.Parallel()
+		assert := assert.New(t)
+		opts := getStOpts()
+		testOpts := stDefaults()
+		assert.Equal(opts, testOpts)
+
+		opts = getStOpts(WithPrompts(Login, SelectAccount))
+		testOpts = stDefaults()
+
+		testOpts.withPrompts = []Prompt{
+			Login, SelectAccount,
+		}
+
+		assert.Equal(opts, testOpts)
+	})
+}
+
+func Test_WithDisplay(t *testing.T) {
+	t.Parallel()
+	t.Run("stOptions", func(t *testing.T) {
+		t.Parallel()
+		assert := assert.New(t)
+		opts := getStOpts()
+		testOpts := stDefaults()
+		assert.Equal(opts, testOpts)
+
+		opts = getStOpts(WithDisplay(WAP))
+		testOpts = stDefaults()
+
+		testOpts.withDisplay = WAP
+
+		assert.Equal(opts, testOpts)
+	})
+}
+
+func Test_WithUILocales(t *testing.T) {
+	t.Parallel()
+	t.Run("stOptions", func(t *testing.T) {
+		t.Parallel()
+		assert := assert.New(t)
+		opts := getStOpts()
+		testOpts := stDefaults()
+		assert.Equal(opts, testOpts)
+
+		opts = getStOpts(WithUILocales(language.AmericanEnglish, language.German))
+		testOpts = stDefaults()
+
+		testOpts.withUILocales = []language.Tag{
+			language.AmericanEnglish, language.German,
+		}
+
+		assert.Equal(opts, testOpts)
+	})
+}
+
+func Test_WithRequestClaims(t *testing.T) {
+	t.Parallel()
+	t.Run("stOptions", func(t *testing.T) {
+		t.Parallel()
+		assert := assert.New(t)
+		opts := getStOpts()
+		testOpts := stDefaults()
+		assert.Equal(opts, testOpts)
+
+		const reqClaims = `
+		{
+			"userinfo":
+			 {
+			  "given_name": {"essential": true},
+			  "nickname": null,
+			  "email": {"essential": true},
+			  "email_verified": {"essential": true},
+			  "picture": null,
+			  "http://example.info/claims/groups": null
+			 },
+			"id_token":
+			 {
+			  "auth_time": {"essential": true},
+			  "acr": {"values": ["urn:mace:incommon:iap:silver"] }
+			 }
+		   }
+		   `
+
+		opts = getStOpts(WithRequestClaims([]byte(reqClaims)))
+		testOpts = stDefaults()
+
+		testOpts.withRequestClaims = []byte(reqClaims)
+		assert.Equal(opts, testOpts)
+	})
+}
+
+func Test_WithACRValues(t *testing.T) {
+	t.Parallel()
+	t.Run("stOptions", func(t *testing.T) {
+		t.Parallel()
+		assert := assert.New(t)
+		opts := getStOpts()
+		testOpts := stDefaults()
+		assert.Equal(opts, testOpts)
+
+		// https://openid.net/specs/openid-connect-eap-acr-values-1_0.html#acrValues
+		opts = getStOpts(WithACRValues("phr", "phrh"))
+		testOpts = stDefaults()
+
+		testOpts.withACRValues = []string{"phr", "phrh"}
+
+		assert.Equal(opts, testOpts)
+	})
 }

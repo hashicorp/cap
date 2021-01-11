@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,11 +21,11 @@ import (
 
 // Provider provides integration with an OIDC provider.
 //  It's primary capabilities include:
-//   * Kicking off a user authentication (authorization code flow and implicit
-//     flow) with p.AuthURL(...)
+//   * Kicking off a user authentication via either the authorization code flow
+//     (with optional PKCE) or implicit flow via the URL from p.AuthURL(...)
 //
-//   * The authorization code flow by exchanging an auth code for tokens in
-//     p.Exchange(...)
+//   * The authorization code flow (with optional PKCE) by exchanging an auth
+//     code for tokens in p.Exchange(...)
 //
 //   * Verifying an id_token issued by a provider with p.VerifyIDToken(...)
 //
@@ -115,15 +116,12 @@ func (p *Provider) Done() {
 }
 
 // AuthURL will generate a URL the caller can use to kick off an OIDC
-// authorization code or an implicit flow with an IdP.  Providing a
-// WithImplicitFlow() option overrides the default authorization code default
-// flow.
+// authorization code (with optional PKCE) or an implicit flow with an IdP.
 //
 // See NewState() to create an oidc flow State with a valid ID and Nonce that
 // will uniquely identify the user's authentication attempt throughout the flow.
-func (p *Provider) AuthURL(ctx context.Context, s State, opt ...Option) (url string, e error) {
+func (p *Provider) AuthURL(ctx context.Context, s State) (url string, e error) {
 	const op = "Provider.AuthURL"
-	opts := getProviderOpts(opt...)
 	if s.ID() == "" {
 		return "", fmt.Errorf("%s: state id is empty: %w", op, ErrInvalidParameter)
 	}
@@ -132,6 +130,10 @@ func (p *Provider) AuthURL(ctx context.Context, s State, opt ...Option) (url str
 	}
 	if s.ID() == s.Nonce() {
 		return "", fmt.Errorf("%s: state id and nonce cannot be equal: %w", op, ErrInvalidParameter)
+	}
+	withImplicit, withImplicitAccessToken := s.ImplicitFlow()
+	if s.PKCEVerifier() != nil && withImplicit {
+		return "", fmt.Errorf("%s: state requests both implicit flow and authorization code with PKCE: %w", op, ErrInvalidParameter)
 	}
 	if s.RedirectURL() == "" {
 		return "", fmt.Errorf("%s: state redirect URL is empty: %w", op, ErrInvalidParameter)
@@ -162,12 +164,45 @@ func (p *Provider) AuthURL(ctx context.Context, s State, opt ...Option) (url str
 	authCodeOpts := []oauth2.AuthCodeOption{
 		oidc.Nonce(s.Nonce()),
 	}
-	if opts.withImplicitFlow != nil {
+	if withImplicit {
 		reqTokens := []string{"id_token"}
-		if !opts.withImplicitFlow.withoutAccessToken {
+		if withImplicitAccessToken {
 			reqTokens = append(reqTokens, "token")
 		}
 		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("response_mode", "form_post"), oauth2.SetAuthURLParam("response_type", strings.Join(reqTokens, " ")))
+	}
+	if s.PKCEVerifier() != nil {
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("code_challenge", s.PKCEVerifier().Challenge()), oauth2.SetAuthURLParam("code_challenge_method", string(s.PKCEVerifier().Method())))
+	}
+	if secs, exp := s.MaxAge(); !exp.IsZero() {
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("max_age", strconv.Itoa(int(secs))))
+	}
+	if len(s.Prompts()) > 0 {
+		prompts := make([]string, 0, len(s.Prompts()))
+		for _, v := range s.Prompts() {
+			prompts = append(prompts, string(v))
+		}
+		prompts = strutils.RemoveDuplicatesStable(prompts, false)
+		if strutils.StrListContains(prompts, string(None)) && len(prompts) > 1 {
+			return "", fmt.Errorf(`%s: prompts (%s) includes "none" with other values: %w`, op, prompts, ErrInvalidParameter)
+		}
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("prompt", strings.Join(prompts, " ")))
+	}
+	if s.Display() != "" {
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("display", string(s.Display())))
+	}
+	if len(s.UILocales()) > 0 {
+		locales := make([]string, 0, len(s.UILocales()))
+		for _, l := range s.UILocales() {
+			locales = append(locales, string(l.String()))
+		}
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("ui_locales", strings.Join(locales, " ")))
+	}
+	if len(s.RequestClaims()) > 0 {
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("claims", string(s.RequestClaims())))
+	}
+	if len(s.ACRValues()) > 0 {
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("acr_values", strings.Join(s.ACRValues(), " ")))
 	}
 	return oauth2Config.AuthCodeURL(s.ID(), authCodeOpts...), nil
 }
@@ -176,15 +211,19 @@ func (p *Provider) AuthURL(ctx context.Context, s State, opt ...Option) (url str
 // authorizationCode and authorizationState it received in an earlier successful
 // oidc authentication response.
 //
+// Exchange will use PKCE when the user's State specifies its use.
+//
 // It will also validate the authorizationState it receives against the
 // existing State for the user's oidc authentication flow.
 //
 // On success, the Token returned will include an IDToken and may
 // include an AccessToken and RefreshToken.
 //
-// See Provider.VerifyIDToken for info about id_token verification.
+// Any tokens returned will have been verified.
+// See: Provider.VerifyIDToken for info about id_token verification.
 //
-// The id_token at_hash claim is verified when present. (see
+// When present, the id_token at_hash claim is verified  against the
+// access_token. (see:
 // https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowTokenValidation)
 //
 // The id_token c_hash claim is verified when present.
@@ -192,6 +231,12 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 	const op = "Provider.Exchange"
 	if p.config == nil {
 		return nil, fmt.Errorf("%s: provider config is nil: %w", op, ErrNilParameter)
+	}
+	if s == nil {
+		return nil, fmt.Errorf("%s: state is nil: %w", op, ErrNilParameter)
+	}
+	if withImplicit, _ := s.ImplicitFlow(); withImplicit {
+		return nil, fmt.Errorf("%s: state (%s) should not be using the implicit flow: %w", op, s.ID(), ErrInvalidFlow)
 	}
 	if s.ID() != authorizationState {
 		return nil, fmt.Errorf("%s: authentication state and authorization state are not equal: %w", op, ErrInvalidParameter)
@@ -219,7 +264,6 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 	}
 	// Add the "openid" scope, which is a required scope for oidc flows
 	scopes = append([]string{oidc.ScopeOpenID}, scopes...)
-
 	var oauth2Config = oauth2.Config{
 		ClientID:     p.config.ClientID,
 		ClientSecret: string(p.config.ClientSecret),
@@ -227,8 +271,11 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 		Endpoint:     p.provider.Endpoint(),
 		Scopes:       scopes,
 	}
-
-	oauth2Token, err := oauth2Config.Exchange(oidcCtx, authorizationCode)
+	var authCodeOpts []oauth2.AuthCodeOption
+	if s.PKCEVerifier() != nil {
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("code_verifier", s.PKCEVerifier().Verifier()))
+	}
+	oauth2Token, err := oauth2Config.Exchange(oidcCtx, authorizationCode, authCodeOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to exchange auth code with provider: %w", op, p.convertError(err))
 	}
@@ -263,11 +310,21 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 }
 
 // UserInfo gets the UserInfo claims from the provider using the token produced
-// by the tokenSource.
-func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource, claims interface{}) error {
-	// TODO: make sure we follow the spec for validating the response.
-	// https://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponseValidation
+// by the tokenSource.  Only JSON user info responses are supported (signed JWT
+// responses are not).  The WithAudiences option is supported to specify
+// optional audiences to verify when the aud claim is present in the response.
+//
+//  It verifies:
+//   * sub (sub) is required and must match
+//   * issuer (iss) - if the iss claim is included in returned claims
+//   * audiences (aud) - if the aud claim is included in returned claims and
+//     WithAudiences option is provided.
+//
+// See: https://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse
+func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource, validSubject string, claims interface{}, opt ...Option) error {
 	const op = "Provider.UserInfo"
+	opts := getUserInfoOpts(opt...)
+
 	if tokenSource == nil {
 		return fmt.Errorf("%s: token source is nil: %w", op, ErrNilParameter)
 	}
@@ -284,13 +341,58 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource,
 
 	userinfo, err := p.provider.UserInfo(oidcCtx, tokenSource)
 	if err != nil {
-		return fmt.Errorf("%s: provider UserInfo request failed: %w", op, err)
+		return fmt.Errorf("%s: provider UserInfo request failed: %w", op, p.convertError(err))
 	}
+	type verifyClaims struct {
+		Sub string
+		Iss string
+		Aud []string
+	}
+	var vc verifyClaims
+	err = userinfo.Claims(&vc)
+	if err != nil {
+		return fmt.Errorf("%s: failed to parse claims for UserInfo verification: %w", op, err)
+	}
+	// Subject is required to match
+	if vc.Sub != validSubject {
+		return fmt.Errorf("%s: %w", op, ErrInvalidSubject)
+	}
+	// optional issuer check...
+	if vc.Iss != "" && vc.Iss != p.config.Issuer {
+		return fmt.Errorf("%s: %w", op, ErrInvalidIssuer)
+	}
+	// optional audiences check...
+	if len(opts.withAudiences) > 0 {
+		if err := p.verifyAudience(opts.withAudiences, vc.Aud); err != nil {
+			return fmt.Errorf("%s: %w", op, ErrInvalidAudience)
+		}
+	}
+
 	err = userinfo.Claims(&claims)
 	if err != nil {
 		return fmt.Errorf("%s: failed to get UserInfo claims: %w", op, err)
 	}
 	return nil
+}
+
+// userInfoOptions is the set of available options for the Provider.UserInfo
+// function
+type userInfoOptions struct {
+	withAudiences []string
+}
+
+// userInfoDefaults is a handy way to get the defaults at runtime and during unit
+// tests.
+func userInfoDefaults() userInfoOptions {
+	return userInfoOptions{}
+}
+
+// getUserInfoOpts gets the provider.UserInfo defaults and applies the opt
+// overrides passed in
+func getUserInfoOpts(opt ...Option) userInfoOptions {
+	opts := userInfoDefaults()
+	ApplyOpts(&opts, opt...)
+	return opts
 }
 
 // VerifyIDToken will verify the inbound IDToken and return its claims.
@@ -309,6 +411,8 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource,
 //     must equal the client id
 //   * when there is a single audience (aud) and it is not equal to the client
 //     id, then the authorized party (azp) must equal the client id
+//   * when max_age was requested, the auth_time claim is verified (with a leeway
+//     of 1 min)
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
 func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, s State, opt ...Option) (map[string]interface{}, error) {
@@ -360,18 +464,8 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, s State, opt ..
 	default:
 		audiences = p.config.Audiences
 	}
-	if len(audiences) > 0 {
-		found := false
-		for _, v := range audiences {
-			if strutils.StrListContains(oidcIDToken.Audience, v) {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			return nil, fmt.Errorf("%s: invalid id_token audiences: %w", op, ErrInvalidAudience)
-		}
+	if err := p.verifyAudience(audiences, oidcIDToken.Audience); err != nil {
+		return nil, fmt.Errorf("%s: invalid id_token audiences: %w", op, err)
 	}
 	if len(oidcIDToken.Audience) > 1 && !strutils.StrListContains(oidcIDToken.Audience, p.config.ClientID) {
 		return nil, fmt.Errorf("%s: invalid id_token: multiple audiences (%s) and one of them is not equal client_id (%s): %w", op, oidcIDToken.Audience, p.config.ClientID, ErrInvalidAudience)
@@ -401,9 +495,42 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, s State, opt ..
 			p.config.ClientID,
 			ErrInvalidAuthorizedParty)
 	}
+
+	if secs, authAfter := s.MaxAge(); !authAfter.IsZero() {
+		atClaim, ok := claims["auth_time"].(float64)
+		if !ok {
+			return nil, fmt.Errorf("%s: missing auth_time claim when max age was requested: %w", op, ErrMissingClaim)
+		}
+		authTime := time.Unix(int64(atClaim), 0)
+		if !authTime.Add(leeway).After(authAfter) {
+			return nil, fmt.Errorf("%s: auth_time (%s) is beyond max age (%d): %w", op, authTime, secs, ErrExpiredAuthTime)
+		}
+	}
+
 	return claims, nil
 }
 
+// verifyAudience simply verified that the aud claim against the allowed
+// audiences.
+func (p *Provider) verifyAudience(allowedAudiences, audienceClaim []string) error {
+	const op = "verifyAudiences"
+	if len(allowedAudiences) > 0 {
+		found := false
+		for _, v := range allowedAudiences {
+			if strutils.StrListContains(audienceClaim, v) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("%s: invalid id_token audiences: %w", op, ErrInvalidAudience)
+		}
+	}
+	return nil
+}
+
+// convertError is used to convert errors from the core-os and oauth2 library
+// calls of: provider.Exchange, verifier.Verify and provider.UserInfo
 func (p *Provider) convertError(e error) error {
 	switch {
 	case strings.Contains(e.Error(), "id token issued by a different provider"):
@@ -424,6 +551,8 @@ func (p *Provider) convertError(e error) error {
 		return fmt.Errorf("%s: %w", e.Error(), ErrInvalidJWKs)
 	case strings.Contains(e.Error(), "server response missing access_token"):
 		return fmt.Errorf("%s: %w", e.Error(), ErrMissingAccessToken)
+	case strings.Contains(e.Error(), "404 Not Found"):
+		return fmt.Errorf("%s: %w", e.Error(), ErrNotFound)
 	default:
 		return e
 	}
@@ -447,6 +576,12 @@ func (p *Provider) HTTPClient() (*http.Client, error) {
 		return nil, fmt.Errorf("%s: the provider's config is nil %w", op, ErrNilParameter)
 	}
 
+	// use the cleanhttp package to create a "pooled" transport that's better
+	// configured for requests that re-use the same provider host.  Among other
+	// things, this transport supports better concurrency when making requests
+	// to the same host.  On the downside, this transport can leak file
+	// descriptors over time, so we'll be sure to call
+	// client.CloseIdleConnections() in the Provider.Done() to stave that off.
 	tr := cleanhttp.DefaultPooledTransport()
 
 	if p.config.ProviderCA != "" {
@@ -486,15 +621,19 @@ func (p *Provider) HTTPClientContext(ctx context.Context) (context.Context, erro
 // loopback uris. Ref: https://tools.ietf.org/html/rfc8252#section-7.3
 func (p *Provider) validRedirect(uri string) error {
 	const op = "Provider.validRedirect"
+	if len(p.config.AllowedRedirectURLs) == 0 {
+		return nil
+	}
+
 	inputURI, err := url.Parse(uri)
 	if err != nil {
-		return fmt.Errorf("redirect URI %s is an invalid URI %s: %w", uri, err.Error(), ErrInvalidParameter)
+		return fmt.Errorf("%s: redirect URI %s is an invalid URI %s: %w", op, uri, err.Error(), ErrInvalidParameter)
 	}
 
 	// if uri isn't a loopback, just string search the allowed list
 	if !strutils.StrListContains([]string{"localhost", "127.0.0.1", "::1"}, inputURI.Hostname()) {
 		if !strutils.StrListContains(p.config.AllowedRedirectURLs, uri) {
-			return fmt.Errorf("redirect URI %s: %w", uri, ErrUnauthorizedRedirectURI)
+			return fmt.Errorf("%s: redirect URI %s: %w", op, uri, ErrUnauthorizedRedirectURI)
 		}
 	}
 
@@ -504,7 +643,7 @@ func (p *Provider) validRedirect(uri string) error {
 	for _, a := range p.config.AllowedRedirectURLs {
 		allowedURI, err := url.Parse(a)
 		if err != nil {
-			return fmt.Errorf("allowed redirect URI %s is an invalid URI %s: %w", allowedURI, err.Error(), ErrInvalidParameter)
+			return fmt.Errorf("%s: allowed redirect URI %s is an invalid URI %s: %w", op, allowedURI, err.Error(), ErrInvalidParameter)
 		}
 		allowedURI.Host = allowedURI.Hostname()
 
@@ -512,52 +651,5 @@ func (p *Provider) validRedirect(uri string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("redirect URI %s: %w", uri, ErrUnauthorizedRedirectURI)
-}
-
-type implicitFlow struct {
-	withoutAccessToken bool
-}
-
-// providerOptions is the set of available options
-type providerOptions struct {
-	withImplicitFlow *implicitFlow
-	withAudiences    []string
-}
-
-// getProviderDefaults is a handy way to get the defaults at runtime and
-// during unit tests.
-func providerDefaults() providerOptions {
-	return providerOptions{}
-}
-
-// getProviderOpts gets the defaults and applies the opt overrides passed
-// in.
-func getProviderOpts(opt ...Option) providerOptions {
-	opts := providerDefaults()
-	ApplyOpts(&opts, opt...)
-	return opts
-}
-
-// WithImplicitFlow provides an option to use an implicit flow for the auth URL
-// being requested. Getting an id_token and access_token is the default, and
-// optionally passing a true bool will prevent an access_token from being
-// requested during the flow.  Valid for: Provider
-func WithImplicitFlow(args ...interface{}) Option {
-	withoutAccessToken := false
-	for _, arg := range args {
-		switch arg := arg.(type) {
-		case bool:
-			if arg {
-				withoutAccessToken = true
-			}
-		}
-	}
-	return func(o interface{}) {
-		if o, ok := o.(*providerOptions); ok {
-			o.withImplicitFlow = &implicitFlow{
-				withoutAccessToken: withoutAccessToken,
-			}
-		}
-	}
+	return fmt.Errorf("%s: redirect URI %s: %w", op, uri, ErrUnauthorizedRedirectURI)
 }

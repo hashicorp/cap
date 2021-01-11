@@ -19,21 +19,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
+	"golang.org/x/text/language"
 )
-
-func TestWithImplicitFlow(t *testing.T) {
-	t.Parallel()
-	assert := assert.New(t)
-	opts := getProviderOpts(WithImplicitFlow())
-	testOpts := providerDefaults()
-	testOpts.withImplicitFlow = &implicitFlow{withoutAccessToken: false}
-	assert.Equal(opts, testOpts)
-
-	opts = getProviderOpts(WithImplicitFlow(true))
-	testOpts = providerDefaults()
-	testOpts.withImplicitFlow = &implicitFlow{withoutAccessToken: true}
-	assert.Equal(opts, testOpts)
-}
 
 // TestNewProvider does not repeat all the Config unit tests.  It just focuses
 // on the additional tests that are unique to creating a new provider.
@@ -165,18 +152,61 @@ func TestProvider_AuthURL(t *testing.T) {
 	validState, err := NewState(1*time.Second, redirect)
 	require.NoError(t, err)
 
+	const reqClaims = `
+	{
+		"id_token":
+		 {
+		  "auth_time": {"essential": true},
+		  "acr": {"values": ["urn:mace:incommon:iap:silver"] }
+		 }
+	   }
+	   `
 	allOptsState, err := NewState(
-		1*time.Second,
+		1*time.Minute,
 		redirect,
 		WithAudiences("state-override"),
 		WithScopes("email", "profile"),
+		WithDisplay(WAP),
+		WithPrompts(Login, Consent, SelectAccount),
+		WithUILocales(language.AmericanEnglish, language.Spanish),
+		WithRequestClaims([]byte(reqClaims)),
+		WithACRValues("phr", "phrh"),
+	)
+	require.NoError(t, err)
+
+	verifier, err := NewCodeVerifier()
+	require.NoError(t, err)
+	stWithPKCE, err := NewState(
+		1*time.Minute,
+		redirect,
+		WithPKCE(verifier),
+	)
+	require.NoError(t, err)
+
+	stWithImplicitNoAccessToken, err := NewState(
+		1*time.Minute,
+		redirect,
+		WithImplicitFlow(),
+	)
+	require.NoError(t, err)
+
+	stWithImplicitWithAccessToken, err := NewState(
+		1*time.Minute,
+		redirect,
+		WithImplicitFlow(true),
+	)
+	require.NoError(t, err)
+
+	stWithBadPrompts, err := NewState(
+		1*time.Minute,
+		redirect,
+		WithPrompts(None, Login),
 	)
 	require.NoError(t, err)
 
 	type args struct {
 		ctx context.Context
 		s   State
-		opt []Option
 	}
 	tests := []struct {
 		name      string
@@ -205,26 +235,45 @@ func TestProvider_AuthURL(t *testing.T) {
 			}(),
 		},
 		{
-			name: "valid-using-implicit-flow",
+			name: "valid-using-PKCE",
 			p:    p,
 			args: args{
 				ctx: ctx,
-				s:   validState,
-				opt: []Option{WithImplicitFlow()},
+				s:   stWithPKCE,
 			},
 			wantURL: func() string {
 				return fmt.Sprintf(
-					"%s/authorize?client_id=%s&nonce=%s&redirect_uri=%s&response_mode=form_post&response_type=id_token+token&scope=openid&state=%s",
+					"%s/authorize?client_id=%s&code_challenge=%s&code_challenge_method=%s&nonce=%s&redirect_uri=%s&response_type=code&scope=openid&state=%s",
 					tp.Addr(),
 					clientID,
-					validState.Nonce(),
+					stWithPKCE.PKCEVerifier().Challenge(),
+					stWithPKCE.PKCEVerifier().Method(),
+					stWithPKCE.Nonce(),
 					redirectEncoded,
-					validState.ID(),
+					stWithPKCE.ID(),
 				)
 			}(),
 		},
 		{
-			name: "valid-with-all-options-state",
+			name: "valid-using-implicit-flow",
+			p:    p,
+			args: args{
+				ctx: ctx,
+				s:   stWithImplicitNoAccessToken,
+			},
+			wantURL: func() string {
+				return fmt.Sprintf(
+					"%s/authorize?client_id=%s&nonce=%s&redirect_uri=%s&response_mode=form_post&response_type=id_token&scope=openid&state=%s",
+					tp.Addr(),
+					clientID,
+					stWithImplicitNoAccessToken.Nonce(),
+					redirectEncoded,
+					stWithImplicitNoAccessToken.ID(),
+				)
+			}(),
+		},
+		{
+			name: "valid-with-all-options-state-except-implicit",
 			p:    p,
 			args: args{
 				ctx: ctx,
@@ -232,12 +281,18 @@ func TestProvider_AuthURL(t *testing.T) {
 			},
 			wantURL: func() string {
 				return fmt.Sprintf(
-					"%s/authorize?client_id=%s&nonce=%s&redirect_uri=%s&response_type=code&scope=openid+email+profile&state=%s",
+					"%s/authorize?acr_values=%s&claims=%s&client_id=%s&display=%s&nonce=%s&prompt=%s&redirect_uri=%s&response_type=code&scope=openid+email+profile&state=%s&ui_locales=%s",
 					tp.Addr(),
+					"phr+phrh", // s.ACRValues() encoded
+					// s.RequestClaims() encoded
+					`%0A%09%7B%0A%09%09%22id_token%22%3A%0A%09%09+%7B%0A%09%09++%22auth_time%22%3A+%7B%22essential%22%3A+true%7D%2C%0A%09%09++%22acr%22%3A+%7B%22values%22%3A+%5B%22urn%3Amace%3Aincommon%3Aiap%3Asilver%22%5D+%7D%0A%09%09+%7D%0A%09+++%7D%0A%09+++`,
 					clientID,
+					"wap", // s.Display()
 					allOptsState.Nonce(),
+					"login+consent+select_account", // s.Prompts() encoded
 					redirectEncoded,
 					allOptsState.ID(),
+					"en-US+es", // s.UILocales() encoded
 				)
 			}(),
 		},
@@ -246,19 +301,64 @@ func TestProvider_AuthURL(t *testing.T) {
 			p:    p,
 			args: args{
 				ctx: ctx,
-				s:   validState,
-				opt: []Option{WithImplicitFlow(true)},
+				s:   stWithImplicitWithAccessToken,
 			},
 			wantURL: func() string {
 				return fmt.Sprintf(
-					"%s/authorize?client_id=%s&nonce=%s&redirect_uri=%s&response_mode=form_post&response_type=id_token&scope=openid&state=%s",
+					"%s/authorize?client_id=%s&nonce=%s&redirect_uri=%s&response_mode=form_post&response_type=id_token+token&scope=openid&state=%s",
 					tp.Addr(),
 					clientID,
-					validState.Nonce(),
+					stWithImplicitWithAccessToken.Nonce(),
 					redirectEncoded,
-					validState.ID(),
+					stWithImplicitWithAccessToken.ID(),
 				)
 			}(),
+		},
+		{
+			name: "implicit-and-PKCE",
+			p:    p,
+			args: args{
+				ctx: ctx,
+				s: &St{
+					id:           "s_1234567890",
+					nonce:        "s_abcdefghigcklmnop",
+					expiration:   time.Now().Add(1 * time.Minute),
+					redirectURL:  "http://locahost",
+					withImplicit: &implicitFlow{},
+					withVerifier: verifier,
+				},
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidParameter,
+		},
+		{
+			name: "empty-redirectURL",
+			p:    p,
+			args: args{
+				ctx: ctx,
+				s: &St{
+					id:         "s_1234567890",
+					nonce:      "s_abcdefghigcklmnop",
+					expiration: time.Now().Add(1 * time.Minute),
+				},
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidParameter,
+		},
+		{
+			name: "bad-redirectURL",
+			p:    p,
+			args: args{
+				ctx: ctx,
+				s: &St{
+					id:          "s_1234567890",
+					nonce:       "s_abcdefghigcklmnop",
+					expiration:  time.Now().Add(1 * time.Minute),
+					redirectURL: "%%%%%%%%%%%",
+				},
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidParameter,
 		},
 		{
 			name: "empty-state-nonce",
@@ -297,11 +397,21 @@ func TestProvider_AuthURL(t *testing.T) {
 			wantErr:   true,
 			wantIsErr: ErrInvalidParameter,
 		},
+		{
+			name: "bad-prompts",
+			p:    p,
+			args: args{
+				ctx: ctx,
+				s:   stWithBadPrompts,
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidParameter,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			gotURL, err := tt.p.AuthURL(tt.args.ctx, tt.args.s, tt.args.opt...)
+			gotURL, err := tt.p.AuthURL(tt.args.ctx, tt.args.s)
 			if tt.wantErr {
 				require.Error(err)
 				assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)
@@ -338,6 +448,15 @@ func TestProvider_Exchange(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	verifier, err := NewCodeVerifier()
+	require.NoError(t, err)
+	stWithPKCE, err := NewState(
+		1*time.Minute,
+		redirect,
+		WithPKCE(verifier),
+	)
+	require.NoError(t, err)
+
 	type args struct {
 		ctx               context.Context
 		s                 State
@@ -370,6 +489,17 @@ func TestProvider_Exchange(t *testing.T) {
 				ctx:               ctx,
 				s:                 allOptsState,
 				authState:         allOptsState.ID(),
+				authCode:          "test-code",
+				expectedAudiences: []string{"state-override"},
+			},
+		},
+		{
+			name: "PKCE",
+			p:    p,
+			args: args{
+				ctx:               ctx,
+				s:                 stWithPKCE,
+				authState:         stWithPKCE.ID(),
 				authCode:          "test-code",
 				expectedAudiences: []string{"state-override"},
 			},
@@ -413,6 +543,9 @@ func TestProvider_Exchange(t *testing.T) {
 			// default to the state's nonce...
 			if tt.args.s != nil {
 				tp.SetExpectedAuthNonce(tt.args.s.Nonce())
+				if tt.args.s.PKCEVerifier() != nil {
+					tp.SetPKCEVerifier(tt.args.s.PKCEVerifier())
+				}
 			}
 			if tt.args.expectedNonce != "" {
 				tp.SetExpectedAuthNonce(tt.args.expectedNonce)
@@ -477,7 +610,7 @@ func TestProvider_Exchange(t *testing.T) {
 }
 
 func TestHTTPClient(t *testing.T) {
-	// HTTPClientContext if mostly covered by other tests, but we need to make
+	// HTTPClient if mostly covered by other tests, but we need to make
 	// sure we handle nil configs and invalid CA certs
 	t.Parallel()
 	t.Run("nil-config", func(t *testing.T) {
@@ -498,6 +631,17 @@ func TestHTTPClient(t *testing.T) {
 		assert.Truef(t, errors.Is(err, ErrInvalidCACert), "wanted \"%s\" but got \"%s\"", ErrInvalidCACert, err)
 		assert.Empty(t, c)
 	})
+	t.Run("check-transport", func(t *testing.T) {
+		_, testCaPem := TestGenerateCA(t, []string{"localhost"})
+		p := &Provider{
+			config: &Config{
+				ProviderCA: testCaPem,
+			},
+		}
+		c, err := p.HTTPClient()
+		require.NoError(t, err)
+		assert.Equal(t, c.Transport, p.client.Transport)
+	})
 }
 
 func TestProvider_UserInfo(t *testing.T) {
@@ -510,17 +654,31 @@ func TestProvider_UserInfo(t *testing.T) {
 	tp.SetAllowedRedirectURIs([]string{redirect})
 	p := testNewProvider(t, clientID, clientSecret, redirect, tp)
 
+	defaultClaims := func() map[string]interface{} {
+		return map[string]interface{}{
+			"sub":           "alice@example.com",
+			"advisor":       "Faythe",
+			"dob":           "1978",
+			"friend":        "bob",
+			"nickname":      "A",
+			"nosy-neighbor": "Eve",
+		}
+	}
+	defaultSub := "alice@example.com"
 	type args struct {
 		tokenSource oauth2.TokenSource
 		claims      interface{}
+		sub         string
+		opt         []Option
 	}
 	tests := []struct {
-		name       string
-		p          *Provider
-		args       args
-		wantClaims interface{}
-		wantErr    bool
-		wantIsErr  error
+		name           string
+		p              *Provider
+		args           args
+		providerClaims map[string]interface{}
+		wantClaims     interface{}
+		wantErr        bool
+		wantIsErr      error
 	}{
 		{
 			name: "valid",
@@ -531,14 +689,69 @@ func TestProvider_UserInfo(t *testing.T) {
 					Expiry:      time.Now().Add(10 * time.Second),
 				}),
 				claims: &map[string]interface{}{},
+				sub:    defaultSub,
+				opt:    []Option{WithAudiences(clientID)},
 			},
-			wantClaims: &map[string]interface{}{
-				"advisor":       "Faythe",
-				"dob":           "1978",
-				"friend":        "bob",
-				"nickname":      "A",
-				"nosy-neighbor": "Eve",
+			providerClaims: func() map[string]interface{} {
+				c := defaultClaims()
+				c["iss"] = tp.Addr()
+				c["aud"] = []string{clientID}
+				return c
+			}(),
+			wantClaims: func() *map[string]interface{} {
+				c := defaultClaims()
+				c["iss"] = tp.Addr()
+				c["aud"] = []interface{}{clientID}
+				return &c
+			}(),
+		},
+		{
+			name: "invalid-audiences",
+			p:    p,
+			args: args{
+				tokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+					AccessToken: "dummy_access_token",
+					Expiry:      time.Now().Add(10 * time.Second),
+				}),
+				claims: &map[string]interface{}{},
+				sub:    defaultSub,
+				opt:    []Option{WithAudiences(tp.Addr())},
 			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidAudience,
+		},
+		{
+			name: "invalid-iss",
+			p:    p,
+			args: args{
+				tokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+					AccessToken: "dummy_access_token",
+					Expiry:      time.Now().Add(10 * time.Second),
+				}),
+				claims: &map[string]interface{}{},
+				sub:    defaultSub,
+			},
+			providerClaims: func() map[string]interface{} {
+				c := defaultClaims()
+				c["iss"] = "bad-issuer"
+				return c
+			}(),
+			wantErr:   true,
+			wantIsErr: ErrInvalidIssuer,
+		},
+		{
+			name: "invalid-sub",
+			p:    p,
+			args: args{
+				tokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+					AccessToken: "dummy_access_token",
+					Expiry:      time.Now().Add(10 * time.Second),
+				}),
+				claims: &map[string]interface{}{},
+				sub:    "nobody",
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidSubject,
 		},
 		{
 			name: "nil-tokensource",
@@ -580,7 +793,12 @@ func TestProvider_UserInfo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			err := p.UserInfo(ctx, tt.args.tokenSource, tt.args.claims)
+			if tt.providerClaims != nil {
+				current := tp.UserInfoReply()
+				tp.SetUserInfoReply(tt.providerClaims)
+				defer tp.SetUserInfoReply(current)
+			}
+			err := p.UserInfo(ctx, tt.args.tokenSource, tt.args.sub, tt.args.claims, tt.args.opt...)
 			if tt.wantErr {
 				require.Error(err)
 				assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)
@@ -599,9 +817,10 @@ func TestProvider_UserInfo(t *testing.T) {
 		})
 		tp.SetDisableUserInfo(true)
 		var claims interface{}
-		err := p.UserInfo(ctx, tokenSource, &claims)
+		err := p.UserInfo(ctx, tokenSource, "alice@example.com", &claims)
 		require.Error(err)
 		assert.Empty(claims)
+		assert.True(errors.Is(err, ErrNotFound))
 	})
 }
 
@@ -631,7 +850,6 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 	defaultState, err := NewState(1*time.Minute, "http://localhost")
 	require.NoError(t, err)
 	defaultClaims := func() map[string]interface{} {
-
 		return map[string]interface{}{
 			"sub":   "alice@bob.com",
 			"aud":   []string{clientID},
@@ -880,6 +1098,60 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			},
 		},
 		{
+			name: "valid-auth_time",
+			p:    defaultProvider,
+			args: args{
+				keys: defaultKeys,
+				claims: func() map[string]interface{} {
+					c := defaultClaims()
+					c["auth_time"] = float64(time.Now().Unix())
+					return c
+				}(),
+				state: func() State {
+					s, err := NewState(1*time.Minute, "http://localhost", WithMaxAge(60*60))
+					s.nonce = defaultState.nonce
+					require.NoError(t, err)
+					return s
+				}(),
+			},
+		},
+		{
+			name: "exp-auth_time",
+			p:    defaultProvider,
+			args: args{
+				keys: defaultKeys,
+				claims: func() map[string]interface{} {
+					c := defaultClaims()
+					c["auth_time"] = float64(time.Now().Add(-1 * time.Hour).Unix())
+					return c
+				}(),
+				state: func() State {
+					s, err := NewState(1*time.Minute, "http://localhost", WithMaxAge(1))
+					s.nonce = defaultState.nonce
+					require.NoError(t, err)
+					return s
+				}(),
+			},
+			wantErr:   true,
+			wantIsErr: ErrExpiredAuthTime,
+		},
+		{
+			name: "missing-auth_time",
+			p:    defaultProvider,
+			args: args{
+				keys:   defaultKeys,
+				claims: defaultClaims(),
+				state: func() State {
+					s, err := NewState(1*time.Minute, "http://localhost", WithMaxAge(1))
+					s.nonce = defaultState.nonce
+					require.NoError(t, err)
+					return s
+				}(),
+			},
+			wantErr:   true,
+			wantIsErr: ErrMissingClaim,
+		},
+		{
 			name: "valid-ES384",
 			p: func() *Provider {
 				p := testNewProvider(t, clientID, clientSecret, redirect, tp)
@@ -1123,9 +1395,9 @@ func TestProvider_validRedirect(t *testing.T) {
 		{"https://127.0.0.1:9000", []string{"a", "b", "https://127.0.0.1:5000"}, nil},
 		{"https://[::1]:9000", []string{"a", "b", "https://[::1]:5000"}, nil},
 		{"https://[::1]:9000/x/y?r=42", []string{"a", "b", "https://[::1]:5000/x/y?r=42"}, nil},
+		{"https://example.com", []string{}, nil},
 
 		// invalid
-		{"https://example.com", []string{}, ErrUnauthorizedRedirectURI},
 		{"http://example.com", []string{"a", "b", "https://example.com"}, ErrUnauthorizedRedirectURI},
 		{"https://example.com:9000", []string{"a", "b", "https://example.com:5000"}, ErrUnauthorizedRedirectURI},
 		{"https://[::2]:9000", []string{"a", "b", "https://[::2]:5000"}, ErrUnauthorizedRedirectURI},
@@ -1135,7 +1407,7 @@ func TestProvider_validRedirect(t *testing.T) {
 		{"https://[::1]:5000/x/y?r=42", []string{"a", "b", "https://[::1]:5000/x/y?r=43"}, ErrUnauthorizedRedirectURI},
 
 		// extra invalid
-		{"%%%%%%%%%%%", []string{}, ErrInvalidParameter},
+		{"%%%%%%%%%%%", []string{"%%%%%%%%%%%"}, ErrInvalidParameter},
 	}
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("uri=%q allowed=%#v", tt.uri, tt.allowed), func(t *testing.T) {
