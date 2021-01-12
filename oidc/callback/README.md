@@ -1,4 +1,5 @@
 # callback
+[![Go Reference](https://pkg.go.dev/badge/github.com/hashicorp/cap/oidc/callback.svg)](https://pkg.go.dev/github.com/hashicorp/cap/oidc/callback)
 
 The callback package includes handlers (http.HandlerFunc) which can be used
 for the callback leg an OIDC flow. Callback handlers for both the authorization

@@ -1,4 +1,5 @@
 # oidc
+[![Go Reference](https://pkg.go.dev/badge/github.com/hashicorp/cap/oidc.svg)](https://pkg.go.dev/github.com/hashicorp/cap/oidc)
 
 oidc is a package for writing clients that integrate with OIDC Providers using
 OIDC flows.
@@ -27,6 +28,7 @@ Primary types provided by the package:
   operation that raised the error, the kind of error, and any wrapped error
 
 #### [oidc.callback](callback/)
+[![Go Reference](https://pkg.go.dev/badge/github.com/hashicorp/cap/oidc/callback.svg)](https://pkg.go.dev/github.com/hashicorp/cap/oidc/callback)
  
 The callback package includes handlers (http.HandlerFunc) which can be used
 for the callback leg an OIDC flow. Callback handlers for both the authorization

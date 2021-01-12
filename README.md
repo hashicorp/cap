@@ -17,6 +17,8 @@ for guidance.
 <hr>
 
 ### [`oidc package`](./oidc) 
+[![Go Reference](https://pkg.go.dev/badge/github.com/hashicorp/cap/oidc.svg)](https://pkg.go.dev/github.com/hashicorp/cap/oidc)
+ 
  A package for writing clients that integrate with OIDC Providers. Primary types provided by the
  package are: 
  1. State
