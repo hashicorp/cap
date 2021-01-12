@@ -45,7 +45,13 @@ When submitting a pull request, please ensure:
    correct changelog sub-section. 
 1. You've followed the above guidelines for contributing to CAP.
 
-Once you open your PR, please allow us a couple of days to comment, request changes, or approve your PR. Thank you for your contribution!
+Once you open your PR, please allow us a couple of days to comment, request
+changes, or approve your PR.  Once a PR is created, please do not rebase your PR
+branch, since rebasing would make it more difficult to review requested PR
+changes. Accepted PR commits will be squashed into a single commit when
+they are merged. 
+
+Thank you for your contribution!
 
 ## Changelog
 
