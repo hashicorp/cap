@@ -283,16 +283,16 @@ func TestProvider_AuthURL(t *testing.T) {
 				return fmt.Sprintf(
 					"%s/authorize?acr_values=%s&claims=%s&client_id=%s&display=%s&nonce=%s&prompt=%s&redirect_uri=%s&response_type=code&scope=openid+email+profile&state=%s&ui_locales=%s",
 					tp.Addr(),
-					"phr+phrh", // s.ACRValues() encoded
-					// s.RequestClaims() encoded
+					"phr+phrh", // r.ACRValues() encoded
+					// r.RequestClaims() encoded
 					`%0A%09%7B%0A%09%09%22id_token%22%3A%0A%09%09+%7B%0A%09%09++%22auth_time%22%3A+%7B%22essential%22%3A+true%7D%2C%0A%09%09++%22acr%22%3A+%7B%22values%22%3A+%5B%22urn%3Amace%3Aincommon%3Aiap%3Asilver%22%5D+%7D%0A%09%09+%7D%0A%09+++%7D%0A%09+++`,
 					clientID,
-					"wap", // s.Display()
+					"wap", // r.Display()
 					allOptsRequest.Nonce(),
-					"login+consent+select_account", // s.Prompts() encoded
+					"login+consent+select_account", // r.Prompts() encoded
 					redirectEncoded,
 					allOptsRequest.State(),
-					"en-US+es", // s.UILocales() encoded
+					"en-US+es", // r.UILocales() encoded
 				)
 			}(),
 		},

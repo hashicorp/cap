@@ -59,7 +59,9 @@ func getIDOpts(opt ...Option) idOptions {
 
 // WithPrefix provides an optional prefix for an new ID.  When this options is
 // provided, NewID will prepend the prefix and an underscore to the new
-// identifier. Valid for: ID
+// identifier.
+//
+// Valid for: ID
 func WithPrefix(prefix string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*idOptions); ok {

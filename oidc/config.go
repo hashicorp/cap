@@ -203,7 +203,9 @@ func getConfigOpts(opt ...Option) configOptions {
 
 // WithProviderCA provides optional CA certs (PEM encoded) for the provider's
 // config.  These certs will can be used when making http requests to the
-// provider. Valid for: Config
+// provider.
+//
+// Valid for: Config
 //
 // See EncodeCertificates(...) to PEM encode a number of certs.
 func WithProviderCA(cert string) Option {

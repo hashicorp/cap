@@ -23,7 +23,7 @@ type SingleRequestReader struct {
 	Request oidc.Request
 }
 
-// Read() will return it's single-request if the state matches it's State(),
+// Read() will return it's single-request if the state matches it's Request.State(),
 // otherwise it returns an error of oidc.ErrNotFound. It satisfies the
 // RequestReader interface.  Read() is concurrently safe.
 func (sr *SingleRequestReader) Read(ctx context.Context, state string) (oidc.Request, error) {

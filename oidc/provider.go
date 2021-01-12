@@ -211,7 +211,7 @@ func (p *Provider) AuthURL(ctx context.Context, oidcRequest Request) (url string
 // authorizationCode and authorizationState it received in an earlier successful
 // oidc authentication response.
 //
-// Exchange will use PKCE when the user's State specifies its use.
+// Exchange will use PKCE when the user's oidc Request specifies its use.
 //
 // It will also validate the authorizationState it receives against the
 // existing Request for the user's oidc authentication flow.

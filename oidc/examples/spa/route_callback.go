@@ -10,30 +10,30 @@ import (
 	"github.com/hashicorp/cap/oidc/callback"
 )
 
-func CallbackHandler(ctx context.Context, p *oidc.Provider, sc *requestCache, withImplicit bool) (http.HandlerFunc, error) {
+func CallbackHandler(ctx context.Context, p *oidc.Provider, rc *requestCache, withImplicit bool) (http.HandlerFunc, error) {
 	if withImplicit {
-		c, err := callback.Implicit(ctx, p, sc, successFn(ctx, sc), failedFn(ctx, sc))
+		c, err := callback.Implicit(ctx, p, rc, successFn(ctx, rc), failedFn(ctx, rc))
 		if err != nil {
 			return nil, fmt.Errorf("CallbackHandler: %w", err)
 		}
 		return c, nil
 	}
-	c, err := callback.AuthCode(ctx, p, sc, successFn(ctx, sc), failedFn(ctx, sc))
+	c, err := callback.AuthCode(ctx, p, rc, successFn(ctx, rc), failedFn(ctx, rc))
 	if err != nil {
 		return nil, fmt.Errorf("CallbackHandler: %w", err)
 	}
 	return c, nil
 }
 
-func successFn(ctx context.Context, sc *requestCache) callback.SuccessResponseFunc {
+func successFn(ctx context.Context, rc *requestCache) callback.SuccessResponseFunc {
 	return func(state string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
-		oidcRequest, err := sc.Read(ctx, state)
+		oidcRequest, err := rc.Read(ctx, state)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error reading state during successful response: %s\n", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if err := sc.SetToken(oidcRequest.State(), t); err != nil {
+		if err := rc.SetToken(oidcRequest.State(), t); err != nil {
 			fmt.Fprintf(os.Stderr, "error updating state during successful response: %s\n", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -43,7 +43,7 @@ func successFn(ctx context.Context, sc *requestCache) callback.SuccessResponseFu
 	}
 }
 
-func failedFn(ctx context.Context, sc *requestCache) callback.ErrorResponseFunc {
+func failedFn(ctx context.Context, rc *requestCache) callback.ErrorResponseFunc {
 	const op = "failedFn"
 	return func(state string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
 		var responseErr error

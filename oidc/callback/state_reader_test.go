@@ -34,7 +34,7 @@ func TestSingleRequestReader_Read(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			s := &SingleRequestReader{
+			sr := &SingleRequestReader{
 				Request: tt.oidcRequest,
 			}
 			var state string
@@ -42,9 +42,9 @@ func TestSingleRequestReader_Read(t *testing.T) {
 			case tt.idOverride != "":
 				state = tt.idOverride
 			default:
-				state = s.Request.State()
+				state = sr.Request.State()
 			}
-			got, err := s.Read(ctx, state)
+			got, err := sr.Read(ctx, state)
 			if tt.wantErr {
 				require.Error(err)
 				assert.True(errors.Is(err, oidc.ErrNotFound))

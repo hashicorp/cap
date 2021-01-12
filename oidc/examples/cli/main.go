@@ -67,6 +67,7 @@ func envConfig(secretNotRequired bool) (map[string]interface{}, error) {
 
 func main() {
 	useImplicit := flag.Bool("implicit", false, "use the implicit flow")
+	implicitAccessToken := flag.Bool("implicit-access-token", false, "include the access_token in the implicit flow")
 	usePKCE := flag.Bool("pkce", false, "use the implicit flow")
 	maxAge := flag.Int("max-age", -1, "max age of user authentication")
 	scopes := flag.String("scopes", "", "comma separated list of additional scopes to requests")
@@ -115,8 +116,10 @@ func main() {
 
 	var requestOptions []oidc.Option
 	switch {
-	case *useImplicit:
+	case *useImplicit && !*implicitAccessToken:
 		requestOptions = append(requestOptions, oidc.WithImplicitFlow())
+	case *useImplicit && *implicitAccessToken:
+		requestOptions = append(requestOptions, oidc.WithImplicitFlow(true))
 	case *usePKCE:
 		v, err := oidc.NewCodeVerifier()
 		if err != nil {

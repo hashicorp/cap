@@ -200,7 +200,7 @@ type Req struct {
 	withACRValues []string
 }
 
-// ensure that St implements the Request interface.
+// ensure that Request implements the Request interface.
 var _ Request = (*Req)(nil)
 
 // NewRequest creates a new Request (*Req).
@@ -259,7 +259,7 @@ func NewRequest(expireIn time.Duration, redirectURL string, opt ...Option) (*Req
 	return r, nil
 }
 
-// ID implements the Request.State() interface function.
+// State implements the Request.State() interface function.
 func (r *Req) State() string { return r.state }
 
 // Nonce implements the Request.Nonce() interface function.
@@ -441,7 +441,7 @@ func getReqOpts(opt ...Option) rqOptions {
 // recommend to not request access_tokens during the implicit flow.  If you need
 // an access_token, then use the authorization code flows.
 //
-// Option is valid for: St
+// Option is valid for: Request
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#ImplicitFlowAuth
 // See: https://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html
@@ -467,7 +467,7 @@ func WithImplicitFlow(args ...interface{}) Option {
 // WithPKCE provides an option to use a CodeVerifier with the authorization
 // code flow with PKCE.  You cannot use WithImplicit and WithPKCE together.
 //
-// Option is valid for: St
+// Option is valid for: Request
 //
 // See: https://tools.ietf.org/html/rfc7636
 func WithPKCE(v CodeVerifier) Option {
@@ -485,7 +485,7 @@ func WithPKCE(v CodeVerifier) Option {
 // preferable to prompt=login, where you have no way to verify when an
 // authentication took place.
 //
-// Option is valid for: St
+// Option is valid for: Request
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
 func WithMaxAge(seconds uint) Option {
@@ -506,6 +506,8 @@ func WithMaxAge(seconds uint) Option {
 // See MaxAge() if wish to specify an allowable elapsed time in seconds since
 // the last time the End-User was actively authenticated by the OP.
 //
+// Option is valid for: Request
+//
 // https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
 func WithPrompts(prompts ...Prompt) Option {
 	return func(o interface{}) {
@@ -517,6 +519,8 @@ func WithPrompts(prompts ...Prompt) Option {
 
 // WithDisplay optionally specifies how the Authorization Server displays the
 // authentication and consent user interface pages to the End-User.
+//
+// Option is valid for: Request
 //
 // https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
 func WithDisplay(d Display) Option {
@@ -530,6 +534,8 @@ func WithDisplay(d Display) Option {
 // WithUILocales optionally specifies End-User's preferred languages via
 // language Tags, ordered by preference.
 //
+// Option is valid for: Request
+//
 // https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
 func WithUILocales(locales ...language.Tag) Option {
 	return func(o interface{}) {
@@ -541,6 +547,8 @@ func WithUILocales(locales ...language.Tag) Option {
 
 // WithRequestClaims optionally requests that specific claims be returned using
 // the claims parameter.
+//
+// Option is valid for: Request
 //
 // https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter
 func WithRequestClaims(json []byte) Option {
@@ -560,6 +568,8 @@ func WithRequestClaims(json []byte) Option {
 // are determined by the provider's implementation. You'll need to verify
 // the claims returned yourself based on values provided by you OIDC
 // Provider's documentation.
+//
+// Option is valid for: Request
 //
 // https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
 func WithACRValues(values ...string) Option {
