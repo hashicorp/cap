@@ -14,7 +14,7 @@ import (
 const DefaultIDLength = 20
 
 // NewID generates a ID with an optional prefix.   The ID generated is suitable
-// for a State's ID or Nonce. The ID length will be DefaultIDLen, unless an
+// for a Request's State or Nonce. The ID length will be DefaultIDLen, unless an
 // optional prefix is provided which will add the prefix's length + an
 // underscore.  The WithPrefix, WithLen options are supported.
 //

@@ -29,25 +29,25 @@ code flow (with optional PKCE) and the implicit flow are provided.
 	}
 	defer p.Done()
 
-	// Create a State for a user's authentication attempt that will use the
-	// authorization code flow.  (See NewState(...) using the WithPKCE and
-	// WithImplicit options for creating a State that uses those flows.)
+	// Create a Request for a user's authentication attempt that will use the
+	// authorization code flow.  (See NewRequest(...) using the WithPKCE and
+	// WithImplicit options for creating a Request that uses those flows.)
 	ttl := 2 * time.Minute
-    authCodeAttempt, err := oidc.NewState(ttl, "http://your_redirect_url/auth-code-callback")
+    authCodeAttempt, err := oidc.NewRequest(ttl, "http://your_redirect_url/auth-code-callback")
 	if err != nil {
 		// handle error
 	}
 
-	// Create a State for a user's authentication attempt using an implicit
+	// Create a Request for a user's authentication attempt using an implicit
 	// flow.
-    implicitAttempt, err := oidc.NewState(ttl, "http://your_redirect_url/implicit-callback")
+    implicitAttempt, err := oidc.NewRequest(ttl, "http://your_redirect_url/implicit-callback")
 	if err != nil {
 		// handle error
 	}
 
 	// A function to handle successful attempts from callback.
 	successFn := func(
-		stateID string,
+		state string,
 		t oidc.Token,
 		w http.ResponseWriter,
 		req *http.Request,
@@ -59,7 +59,7 @@ code flow (with optional PKCE) and the implicit flow are provided.
 
 	// A function to handle errors and failed attempts from **callback**.
 	errorFn := func(
-		stateID string,
+		state string,
 		r *callback.AuthenErrorResponse,
 		e error,
 		w http.ResponseWriter,
@@ -74,14 +74,14 @@ code flow (with optional PKCE) and the implicit flow are provided.
 	}
 
 	// create the authorization code callback and register it for use.
-    authCodeCallback, err := AuthCode(ctx, p, &SingleStateReader{State: authCodeAttempt}, successFn, errorFn)
+    authCodeCallback, err := AuthCode(ctx, p, &SingleRequestReader{Request: authCodeAttempt}, successFn, errorFn)
 	if err != nil {
 		// handle error
 	}
 	http.HandleFunc("/auth-code-callback", authCodeCallback)
 
 	// create an implicit flow callback and register it for use.
-    implicitCallback, err := Implicit(ctx, p, &SingleStateReader{State: implicitAttempt}, successFn, errorFn)
+    implicitCallback, err := Implicit(ctx, p, &SingleRequestReader{Request: implicitAttempt}, successFn, errorFn)
 	if err != nil {
 		// handle error
 	}

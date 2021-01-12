@@ -8,63 +8,63 @@ import (
 	"github.com/hashicorp/cap/oidc"
 )
 
-type extendedState struct {
-	oidc.State
+type extendedRequest struct {
+	oidc.Request
 	t oidc.Token
 }
 
-type stateCache struct {
+type requestCache struct {
 	m sync.Mutex
-	c map[string]extendedState
+	c map[string]extendedRequest
 }
 
-func newStateCache() *stateCache {
-	return &stateCache{
-		c: map[string]extendedState{},
+func newRequestCache() *requestCache {
+	return &requestCache{
+		c: map[string]extendedRequest{},
 	}
 
 }
 
 // Read implements the callback.StateReader interface and will delete the state
 // before returning.
-func (sc *stateCache) Read(ctx context.Context, stateID string) (oidc.State, error) {
-	const op = "stateCache.Read"
-	sc.m.Lock()
-	defer sc.m.Unlock()
-	if s, ok := sc.c[stateID]; ok {
-		if s.IsExpired() {
-			delete(sc.c, stateID)
-			return nil, fmt.Errorf("%s: state %s not found", op, stateID)
+func (rc *requestCache) Read(ctx context.Context, state string) (oidc.Request, error) {
+	const op = "requestCache.Read"
+	rc.m.Lock()
+	defer rc.m.Unlock()
+	if oidcRequest, ok := rc.c[state]; ok {
+		if oidcRequest.IsExpired() {
+			delete(rc.c, state)
+			return nil, fmt.Errorf("%s: state %s not found", op, state)
 		}
-		return s, nil
+		return oidcRequest, nil
 	}
-	return nil, fmt.Errorf("%s: state %s not found", op, stateID)
+	return nil, fmt.Errorf("%s: state %s not found", op, state)
 }
 
-func (sc *stateCache) Add(s oidc.State) {
-	sc.m.Lock()
-	defer sc.m.Unlock()
-	sc.c[s.ID()] = extendedState{State: s}
+func (rc *requestCache) Add(s oidc.Request) {
+	rc.m.Lock()
+	defer rc.m.Unlock()
+	rc.c[s.State()] = extendedRequest{Request: s}
 }
 
-func (sc *stateCache) SetToken(id string, t oidc.Token) error {
+func (rc *requestCache) SetToken(id string, t oidc.Token) error {
 	const op = "stateCache.SetToken"
-	sc.m.Lock()
-	defer sc.m.Unlock()
-	if s, ok := sc.c[id]; ok {
-		if s.IsExpired() {
-			delete(sc.c, id)
+	rc.m.Lock()
+	defer rc.m.Unlock()
+	if oidcRequest, ok := rc.c[id]; ok {
+		if oidcRequest.IsExpired() {
+			delete(rc.c, id)
 			return fmt.Errorf("%s: state %s not found (expired)", op, id)
 		}
-		sc.c[id] = extendedState{State: s.State, t: t}
+		rc.c[id] = extendedRequest{Request: oidcRequest.Request, t: t}
 		return nil
 	}
 	return fmt.Errorf("%s: %s not found", op, id)
 
 }
 
-func (sc *stateCache) Delete(id string) {
-	sc.m.Lock()
-	defer sc.m.Unlock()
-	delete(sc.c, id)
+func (rc *requestCache) Delete(id string) {
+	rc.m.Lock()
+	defer rc.m.Unlock()
+	delete(rc.c, id)
 }

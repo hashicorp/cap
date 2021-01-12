@@ -11,47 +11,47 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type testState struct {
-	*oidc.St
+type testRequest struct {
+	*oidc.Req
 }
 
-func newTestState() *testState {
-	s, _ := oidc.NewState(1*time.Minute, "http://whatever.com")
-	return &testState{s}
+func newTestRequest() *testRequest {
+	r, _ := oidc.NewRequest(1*time.Minute, "http://whatever.com")
+	return &testRequest{r}
 }
 
-func TestSingleStateReader_Read(t *testing.T) {
+func TestSingleRequestReader_Read(t *testing.T) {
 	ctx := context.Background()
 	tests := []struct {
-		name       string
-		state      oidc.State
-		idOverride string
-		wantErr    bool
+		name        string
+		oidcRequest oidc.Request
+		idOverride  string
+		wantErr     bool
 	}{
-		{"valid", newTestState(), "", false},
-		{"not-found", newTestState(), "not-found", true},
+		{"valid", newTestRequest(), "", false},
+		{"not-found", newTestRequest(), "not-found", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			s := &SingleStateReader{
-				State: tt.state,
+			s := &SingleRequestReader{
+				Request: tt.oidcRequest,
 			}
-			var id string
+			var state string
 			switch {
 			case tt.idOverride != "":
-				id = tt.idOverride
+				state = tt.idOverride
 			default:
-				id = s.State.ID()
+				state = s.Request.State()
 			}
-			got, err := s.Read(ctx, id)
+			got, err := s.Read(ctx, state)
 			if tt.wantErr {
 				require.Error(err)
 				assert.True(errors.Is(err, oidc.ErrNotFound))
 				return
 			}
 			require.NoError(err)
-			assert.Equal(tt.state, got)
+			assert.Equal(tt.oidcRequest, got)
 		})
 	}
 }

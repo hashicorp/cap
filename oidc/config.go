@@ -43,7 +43,7 @@ type Config struct {
 
 	// Scopes is a list of default oidc scopes to request of the provider. The
 	// required "oidc" scope is requested by default, and does not need to be
-	// part of this optional list. If a State has scopes, they will override
+	// part of this optional list. If a Request has scopes, they will override
 	// this configured list for a specific authentication attempt.
 	Scopes []string
 
@@ -66,7 +66,7 @@ type Config struct {
 
 	// AllowedRedirectURLs is a list of allowed URLs for the provider to
 	// redirect to after a user authenticates.  If AllowedRedirects is empty,
-	// the package will not check the State.RedirectURL() to see if it's
+	// the package will not check the Request.RedirectURL() to see if it's
 	// allowed, and the check will be left to the OIDC provider's /authorize
 	// endpoint.
 	AllowedRedirectURLs []string
@@ -74,7 +74,7 @@ type Config struct {
 	// Audiences is an optional default list of case-sensitive strings to use when
 	// verifying an id_token's "aud" claim (which is also a list) If provided,
 	// the audiences of an id_token must match one of the configured audiences.
-	// If a State has audiences, they will override this configured list for a
+	// If a Request has audiences, they will override this configured list for a
 	// specific authentication attempt.
 	Audiences []string
 

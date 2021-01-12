@@ -19,7 +19,7 @@ for guidance.
 ### [`oidc package`](./oidc) 
  A package for writing clients that integrate with OIDC Providers. Primary types provided by the
  package are: 
- 1. State
+ 1. Request
  2. Token
  3. Config
  4. Provider 
@@ -51,16 +51,16 @@ if err != nil {
 defer p.Done()
 
 
-// Create a State for a user's authorization code flow authentication attempt, 
+// Create a Request for a user's authorization code flow authentication attempt, 
 // with a 2 min timeout for  completion. 
-s, err := oidc.NewState(2 * time.Minute, "https://your_redirect_url")
+oidcRequest, err := oidc.NewRequest(2 * time.Minute, "https://your_redirect_url")
 if err != nil {
     // handle error
 }
 
 
 // Create an auth URL
-authURL, err := p.AuthURL(ctx, s)
+authURL, err := p.AuthURL(ctx, oidcRequest)
 if err != nil {
     // handle error
 }
@@ -69,7 +69,7 @@ fmt.Println("open url to kick-off authentication: ", authURL)
 
 Create a http.Handler for OIDC authentication response redirects.
 ```go
-func NewHandler(ctx context.Context, p *oidc.Provider, r callback.StateReader) (http.HandlerFunc, error)
+func NewHandler(ctx context.Context, p *oidc.Provider, r callback.RequestReader) (http.HandlerFunc, error)
     if p == nil { 
         // handle error
     }
@@ -77,12 +77,12 @@ func NewHandler(ctx context.Context, p *oidc.Provider, r callback.StateReader) (
         // handle error
     }
     return func(w http.ResponseWriter, req *http.Request) {
-        state, err := rw.Read(ctx, req.FormValue("state"))
+        oidcRequest, err := rw.Read(ctx, req.FormValue("state"))
         if err != nil {
             // handle error
         }
         // Exchange(...) will verify the tokens before returning. 
-        token, err := p.Exchange(ctx, state, req.FormValue("state"), req.FormValue("code"))
+        token, err := p.Exchange(ctx, oidcRequest, req.FormValue("state"), req.FormValue("code"))
         if err != nil {
             // handle error
         }

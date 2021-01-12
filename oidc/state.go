@@ -7,23 +7,23 @@ import (
 	"golang.org/x/text/language"
 )
 
-// State basically represents one OIDC authentication flow for a user. It
+// Request basically represents one OIDC authentication flow for a user. It
 // contains the data needed to uniquely represent that one-time flow across the
 // multiple interactions needed to complete the OIDC flow the user is
 // attempting.
 //
-// ID() is passed throughout the OIDC interactions to uniquely identify the
-// flow's state. The ID() and Nonce() cannot be equal, and will be used during
-// the OIDC flow to prevent CSRF and replay attacks (see the oidc spec for
-// specifics).
+// Request() is passed throughout the OIDC interactions to uniquely identify the
+// flow's request. The Request.State() and Request.Nonce() cannot be equal, and
+// will be used during the OIDC flow to prevent CSRF and replay attacks (see the
+// oidc spec for specifics).
 //
 // Audiences and Scopes are optional overrides of configured provider defaults
 // for specific authentication attempts
-type State interface {
-	// ID is a unique identifier and an opaque value used to maintain state
-	// between the oidc request and the callback. ID cannot equal the Nonce.
+type Request interface {
+	// State is a unique identifier and an opaque value used to maintain request
+	// between the oidc request and the callback. State cannot equal the Nonce.
 	// See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest.
-	ID() string
+	State() string
 
 	// Nonce is a unique nonce and a string value used to associate a Client
 	// session with an ID Token, and to mitigate replay attacks. Nonce cannot
@@ -32,21 +32,21 @@ type State interface {
 	// and https://openid.net/specs/openid-connect-core-1_0.html#NonceNotes.
 	Nonce() string
 
-	// IsExpired returns true if the state has expired. Implementations should
-	// support a time skew (perhaps StateExpirySkew) when checking expiration.
+	// IsExpired returns true if the request has expired. Implementations should
+	// support a time skew (perhaps RequestExpirySkew) when checking expiration.
 	IsExpired() bool
 
 	// Audiences is an specific authentication attempt's list of optional
 	// case-sensitive strings to use when verifying an id_token's "aud" claim
 	// (which is also a list). If provided, the audiences of an id_token must
-	// match one of the configured audiences.  If a State does not have
+	// match one of the configured audiences.  If a Request does not have
 	// audiences, then the configured list of default audiences will be used.
 	Audiences() []string
 
 	// Scopes is a specific authentication attempt's list of optional
 	// scopes to request of the provider. The required "oidc" scope is requested
 	// by default, and does not need to be part of this optional list. If a
-	// State does not have Scopes, then the configured list of default
+	// Request does not have Scopes, then the configured list of default
 	// requested scopes will be used.
 	Scopes() []string
 
@@ -127,16 +127,16 @@ type State interface {
 	ACRValues() []string
 }
 
-// St represents the oidc state used for oidc flows and implements the State interface.
-type St struct {
-	//	id is a unique identifier and an opaque value used to maintain state
+// Req represents the oidc request used for oidc flows and implements the Request interface.
+type Req struct {
+	//	state is a unique identifier and an opaque value used to maintain request
 	//	between the oidc request and the callback.
-	id string
+	state string
 
 	// nonce is a unique nonce and suitable for use as an oidc nonce.
 	nonce string
 
-	// Expiration is the expiration time for the State.
+	// Expiration is the expiration time for the Request.
 	expiration time.Time
 
 	// redirectURL is a URL where providers will redirect responses to
@@ -146,14 +146,14 @@ type St struct {
 	// scopes is a specific authentication attempt's list of optional
 	// scopes to request of the provider. The required "oidc" scope is requested
 	// by default, and does not need to be part of this optional list. If a
-	// State does not have Scopes, then the configured list of default
+	// Request does not have Scopes, then the configured list of default
 	// requested scopes will be used.
 	scopes []string
 
 	// audiences is an specific authentication attempt's list of optional
 	// case-sensitive strings to use when verifying an id_token's "aud" claim
 	// (which is also a list). If provided, the audiences of an id_token must
-	// match one of the configured audiences.  If a State does not have
+	// match one of the configured audiences.  If a Request does not have
 	// audiences, then the configured list of default audiences will be used.
 	audiences []string
 
@@ -200,10 +200,10 @@ type St struct {
 	withACRValues []string
 }
 
-// ensure that St implements the State interface.
-var _ State = (*St)(nil)
+// ensure that St implements the Request interface.
+var _ Request = (*Req)(nil)
 
-// NewState creates a new State (*St).
+// NewRequest creates a new Request (*Req).
 //  Supports the options:
 //   * WithNow
 //   * WithAudiences
@@ -215,20 +215,20 @@ var _ State = (*St)(nil)
 //   * WithDisplay
 //   * WithUILocales
 //   * WithRequestClaims
-func NewState(expireIn time.Duration, redirectURL string, opt ...Option) (*St, error) {
-	const op = "oidc.NewState"
-	opts := getStOpts(opt...)
+func NewRequest(expireIn time.Duration, redirectURL string, opt ...Option) (*Req, error) {
+	const op = "oidc.NewRequest"
+	opts := getReqOpts(opt...)
 	if redirectURL == "" {
 		return nil, fmt.Errorf("%s: redirect URL is empty: %w", op, ErrInvalidParameter)
 	}
 	nonce, err := NewID(WithPrefix("n"))
 	if err != nil {
-		return nil, fmt.Errorf("%s: unable to generate a state's nonce: %w", op, err)
+		return nil, fmt.Errorf("%s: unable to generate a request's nonce: %w", op, err)
 	}
 
 	id, err := NewID(WithPrefix("st"))
 	if err != nil {
-		return nil, fmt.Errorf("%s: unable to generate a state's id: %w", op, err)
+		return nil, fmt.Errorf("%s: unable to generate a request's id: %w", op, err)
 	}
 	if expireIn == 0 || expireIn < 0 {
 		return nil, fmt.Errorf("%s: expireIn not greater than zero: %w", op, ErrInvalidParameter)
@@ -236,8 +236,8 @@ func NewState(expireIn time.Duration, redirectURL string, opt ...Option) (*St, e
 	if opts.withVerifier != nil && opts.withImplicitFlow != nil {
 		return nil, fmt.Errorf("%s: requested both implicit flow and authorization code with PKCE: %w", op, ErrInvalidParameter)
 	}
-	s := &St{
-		id:                id,
+	r := &Req{
+		state:             id,
 		nonce:             nonce,
 		redirectURL:       redirectURL,
 		nowFunc:           opts.withNowFunc,
@@ -251,98 +251,98 @@ func NewState(expireIn time.Duration, redirectURL string, opt ...Option) (*St, e
 		withRequestClaims: opts.withRequestClaims,
 		withACRValues:     opts.withACRValues,
 	}
-	s.expiration = s.now().Add(expireIn)
+	r.expiration = r.now().Add(expireIn)
 	if opts.withMaxAge != nil {
-		opts.withMaxAge.authAfter = s.now().Add(time.Duration(-opts.withMaxAge.seconds) * time.Second)
-		s.withMaxAge = opts.withMaxAge
+		opts.withMaxAge.authAfter = r.now().Add(time.Duration(-opts.withMaxAge.seconds) * time.Second)
+		r.withMaxAge = opts.withMaxAge
 	}
-	return s, nil
+	return r, nil
 }
 
-// ID implements the State.ID() interface function.
-func (s *St) ID() string { return s.id }
+// ID implements the Request.State() interface function.
+func (r *Req) State() string { return r.state }
 
-// Nonce implements the State.Nonce() interface function.
-func (s *St) Nonce() string { return s.nonce }
+// Nonce implements the Request.Nonce() interface function.
+func (r *Req) Nonce() string { return r.nonce }
 
-// Audiences implements the State.Audiences() interface function and returns a
+// Audiences implements the Request.Audiences() interface function and returns a
 // copy of the audiences.
-func (s *St) Audiences() []string {
-	if s.audiences == nil {
+func (r *Req) Audiences() []string {
+	if r.audiences == nil {
 		return nil
 	}
-	cp := make([]string, len(s.audiences))
-	copy(cp, s.audiences)
+	cp := make([]string, len(r.audiences))
+	copy(cp, r.audiences)
 	return cp
 }
 
-// Scopes implements the State.Scopes() interface function and returns a copy of
+// Scopes implements the Request.Scopes() interface function and returns a copy of
 // the scopes.
-func (s *St) Scopes() []string {
-	if s.scopes == nil {
+func (r *Req) Scopes() []string {
+	if r.scopes == nil {
 		return nil
 	}
-	cp := make([]string, len(s.scopes))
-	copy(cp, s.scopes)
+	cp := make([]string, len(r.scopes))
+	copy(cp, r.scopes)
 	return cp
 }
 
-// RedirectURL implements the State.RedirectURL() interface function.
-func (s *St) RedirectURL() string { return s.redirectURL }
+// RedirectURL implements the Request.RedirectURL() interface function.
+func (r *Req) RedirectURL() string { return r.redirectURL }
 
-// PKCEVerifier implements the State.PKCEVerifier() interface function and
+// PKCEVerifier implements the Request.PKCEVerifier() interface function and
 // returns a copy of the CodeVerifier
-func (s *St) PKCEVerifier() CodeVerifier {
-	if s.withVerifier == nil {
+func (r *Req) PKCEVerifier() CodeVerifier {
+	if r.withVerifier == nil {
 		return nil
 	}
-	return s.withVerifier.Copy()
+	return r.withVerifier.Copy()
 }
 
-// Prompts() implements the State.Prompts() interface function and returns a
+// Prompts() implements the Request.Prompts() interface function and returns a
 // copy of the prompts.
-func (s *St) Prompts() []Prompt {
-	if s.withPrompts == nil {
+func (r *Req) Prompts() []Prompt {
+	if r.withPrompts == nil {
 		return nil
 	}
-	cp := make([]Prompt, len(s.withPrompts))
-	copy(cp, s.withPrompts)
+	cp := make([]Prompt, len(r.withPrompts))
+	copy(cp, r.withPrompts)
 	return cp
 }
 
-// Display() implements the State.Display() interface function.
-func (s *St) Display() Display { return s.withDisplay }
+// Display() implements the Request.Display() interface function.
+func (r *Req) Display() Display { return r.withDisplay }
 
-// UILocales() implements the State.UILocales() interface function and returns a
+// UILocales() implements the Request.UILocales() interface function and returns a
 // copy of the UILocales
-func (s *St) UILocales() []language.Tag {
-	if s.withUILocales == nil {
+func (r *Req) UILocales() []language.Tag {
+	if r.withUILocales == nil {
 		return nil
 	}
-	cp := make([]language.Tag, len(s.withUILocales))
-	copy(cp, s.withUILocales)
+	cp := make([]language.Tag, len(r.withUILocales))
+	copy(cp, r.withUILocales)
 	return cp
 }
 
-// RequestClaims() implements the State.RequestClaims() interface function
+// RequestClaims() implements the Request.RequestClaims() interface function
 // and returns a copy of the claims request.
-func (s *St) RequestClaims() []byte {
-	if s.withRequestClaims == nil {
+func (r *Req) RequestClaims() []byte {
+	if r.withRequestClaims == nil {
 		return nil
 	}
-	cp := make([]byte, len(s.withRequestClaims))
-	copy(cp, s.withRequestClaims)
+	cp := make([]byte, len(r.withRequestClaims))
+	copy(cp, r.withRequestClaims)
 	return cp
 }
 
-// ACRValues() implements the State.ARCValues() interface function and returns a
+// ACRValues() implements the Request.ARCValues() interface function and returns a
 // copy of the acr values
-func (s *St) ACRValues() []string {
-	if len(s.withACRValues) == 0 {
+func (r *Req) ACRValues() []string {
+	if len(r.withACRValues) == 0 {
 		return nil
 	}
-	cp := make([]string, len(s.withACRValues))
-	copy(cp, s.withACRValues)
+	cp := make([]string, len(r.withACRValues))
+	copy(cp, r.withACRValues)
 	return cp
 }
 
@@ -350,11 +350,11 @@ func (s *St) ACRValues() []string {
 // id_token's auth_time claim must be after the specified time.
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
-func (s *St) MaxAge() (uint, time.Time) {
-	if s.withMaxAge == nil {
+func (r *Req) MaxAge() (uint, time.Time) {
+	if r.withMaxAge == nil {
 		return 0, time.Time{}
 	}
-	return s.withMaxAge.seconds, s.withMaxAge.authAfter.Truncate(time.Second)
+	return r.withMaxAge.seconds, r.withMaxAge.authAfter.Truncate(time.Second)
 }
 
 // ImplicitFlow indicates whether or not to use the implicit flow.  Getting
@@ -368,30 +368,30 @@ func (s *St) MaxAge() (uint, time.Time) {
 // The first returned bool represents if the implicit flow has been requested.
 // The second returned bool represents if an access token has been requested
 // during the implicit flow.
-func (s *St) ImplicitFlow() (bool, bool) {
-	if s.withImplicit == nil {
+func (r *Req) ImplicitFlow() (bool, bool) {
+	if r.withImplicit == nil {
 		return false, false
 	}
 	switch {
-	case s.withImplicit.withAccessToken:
+	case r.withImplicit.withAccessToken:
 		return true, true
 	default:
 		return true, false
 	}
 }
 
-// StateExpirySkew defines a time skew when checking a State's expiration.
-const StateExpirySkew = 1 * time.Second
+// RequestExpirySkew defines a time skew when checking a Request's expiration.
+const RequestExpirySkew = 1 * time.Second
 
-// IsExpired returns true if the state has expired.
-func (s *St) IsExpired() bool {
-	return s.expiration.Before(time.Now().Add(StateExpirySkew))
+// IsExpired returns true if the request has expired.
+func (r *Req) IsExpired() bool {
+	return r.expiration.Before(time.Now().Add(RequestExpirySkew))
 }
 
 // now returns the current time using the optional timeFn
-func (s *St) now() time.Time {
-	if s.nowFunc != nil {
-		return s.nowFunc()
+func (r *Req) now() time.Time {
+	if r.nowFunc != nil {
+		return r.nowFunc()
 	}
 	return time.Now() // fallback to this default
 }
@@ -405,8 +405,8 @@ type maxAge struct {
 	authAfter time.Time
 }
 
-// stOptions is the set of available options for St functions
-type stOptions struct {
+// rqOptions is the set of available options for Req functions
+type rqOptions struct {
 	withNowFunc       func() time.Time
 	withScopes        []string
 	withAudiences     []string
@@ -420,15 +420,15 @@ type stOptions struct {
 	withACRValues     []string
 }
 
-// stDefaults is a handy way to get the defaults at runtime and during unit
+// reqDefaults is a handy way to get the defaults at runtime and during unit
 // tests.
-func stDefaults() stOptions {
-	return stOptions{}
+func reqDefaults() rqOptions {
+	return rqOptions{}
 }
 
-// getStateOpts gets the state defaults and applies the opt overrides passed in
-func getStOpts(opt ...Option) stOptions {
-	opts := stDefaults()
+// getReqOpts gets the request defaults and applies the opt overrides passed in
+func getReqOpts(opt ...Option) rqOptions {
+	opts := reqDefaults()
 	ApplyOpts(&opts, opt...)
 	return opts
 }
@@ -456,7 +456,7 @@ func WithImplicitFlow(args ...interface{}) Option {
 		}
 	}
 	return func(o interface{}) {
-		if o, ok := o.(*stOptions); ok {
+		if o, ok := o.(*rqOptions); ok {
 			o.withImplicitFlow = &implicitFlow{
 				withAccessToken: withAccessToken,
 			}
@@ -472,7 +472,7 @@ func WithImplicitFlow(args ...interface{}) Option {
 // See: https://tools.ietf.org/html/rfc7636
 func WithPKCE(v CodeVerifier) Option {
 	return func(o interface{}) {
-		if o, ok := o.(*stOptions); ok {
+		if o, ok := o.(*rqOptions); ok {
 			o.withVerifier = v
 		}
 	}
@@ -490,9 +490,9 @@ func WithPKCE(v CodeVerifier) Option {
 // See: https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
 func WithMaxAge(seconds uint) Option {
 	return func(o interface{}) {
-		if o, ok := o.(*stOptions); ok {
+		if o, ok := o.(*rqOptions); ok {
 			// authAfter will be a zero value, since it's not set until the
-			// NewState() factory, when it can determine it's nowFunc
+			// NewRequest() factory, when it can determine it's nowFunc
 			o.withMaxAge = &maxAge{
 				seconds: seconds,
 			}
@@ -509,7 +509,7 @@ func WithMaxAge(seconds uint) Option {
 // https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
 func WithPrompts(prompts ...Prompt) Option {
 	return func(o interface{}) {
-		if o, ok := o.(*stOptions); ok {
+		if o, ok := o.(*rqOptions); ok {
 			o.withPrompts = prompts
 		}
 	}
@@ -521,7 +521,7 @@ func WithPrompts(prompts ...Prompt) Option {
 // https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
 func WithDisplay(d Display) Option {
 	return func(o interface{}) {
-		if o, ok := o.(*stOptions); ok {
+		if o, ok := o.(*rqOptions); ok {
 			o.withDisplay = d
 		}
 	}
@@ -533,7 +533,7 @@ func WithDisplay(d Display) Option {
 // https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
 func WithUILocales(locales ...language.Tag) Option {
 	return func(o interface{}) {
-		if o, ok := o.(*stOptions); ok {
+		if o, ok := o.(*rqOptions); ok {
 			o.withUILocales = locales
 		}
 	}
@@ -545,7 +545,7 @@ func WithUILocales(locales ...language.Tag) Option {
 // https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter
 func WithRequestClaims(json []byte) Option {
 	return func(o interface{}) {
-		if o, ok := o.(*stOptions); ok {
+		if o, ok := o.(*rqOptions); ok {
 			o.withRequestClaims = json
 		}
 	}
@@ -564,7 +564,7 @@ func WithRequestClaims(json []byte) Option {
 // https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
 func WithACRValues(values ...string) Option {
 	return func(o interface{}) {
-		if o, ok := o.(*stOptions); ok {
+		if o, ok := o.(*rqOptions); ok {
 			o.withACRValues = values
 		}
 	}
