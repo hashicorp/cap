@@ -5,7 +5,7 @@ packages which enable support for OIDC, JWT Verification and Distributed Claims.
 
 **Please note**: We take security and our users' trust very seriously. If you 
 believe you have found a security issue, please [responsibly
-disclose](https://www.hashicorp.com/ security#vulnerability-reporting) by
+disclose](https://www.hashicorp.com/security#vulnerability-reporting) by
 contacting us at  security@hashicorp.com.
 
 ## Contributing
@@ -17,6 +17,8 @@ for guidance.
 <hr>
 
 ### [`oidc package`](./oidc) 
+[![Go Reference](https://pkg.go.dev/badge/github.com/hashicorp/cap/oidc.svg)](https://pkg.go.dev/github.com/hashicorp/cap/oidc)
+ 
  A package for writing clients that integrate with OIDC Providers. Primary types provided by the
  package are: 
  1. State
