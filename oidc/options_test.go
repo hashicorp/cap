@@ -32,7 +32,7 @@ func Test_WithNow(t *testing.T) {
 		testAssertEqualFunc(t, opts.withNowFunc, testNow, "now = %p,want %p", opts.withNowFunc, testNow)
 
 	})
-	t.Run("stOptions", func(t *testing.T) {
+	t.Run("reqOptions", func(t *testing.T) {
 		opts := getReqOpts(WithNow(testNow))
 		testOpts := reqDefaults()
 		testOpts.withNowFunc = testNow
@@ -54,7 +54,7 @@ func Test_WithAudiences(t *testing.T) {
 		testOpts.withAudiences = nil
 		assert.Equal(opts, testOpts)
 	})
-	t.Run("stOptions", func(t *testing.T) {
+	t.Run("reqOptions", func(t *testing.T) {
 		assert := assert.New(t)
 		opts := getReqOpts(WithAudiences("alice", "bob"))
 		testOpts := reqDefaults()
@@ -82,7 +82,7 @@ func Test_WithScopes(t *testing.T) {
 		testOpts.withScopes = []string{oidc.ScopeOpenID}
 		assert.Equal(opts, testOpts)
 	})
-	t.Run("stOptions", func(t *testing.T) {
+	t.Run("reqOptions", func(t *testing.T) {
 		t.Parallel()
 		assert := assert.New(t)
 		opts := getReqOpts(WithScopes("alice", "bob"))

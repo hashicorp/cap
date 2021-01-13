@@ -108,7 +108,7 @@ func TestRequest_IsExpired(t *testing.T) {
 
 func Test_WithImplicit(t *testing.T) {
 	t.Parallel()
-	t.Run("stOptions", func(t *testing.T) {
+	t.Run("reqOptions", func(t *testing.T) {
 		t.Parallel()
 		assert := assert.New(t)
 		opts := getReqOpts()
@@ -129,7 +129,7 @@ func Test_WithImplicit(t *testing.T) {
 
 func Test_WithPKCE(t *testing.T) {
 	t.Parallel()
-	t.Run("stOptions", func(t *testing.T) {
+	t.Run("reqOptions", func(t *testing.T) {
 		t.Parallel()
 		assert, require := assert.New(t), require.New(t)
 		opts := getReqOpts()
@@ -148,7 +148,7 @@ func Test_WithPKCE(t *testing.T) {
 
 func Test_WithMaxAge(t *testing.T) {
 	t.Parallel()
-	t.Run("stOptions", func(t *testing.T) {
+	t.Run("reqOptions", func(t *testing.T) {
 		t.Parallel()
 		assert := assert.New(t)
 		opts := getReqOpts()
@@ -169,7 +169,7 @@ func Test_WithMaxAge(t *testing.T) {
 
 func Test_WithPrompts(t *testing.T) {
 	t.Parallel()
-	t.Run("stOptions", func(t *testing.T) {
+	t.Run("reqOptions", func(t *testing.T) {
 		t.Parallel()
 		assert := assert.New(t)
 		opts := getReqOpts()
@@ -189,7 +189,7 @@ func Test_WithPrompts(t *testing.T) {
 
 func Test_WithDisplay(t *testing.T) {
 	t.Parallel()
-	t.Run("stOptions", func(t *testing.T) {
+	t.Run("reqOptions", func(t *testing.T) {
 		t.Parallel()
 		assert := assert.New(t)
 		opts := getReqOpts()
@@ -207,7 +207,7 @@ func Test_WithDisplay(t *testing.T) {
 
 func Test_WithUILocales(t *testing.T) {
 	t.Parallel()
-	t.Run("stOptions", func(t *testing.T) {
+	t.Run("reqOptions", func(t *testing.T) {
 		t.Parallel()
 		assert := assert.New(t)
 		opts := getReqOpts()
@@ -227,7 +227,7 @@ func Test_WithUILocales(t *testing.T) {
 
 func Test_WithRequestClaims(t *testing.T) {
 	t.Parallel()
-	t.Run("stOptions", func(t *testing.T) {
+	t.Run("reqOptions", func(t *testing.T) {
 		t.Parallel()
 		assert := assert.New(t)
 		opts := getReqOpts()
