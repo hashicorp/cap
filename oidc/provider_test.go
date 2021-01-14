@@ -169,35 +169,35 @@ func TestProvider_AuthURL(t *testing.T) {
 		WithDisplay(WAP),
 		WithPrompts(Login, Consent, SelectAccount),
 		WithUILocales(language.AmericanEnglish, language.Spanish),
-		WithRequestClaims([]byte(reqClaims)),
+		WithClaims([]byte(reqClaims)),
 		WithACRValues("phr", "phrh"),
 	)
 	require.NoError(t, err)
 
 	verifier, err := NewCodeVerifier()
 	require.NoError(t, err)
-	rqWithPKCE, err := NewRequest(
+	reqWithPKCE, err := NewRequest(
 		1*time.Minute,
 		redirect,
 		WithPKCE(verifier),
 	)
 	require.NoError(t, err)
 
-	rqWithImplicitNoAccessToken, err := NewRequest(
+	reqWithImplicitNoAccessToken, err := NewRequest(
 		1*time.Minute,
 		redirect,
 		WithImplicitFlow(),
 	)
 	require.NoError(t, err)
 
-	rqWithImplicitWithAccessToken, err := NewRequest(
+	reqWithImplicitWithAccessToken, err := NewRequest(
 		1*time.Minute,
 		redirect,
 		WithImplicitFlow(true),
 	)
 	require.NoError(t, err)
 
-	rqWithBadPrompts, err := NewRequest(
+	reqWithBadPrompts, err := NewRequest(
 		1*time.Minute,
 		redirect,
 		WithPrompts(None, Login),
@@ -239,18 +239,18 @@ func TestProvider_AuthURL(t *testing.T) {
 			p:    p,
 			args: args{
 				ctx:         ctx,
-				oidcRequest: rqWithPKCE,
+				oidcRequest: reqWithPKCE,
 			},
 			wantURL: func() string {
 				return fmt.Sprintf(
 					"%s/authorize?client_id=%s&code_challenge=%s&code_challenge_method=%s&nonce=%s&redirect_uri=%s&response_type=code&scope=openid&state=%s",
 					tp.Addr(),
 					clientID,
-					rqWithPKCE.PKCEVerifier().Challenge(),
-					rqWithPKCE.PKCEVerifier().Method(),
-					rqWithPKCE.Nonce(),
+					reqWithPKCE.PKCEVerifier().Challenge(),
+					reqWithPKCE.PKCEVerifier().Method(),
+					reqWithPKCE.Nonce(),
 					redirectEncoded,
-					rqWithPKCE.State(),
+					reqWithPKCE.State(),
 				)
 			}(),
 		},
@@ -259,16 +259,16 @@ func TestProvider_AuthURL(t *testing.T) {
 			p:    p,
 			args: args{
 				ctx:         ctx,
-				oidcRequest: rqWithImplicitNoAccessToken,
+				oidcRequest: reqWithImplicitNoAccessToken,
 			},
 			wantURL: func() string {
 				return fmt.Sprintf(
 					"%s/authorize?client_id=%s&nonce=%s&redirect_uri=%s&response_mode=form_post&response_type=id_token&scope=openid&state=%s",
 					tp.Addr(),
 					clientID,
-					rqWithImplicitNoAccessToken.Nonce(),
+					reqWithImplicitNoAccessToken.Nonce(),
 					redirectEncoded,
-					rqWithImplicitNoAccessToken.State(),
+					reqWithImplicitNoAccessToken.State(),
 				)
 			}(),
 		},
@@ -284,7 +284,7 @@ func TestProvider_AuthURL(t *testing.T) {
 					"%s/authorize?acr_values=%s&claims=%s&client_id=%s&display=%s&nonce=%s&prompt=%s&redirect_uri=%s&response_type=code&scope=openid+email+profile&state=%s&ui_locales=%s",
 					tp.Addr(),
 					"phr+phrh", // r.ACRValues() encoded
-					// r.RequestClaims() encoded
+					// r.Claims() encoded
 					`%0A%09%7B%0A%09%09%22id_token%22%3A%0A%09%09+%7B%0A%09%09++%22auth_time%22%3A+%7B%22essential%22%3A+true%7D%2C%0A%09%09++%22acr%22%3A+%7B%22values%22%3A+%5B%22urn%3Amace%3Aincommon%3Aiap%3Asilver%22%5D+%7D%0A%09%09+%7D%0A%09+++%7D%0A%09+++`,
 					clientID,
 					"wap", // r.Display()
@@ -301,16 +301,16 @@ func TestProvider_AuthURL(t *testing.T) {
 			p:    p,
 			args: args{
 				ctx:         ctx,
-				oidcRequest: rqWithImplicitWithAccessToken,
+				oidcRequest: reqWithImplicitWithAccessToken,
 			},
 			wantURL: func() string {
 				return fmt.Sprintf(
 					"%s/authorize?client_id=%s&nonce=%s&redirect_uri=%s&response_mode=form_post&response_type=id_token+token&scope=openid&state=%s",
 					tp.Addr(),
 					clientID,
-					rqWithImplicitWithAccessToken.Nonce(),
+					reqWithImplicitWithAccessToken.Nonce(),
 					redirectEncoded,
-					rqWithImplicitWithAccessToken.State(),
+					reqWithImplicitWithAccessToken.State(),
 				)
 			}(),
 		},
@@ -402,7 +402,7 @@ func TestProvider_AuthURL(t *testing.T) {
 			p:    p,
 			args: args{
 				ctx:         ctx,
-				oidcRequest: rqWithBadPrompts,
+				oidcRequest: reqWithBadPrompts,
 			},
 			wantErr:   true,
 			wantIsErr: ErrInvalidParameter,
@@ -450,7 +450,7 @@ func TestProvider_Exchange(t *testing.T) {
 
 	verifier, err := NewCodeVerifier()
 	require.NoError(t, err)
-	rqWithPKCE, err := NewRequest(
+	reqWithPKCE, err := NewRequest(
 		1*time.Minute,
 		redirect,
 		WithPKCE(verifier),
@@ -498,8 +498,8 @@ func TestProvider_Exchange(t *testing.T) {
 			p:    p,
 			args: args{
 				ctx:               ctx,
-				r:                 rqWithPKCE,
-				authRequest:       rqWithPKCE.State(),
+				r:                 reqWithPKCE,
+				authRequest:       reqWithPKCE.State(),
 				authCode:          "test-code",
 				expectedAudiences: []string{"state-override"},
 			},

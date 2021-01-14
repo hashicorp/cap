@@ -107,11 +107,11 @@ type Request interface {
 	// https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
 	UILocales() []language.Tag
 
-	// RequestClaims optionally requests that specific claims be returned using
+	// Claims optionally requests that specific claims be returned using
 	// the claims parameter.
 	//
 	// https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter
-	RequestClaims() []byte
+	Claims() []byte
 
 	// ACRValues() optionally specifies the acr values that the Authorization
 	// Server is being requested to use for processing this Authentication
@@ -190,9 +190,9 @@ type Req struct {
 	// language Tags, ordered by preference.
 	withUILocales []language.Tag
 
-	// withRequestClaims optionally requests that specific claims be returned
+	// withClaims optionally requests that specific claims be returned
 	// using the claims parameter.
-	withRequestClaims []byte
+	withClaims []byte
 
 	// withACRValues() optionally specifies the acr values that the Authorization
 	// Server is being requested to use for processing this Authentication
@@ -214,7 +214,7 @@ var _ Request = (*Req)(nil)
 //   * WithPrompts
 //   * WithDisplay
 //   * WithUILocales
-//   * WithRequestClaims
+//   * WithClaims
 func NewRequest(expireIn time.Duration, redirectURL string, opt ...Option) (*Req, error) {
 	const op = "oidc.NewRequest"
 	opts := getReqOpts(opt...)
@@ -237,19 +237,19 @@ func NewRequest(expireIn time.Duration, redirectURL string, opt ...Option) (*Req
 		return nil, fmt.Errorf("%s: requested both implicit flow and authorization code with PKCE: %w", op, ErrInvalidParameter)
 	}
 	r := &Req{
-		state:             id,
-		nonce:             nonce,
-		redirectURL:       redirectURL,
-		nowFunc:           opts.withNowFunc,
-		audiences:         opts.withAudiences,
-		scopes:            opts.withScopes,
-		withImplicit:      opts.withImplicitFlow,
-		withVerifier:      opts.withVerifier,
-		withPrompts:       opts.withPrompts,
-		withDisplay:       opts.withDisplay,
-		withUILocales:     opts.withUILocales,
-		withRequestClaims: opts.withRequestClaims,
-		withACRValues:     opts.withACRValues,
+		state:         id,
+		nonce:         nonce,
+		redirectURL:   redirectURL,
+		nowFunc:       opts.withNowFunc,
+		audiences:     opts.withAudiences,
+		scopes:        opts.withScopes,
+		withImplicit:  opts.withImplicitFlow,
+		withVerifier:  opts.withVerifier,
+		withPrompts:   opts.withPrompts,
+		withDisplay:   opts.withDisplay,
+		withUILocales: opts.withUILocales,
+		withClaims:    opts.withClaims,
+		withACRValues: opts.withACRValues,
 	}
 	r.expiration = r.now().Add(expireIn)
 	if opts.withMaxAge != nil {
@@ -324,14 +324,14 @@ func (r *Req) UILocales() []language.Tag {
 	return cp
 }
 
-// RequestClaims() implements the Request.RequestClaims() interface function
+// Claims() implements the Request.Claims() interface function
 // and returns a copy of the claims request.
-func (r *Req) RequestClaims() []byte {
-	if r.withRequestClaims == nil {
+func (r *Req) Claims() []byte {
+	if r.withClaims == nil {
 		return nil
 	}
-	cp := make([]byte, len(r.withRequestClaims))
-	copy(cp, r.withRequestClaims)
+	cp := make([]byte, len(r.withClaims))
+	copy(cp, r.withClaims)
 	return cp
 }
 
@@ -405,29 +405,29 @@ type maxAge struct {
 	authAfter time.Time
 }
 
-// rqOptions is the set of available options for Req functions
-type rqOptions struct {
-	withNowFunc       func() time.Time
-	withScopes        []string
-	withAudiences     []string
-	withImplicitFlow  *implicitFlow
-	withVerifier      CodeVerifier
-	withMaxAge        *maxAge
-	withPrompts       []Prompt
-	withDisplay       Display
-	withUILocales     []language.Tag
-	withRequestClaims []byte
-	withACRValues     []string
+// reqOptions is the set of available options for Req functions
+type reqOptions struct {
+	withNowFunc      func() time.Time
+	withScopes       []string
+	withAudiences    []string
+	withImplicitFlow *implicitFlow
+	withVerifier     CodeVerifier
+	withMaxAge       *maxAge
+	withPrompts      []Prompt
+	withDisplay      Display
+	withUILocales    []language.Tag
+	withClaims       []byte
+	withACRValues    []string
 }
 
 // reqDefaults is a handy way to get the defaults at runtime and during unit
 // tests.
-func reqDefaults() rqOptions {
-	return rqOptions{}
+func reqDefaults() reqOptions {
+	return reqOptions{}
 }
 
 // getReqOpts gets the request defaults and applies the opt overrides passed in
-func getReqOpts(opt ...Option) rqOptions {
+func getReqOpts(opt ...Option) reqOptions {
 	opts := reqDefaults()
 	ApplyOpts(&opts, opt...)
 	return opts
@@ -456,7 +456,7 @@ func WithImplicitFlow(args ...interface{}) Option {
 		}
 	}
 	return func(o interface{}) {
-		if o, ok := o.(*rqOptions); ok {
+		if o, ok := o.(*reqOptions); ok {
 			o.withImplicitFlow = &implicitFlow{
 				withAccessToken: withAccessToken,
 			}
@@ -472,7 +472,7 @@ func WithImplicitFlow(args ...interface{}) Option {
 // See: https://tools.ietf.org/html/rfc7636
 func WithPKCE(v CodeVerifier) Option {
 	return func(o interface{}) {
-		if o, ok := o.(*rqOptions); ok {
+		if o, ok := o.(*reqOptions); ok {
 			o.withVerifier = v
 		}
 	}
@@ -490,7 +490,7 @@ func WithPKCE(v CodeVerifier) Option {
 // See: https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
 func WithMaxAge(seconds uint) Option {
 	return func(o interface{}) {
-		if o, ok := o.(*rqOptions); ok {
+		if o, ok := o.(*reqOptions); ok {
 			// authAfter will be a zero value, since it's not set until the
 			// NewRequest() factory, when it can determine it's nowFunc
 			o.withMaxAge = &maxAge{
@@ -511,7 +511,7 @@ func WithMaxAge(seconds uint) Option {
 // https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
 func WithPrompts(prompts ...Prompt) Option {
 	return func(o interface{}) {
-		if o, ok := o.(*rqOptions); ok {
+		if o, ok := o.(*reqOptions); ok {
 			o.withPrompts = prompts
 		}
 	}
@@ -525,7 +525,7 @@ func WithPrompts(prompts ...Prompt) Option {
 // https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
 func WithDisplay(d Display) Option {
 	return func(o interface{}) {
-		if o, ok := o.(*rqOptions); ok {
+		if o, ok := o.(*reqOptions); ok {
 			o.withDisplay = d
 		}
 	}
@@ -539,22 +539,22 @@ func WithDisplay(d Display) Option {
 // https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
 func WithUILocales(locales ...language.Tag) Option {
 	return func(o interface{}) {
-		if o, ok := o.(*rqOptions); ok {
+		if o, ok := o.(*reqOptions); ok {
 			o.withUILocales = locales
 		}
 	}
 }
 
-// WithRequestClaims optionally requests that specific claims be returned using
+// WithClaims optionally requests that specific claims be returned using
 // the claims parameter.
 //
 // Option is valid for: Request
 //
 // https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter
-func WithRequestClaims(json []byte) Option {
+func WithClaims(json []byte) Option {
 	return func(o interface{}) {
-		if o, ok := o.(*rqOptions); ok {
-			o.withRequestClaims = json
+		if o, ok := o.(*reqOptions); ok {
+			o.withClaims = json
 		}
 	}
 }
@@ -574,7 +574,7 @@ func WithRequestClaims(json []byte) Option {
 // https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
 func WithACRValues(values ...string) Option {
 	return func(o interface{}) {
-		if o, ok := o.(*rqOptions); ok {
+		if o, ok := o.(*reqOptions); ok {
 			o.withACRValues = values
 		}
 	}

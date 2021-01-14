@@ -198,8 +198,8 @@ func (p *Provider) AuthURL(ctx context.Context, oidcRequest Request) (url string
 		}
 		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("ui_locales", strings.Join(locales, " ")))
 	}
-	if len(oidcRequest.RequestClaims()) > 0 {
-		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("claims", string(oidcRequest.RequestClaims())))
+	if len(oidcRequest.Claims()) > 0 {
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("claims", string(oidcRequest.Claims())))
 	}
 	if len(oidcRequest.ACRValues()) > 0 {
 		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("acr_values", strings.Join(oidcRequest.ACRValues(), " ")))

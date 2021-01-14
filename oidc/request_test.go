@@ -225,7 +225,7 @@ func Test_WithUILocales(t *testing.T) {
 	})
 }
 
-func Test_WithRequestClaims(t *testing.T) {
+func Test_WithClaims(t *testing.T) {
 	t.Parallel()
 	t.Run("reqOptions", func(t *testing.T) {
 		t.Parallel()
@@ -253,17 +253,17 @@ func Test_WithRequestClaims(t *testing.T) {
 		   }
 		   `
 
-		opts = getReqOpts(WithRequestClaims([]byte(reqClaims)))
+		opts = getReqOpts(WithClaims([]byte(reqClaims)))
 		testOpts = reqDefaults()
 
-		testOpts.withRequestClaims = []byte(reqClaims)
+		testOpts.withClaims = []byte(reqClaims)
 		assert.Equal(opts, testOpts)
 	})
 }
 
 func Test_WithACRValues(t *testing.T) {
 	t.Parallel()
-	t.Run("rqOptions", func(t *testing.T) {
+	t.Run("reqOptions", func(t *testing.T) {
 		t.Parallel()
 		assert := assert.New(t)
 		opts := getReqOpts()

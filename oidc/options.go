@@ -36,7 +36,7 @@ func WithNow(now func() time.Time) Option {
 			v.withNowFunc = now
 		case *tokenOptions:
 			v.withNowFunc = now
-		case *rqOptions:
+		case *reqOptions:
 			v.withNowFunc = now
 		}
 	}
@@ -55,7 +55,7 @@ func WithScopes(scopes ...string) Option {
 			// configOptions already has the oidc.ScopeOpenID in its defaults.
 			scopes = strutils.RemoveDuplicatesStable(scopes, false)
 			v.withScopes = append(v.withScopes, scopes...)
-		case *rqOptions:
+		case *reqOptions:
 			// need to prepend the oidc.ScopeOpenID
 			ts := append([]string{oidc.ScopeOpenID}, scopes...)
 			scopes = strutils.RemoveDuplicatesStable(ts, false)
@@ -76,7 +76,7 @@ func WithAudiences(auds ...string) Option {
 		switch v := o.(type) {
 		case *configOptions:
 			v.withAudiences = append(v.withAudiences, auds...)
-		case *rqOptions:
+		case *reqOptions:
 			v.withAudiences = append(v.withAudiences, auds...)
 		case *userInfoOptions:
 			v.withAudiences = append(v.withAudiences, auds...)
