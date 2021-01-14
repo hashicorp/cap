@@ -67,6 +67,7 @@ func envConfig(secretNotRequired bool) (map[string]interface{}, error) {
 
 func main() {
 	useImplicit := flag.Bool("implicit", false, "use the implicit flow")
+	implicitAccessToken := flag.Bool("implicit-access-token", false, "include the access_token in the implicit flow")
 	usePKCE := flag.Bool("pkce", false, "use the implicit flow")
 	maxAge := flag.Int("max-age", -1, "max age of user authentication")
 	scopes := flag.String("scopes", "", "comma separated list of additional scopes to requests")
@@ -113,26 +114,28 @@ func main() {
 	}
 	defer p.Done()
 
-	var stateOptions []oidc.Option
+	var requestOptions []oidc.Option
 	switch {
-	case *useImplicit:
-		stateOptions = append(stateOptions, oidc.WithImplicitFlow())
+	case *useImplicit && !*implicitAccessToken:
+		requestOptions = append(requestOptions, oidc.WithImplicitFlow())
+	case *useImplicit && *implicitAccessToken:
+		requestOptions = append(requestOptions, oidc.WithImplicitFlow(true))
 	case *usePKCE:
 		v, err := oidc.NewCodeVerifier()
 		if err != nil {
 			fmt.Fprint(os.Stderr, err.Error())
 			return
 		}
-		stateOptions = append(stateOptions, oidc.WithPKCE(v))
+		requestOptions = append(requestOptions, oidc.WithPKCE(v))
 	}
 
 	if *maxAge >= 0 {
-		stateOptions = append(stateOptions, oidc.WithMaxAge(uint(*maxAge)))
+		requestOptions = append(requestOptions, oidc.WithMaxAge(uint(*maxAge)))
 	}
 
-	stateOptions = append(stateOptions, oidc.WithScopes(optScopes...))
+	requestOptions = append(requestOptions, oidc.WithScopes(optScopes...))
 
-	s, err := oidc.NewState(env[attemptExp].(time.Duration), redirectURL, stateOptions...)
+	oidcRequest, err := oidc.NewRequest(env[attemptExp].(time.Duration), redirectURL, requestOptions...)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return
@@ -143,20 +146,20 @@ func main() {
 
 	var handler http.HandlerFunc
 	if *useImplicit {
-		handler, err = callback.Implicit(ctx, p, &callback.SingleStateReader{State: s}, successFn, errorFn)
+		handler, err = callback.Implicit(ctx, p, &callback.SingleRequestReader{Request: oidcRequest}, successFn, errorFn)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error creating callback handler: %s", err)
 			return
 		}
 	} else {
-		handler, err = callback.AuthCode(ctx, p, &callback.SingleStateReader{State: s}, successFn, errorFn)
+		handler, err = callback.AuthCode(ctx, p, &callback.SingleRequestReader{Request: oidcRequest}, successFn, errorFn)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error creating auth code handler: %s", err)
 			return
 		}
 	}
 
-	authURL, err := p.AuthURL(ctx, s)
+	authURL, err := p.AuthURL(ctx, oidcRequest)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error getting auth url: %s", err)
 		return
@@ -225,7 +228,7 @@ type successResp struct {
 func success() (callback.SuccessResponseFunc, <-chan successResp) {
 	const op = "success"
 	doneCh := make(chan successResp)
-	return func(stateID string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
+	return func(state string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
 		var responseErr error
 		defer func() {
 			doneCh <- successResp{t, responseErr}
@@ -242,7 +245,7 @@ func success() (callback.SuccessResponseFunc, <-chan successResp) {
 func failed() (callback.ErrorResponseFunc, <-chan error) {
 	const op = "failed"
 	doneCh := make(chan error)
-	return func(stateID string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
+	return func(state string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
 		var responseErr error
 		defer func() {
 			if _, err := w.Write([]byte(responseErr.Error())); err != nil {

@@ -118,33 +118,33 @@ func (p *Provider) Done() {
 // AuthURL will generate a URL the caller can use to kick off an OIDC
 // authorization code (with optional PKCE) or an implicit flow with an IdP.
 //
-// See NewState() to create an oidc flow State with a valid ID and Nonce that
+// See NewRequest() to create an oidc flow Request with a valid state and Nonce that
 // will uniquely identify the user's authentication attempt throughout the flow.
-func (p *Provider) AuthURL(ctx context.Context, s State) (url string, e error) {
+func (p *Provider) AuthURL(ctx context.Context, oidcRequest Request) (url string, e error) {
 	const op = "Provider.AuthURL"
-	if s.ID() == "" {
-		return "", fmt.Errorf("%s: state id is empty: %w", op, ErrInvalidParameter)
+	if oidcRequest.State() == "" {
+		return "", fmt.Errorf("%s: request id is empty: %w", op, ErrInvalidParameter)
 	}
-	if s.Nonce() == "" {
-		return "", fmt.Errorf("%s: state nonce is empty: %w", op, ErrInvalidParameter)
+	if oidcRequest.Nonce() == "" {
+		return "", fmt.Errorf("%s: request nonce is empty: %w", op, ErrInvalidParameter)
 	}
-	if s.ID() == s.Nonce() {
-		return "", fmt.Errorf("%s: state id and nonce cannot be equal: %w", op, ErrInvalidParameter)
+	if oidcRequest.State() == oidcRequest.Nonce() {
+		return "", fmt.Errorf("%s: request id and nonce cannot be equal: %w", op, ErrInvalidParameter)
 	}
-	withImplicit, withImplicitAccessToken := s.ImplicitFlow()
-	if s.PKCEVerifier() != nil && withImplicit {
-		return "", fmt.Errorf("%s: state requests both implicit flow and authorization code with PKCE: %w", op, ErrInvalidParameter)
+	withImplicit, withImplicitAccessToken := oidcRequest.ImplicitFlow()
+	if oidcRequest.PKCEVerifier() != nil && withImplicit {
+		return "", fmt.Errorf("%s: request requests both implicit flow and authorization code with PKCE: %w", op, ErrInvalidParameter)
 	}
-	if s.RedirectURL() == "" {
-		return "", fmt.Errorf("%s: state redirect URL is empty: %w", op, ErrInvalidParameter)
+	if oidcRequest.RedirectURL() == "" {
+		return "", fmt.Errorf("%s: request redirect URL is empty: %w", op, ErrInvalidParameter)
 	}
-	if err := p.validRedirect(s.RedirectURL()); err != nil {
+	if err := p.validRedirect(oidcRequest.RedirectURL()); err != nil {
 		return "", fmt.Errorf("%s: %w", op, err)
 	}
 	var scopes []string
 	switch {
-	case len(s.Scopes()) > 0:
-		scopes = s.Scopes()
+	case len(oidcRequest.Scopes()) > 0:
+		scopes = oidcRequest.Scopes()
 	default:
 		scopes = p.config.Scopes
 	}
@@ -157,12 +157,12 @@ func (p *Provider) AuthURL(ctx context.Context, s State) (url string, e error) {
 	oauth2Config := oauth2.Config{
 		ClientID:     p.config.ClientID,
 		ClientSecret: string(p.config.ClientSecret),
-		RedirectURL:  s.RedirectURL(),
+		RedirectURL:  oidcRequest.RedirectURL(),
 		Endpoint:     p.provider.Endpoint(),
 		Scopes:       scopes,
 	}
 	authCodeOpts := []oauth2.AuthCodeOption{
-		oidc.Nonce(s.Nonce()),
+		oidc.Nonce(oidcRequest.Nonce()),
 	}
 	if withImplicit {
 		reqTokens := []string{"id_token"}
@@ -171,15 +171,15 @@ func (p *Provider) AuthURL(ctx context.Context, s State) (url string, e error) {
 		}
 		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("response_mode", "form_post"), oauth2.SetAuthURLParam("response_type", strings.Join(reqTokens, " ")))
 	}
-	if s.PKCEVerifier() != nil {
-		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("code_challenge", s.PKCEVerifier().Challenge()), oauth2.SetAuthURLParam("code_challenge_method", string(s.PKCEVerifier().Method())))
+	if oidcRequest.PKCEVerifier() != nil {
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("code_challenge", oidcRequest.PKCEVerifier().Challenge()), oauth2.SetAuthURLParam("code_challenge_method", string(oidcRequest.PKCEVerifier().Method())))
 	}
-	if secs, exp := s.MaxAge(); !exp.IsZero() {
+	if secs, exp := oidcRequest.MaxAge(); !exp.IsZero() {
 		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("max_age", strconv.Itoa(int(secs))))
 	}
-	if len(s.Prompts()) > 0 {
-		prompts := make([]string, 0, len(s.Prompts()))
-		for _, v := range s.Prompts() {
+	if len(oidcRequest.Prompts()) > 0 {
+		prompts := make([]string, 0, len(oidcRequest.Prompts()))
+		for _, v := range oidcRequest.Prompts() {
 			prompts = append(prompts, string(v))
 		}
 		prompts = strutils.RemoveDuplicatesStable(prompts, false)
@@ -188,33 +188,33 @@ func (p *Provider) AuthURL(ctx context.Context, s State) (url string, e error) {
 		}
 		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("prompt", strings.Join(prompts, " ")))
 	}
-	if s.Display() != "" {
-		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("display", string(s.Display())))
+	if oidcRequest.Display() != "" {
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("display", string(oidcRequest.Display())))
 	}
-	if len(s.UILocales()) > 0 {
-		locales := make([]string, 0, len(s.UILocales()))
-		for _, l := range s.UILocales() {
+	if len(oidcRequest.UILocales()) > 0 {
+		locales := make([]string, 0, len(oidcRequest.UILocales()))
+		for _, l := range oidcRequest.UILocales() {
 			locales = append(locales, string(l.String()))
 		}
 		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("ui_locales", strings.Join(locales, " ")))
 	}
-	if len(s.RequestClaims()) > 0 {
-		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("claims", string(s.RequestClaims())))
+	if len(oidcRequest.Claims()) > 0 {
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("claims", string(oidcRequest.Claims())))
 	}
-	if len(s.ACRValues()) > 0 {
-		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("acr_values", strings.Join(s.ACRValues(), " ")))
+	if len(oidcRequest.ACRValues()) > 0 {
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("acr_values", strings.Join(oidcRequest.ACRValues(), " ")))
 	}
-	return oauth2Config.AuthCodeURL(s.ID(), authCodeOpts...), nil
+	return oauth2Config.AuthCodeURL(oidcRequest.State(), authCodeOpts...), nil
 }
 
 // Exchange will request a token from the oidc token endpoint, using the
 // authorizationCode and authorizationState it received in an earlier successful
 // oidc authentication response.
 //
-// Exchange will use PKCE when the user's State specifies its use.
+// Exchange will use PKCE when the user's oidc Request specifies its use.
 //
 // It will also validate the authorizationState it receives against the
-// existing State for the user's oidc authentication flow.
+// existing Request for the user's oidc authentication flow.
 //
 // On success, the Token returned will include an IDToken and may
 // include an AccessToken and RefreshToken.
@@ -227,28 +227,28 @@ func (p *Provider) AuthURL(ctx context.Context, s State) (url string, e error) {
 // https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowTokenValidation)
 //
 // The id_token c_hash claim is verified when present.
-func (p *Provider) Exchange(ctx context.Context, s State, authorizationState string, authorizationCode string) (*Tk, error) {
+func (p *Provider) Exchange(ctx context.Context, oidcRequest Request, authorizationState string, authorizationCode string) (*Tk, error) {
 	const op = "Provider.Exchange"
 	if p.config == nil {
 		return nil, fmt.Errorf("%s: provider config is nil: %w", op, ErrNilParameter)
 	}
-	if s == nil {
-		return nil, fmt.Errorf("%s: state is nil: %w", op, ErrNilParameter)
+	if oidcRequest == nil {
+		return nil, fmt.Errorf("%s: request is nil: %w", op, ErrNilParameter)
 	}
-	if withImplicit, _ := s.ImplicitFlow(); withImplicit {
-		return nil, fmt.Errorf("%s: state (%s) should not be using the implicit flow: %w", op, s.ID(), ErrInvalidFlow)
+	if withImplicit, _ := oidcRequest.ImplicitFlow(); withImplicit {
+		return nil, fmt.Errorf("%s: request (%s) should not be using the implicit flow: %w", op, oidcRequest.State(), ErrInvalidFlow)
 	}
-	if s.ID() != authorizationState {
-		return nil, fmt.Errorf("%s: authentication state and authorization state are not equal: %w", op, ErrInvalidParameter)
+	if oidcRequest.State() != authorizationState {
+		return nil, fmt.Errorf("%s: authentication request state and authorization state are not equal: %w", op, ErrInvalidParameter)
 	}
-	if s.RedirectURL() == "" {
-		return nil, fmt.Errorf("%s: authentication state redirect URL is empty: %w", op, ErrInvalidParameter)
+	if oidcRequest.RedirectURL() == "" {
+		return nil, fmt.Errorf("%s: authentication request redirect URL is empty: %w", op, ErrInvalidParameter)
 	}
-	if err := p.validRedirect(s.RedirectURL()); err != nil {
+	if err := p.validRedirect(oidcRequest.RedirectURL()); err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
-	if s.IsExpired() {
-		return nil, fmt.Errorf("%s: authentication state is expired: %w", op, ErrInvalidParameter)
+	if oidcRequest.IsExpired() {
+		return nil, fmt.Errorf("%s: authentication request is expired: %w", op, ErrInvalidParameter)
 	}
 
 	oidcCtx, err := p.HTTPClientContext(ctx)
@@ -257,8 +257,8 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 	}
 	var scopes []string
 	switch {
-	case len(s.Scopes()) > 0:
-		scopes = s.Scopes()
+	case len(oidcRequest.Scopes()) > 0:
+		scopes = oidcRequest.Scopes()
 	default:
 		scopes = p.config.Scopes
 	}
@@ -267,13 +267,13 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 	var oauth2Config = oauth2.Config{
 		ClientID:     p.config.ClientID,
 		ClientSecret: string(p.config.ClientSecret),
-		RedirectURL:  s.RedirectURL(),
+		RedirectURL:  oidcRequest.RedirectURL(),
 		Endpoint:     p.provider.Endpoint(),
 		Scopes:       scopes,
 	}
 	var authCodeOpts []oauth2.AuthCodeOption
-	if s.PKCEVerifier() != nil {
-		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("code_verifier", s.PKCEVerifier().Verifier()))
+	if oidcRequest.PKCEVerifier() != nil {
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("code_verifier", oidcRequest.PKCEVerifier().Verifier()))
 	}
 	oauth2Token, err := oauth2Config.Exchange(oidcCtx, authorizationCode, authCodeOpts...)
 	if err != nil {
@@ -288,7 +288,7 @@ func (p *Provider) Exchange(ctx context.Context, s State, authorizationState str
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to create new id_token: %w", op, err)
 	}
-	claims, err := p.VerifyIDToken(ctx, t.IDToken(), s)
+	claims, err := p.VerifyIDToken(ctx, t.IDToken(), oidcRequest)
 	if err != nil {
 		return nil, fmt.Errorf("%s: id_token failed verification: %w", op, err)
 	}
@@ -415,12 +415,12 @@ func getUserInfoOpts(opt ...Option) userInfoOptions {
 //     of 1 min)
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
-func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, s State, opt ...Option) (map[string]interface{}, error) {
+func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, oidcRequest Request, opt ...Option) (map[string]interface{}, error) {
 	const op = "Provider.VerifyIDToken"
 	if t == "" {
 		return nil, fmt.Errorf("%s: id_token is empty: %w", op, ErrInvalidParameter)
 	}
-	if s.Nonce() == "" {
+	if oidcRequest.Nonce() == "" {
 		return nil, fmt.Errorf("%s: nonce is empty: %w", op, ErrInvalidParameter)
 	}
 	algs := []string{}
@@ -444,7 +444,7 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, s State, opt ..
 	}
 	// so.. we still need to check: nonce, iat, auth_time, azp, the aud includes
 	// additional audiences configured.
-	if oidcIDToken.Nonce != s.Nonce() {
+	if oidcIDToken.Nonce != oidcRequest.Nonce() {
 		return nil, fmt.Errorf("%s: invalid id_token nonce: %w", op, ErrInvalidNonce)
 	}
 	if nowTime.Add(leeway).Before(oidcIDToken.IssuedAt) {
@@ -459,8 +459,8 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, s State, opt ..
 
 	var audiences []string
 	switch {
-	case len(s.Audiences()) > 0:
-		audiences = s.Audiences()
+	case len(oidcRequest.Audiences()) > 0:
+		audiences = oidcRequest.Audiences()
 	default:
 		audiences = p.config.Audiences
 	}
@@ -496,7 +496,7 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, s State, opt ..
 			ErrInvalidAuthorizedParty)
 	}
 
-	if secs, authAfter := s.MaxAge(); !authAfter.IsZero() {
+	if secs, authAfter := oidcRequest.MaxAge(); !authAfter.IsZero() {
 		atClaim, ok := claims["auth_time"].(float64)
 		if !ok {
 			return nil, fmt.Errorf("%s: missing auth_time claim when max age was requested: %w", op, ErrMissingClaim)

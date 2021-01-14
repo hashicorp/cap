@@ -6,10 +6,10 @@ OIDC flows.
 
 Primary types provided by the package:
 
-* `State`: represents one OIDC authentication flow for a user.  It contains the
+* `Request`: represents one OIDC authentication flow for a user.  It contains the
   data needed to uniquely represent that one-time flow across the multiple
   interactions needed to complete the OIDC flow the user is attempting.  All
-  States contain an expiration for the user's OIDC flow.
+  Requests contain an expiration for the user's OIDC flow.
 
 * `Token`: represents an OIDC id_token, as well as an Oauth2 access_token and
   refresh_token (including the the access_token expiry)
@@ -69,16 +69,16 @@ if err != nil {
 defer p.Done()
 
 	
-// Create a State for a user's authentication attempt that will use the
-// authorization code flow.  (See NewState(...) using the WithPKCE and
-// WithImplicit options for creating a State that uses those flows.)	
-s, err := oidc.NewState(2 * time.Minute, "http://your_redirect_url/callback")
+// Create a Request for a user's authentication attempt that will use the
+// authorization code flow.  (See NewRequest(...) using the WithPKCE and
+// WithImplicit options for creating a Request that uses those flows.)	
+oidcRequest, err := oidc.NewRequest(2 * time.Minute, "http://your_redirect_url/callback")
 if err != nil {
   // handle error
 }
 
 // Create an auth URL
-authURL, err := p.AuthURL(context.Background(), s)
+authURL, err := p.AuthURL(context.Background(), oidcRequest)
 if err != nil {
   // handle error
 }
@@ -88,7 +88,7 @@ fmt.Println("open url to kick-off authentication: ", authURL)
 Create a http.Handler for OIDC authentication response redirects.
 
 ```go
-func NewHandler(ctx context.Context, p *oidc.Provider, rw callback.StateReader) (http.HandlerFunc, error)
+func NewHandler(ctx context.Context, p *oidc.Provider, rw callback.RequestReader) (http.HandlerFunc, error)
   if p == nil { 
     // handle error
   }
@@ -96,12 +96,12 @@ func NewHandler(ctx context.Context, p *oidc.Provider, rw callback.StateReader) 
     // handle error
   }
   return func(w http.ResponseWriter, r *http.Request) {
-    state, err := rw.Read(ctx, req.FormValue("state"))
+    oidcRequest, err := rw.Read(ctx, req.FormValue("state"))
     if err != nil {
       // handle error
     }
     // Exchange(...) will verify the tokens before returning. 
-    token, err := p.Exchange(ctx, state, req.FormValue("state"), req.FormValue("code"))
+    token, err := p.Exchange(ctx, oidcRequest, req.FormValue("state"), req.FormValue("code"))
     if err != nil {
       // handle error
     }

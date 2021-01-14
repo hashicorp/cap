@@ -30,12 +30,12 @@ func TestImplicit(t *testing.T) {
 	clientSecret := "test-client-secret"
 	tp := oidc.StartTestProvider(t)
 	p := testNewProvider(t, clientID, clientSecret, "http://alice.com", tp)
-	rw := &SingleStateReader{}
+	rw := &SingleRequestReader{}
 
 	tests := []struct {
 		name      string
 		p         *oidc.Provider
-		rw        StateReader
+		rw        RequestReader
 		sFn       SuccessResponseFunc
 		eFn       ErrorResponseFunc
 		wantErr   bool
@@ -79,7 +79,7 @@ func Test_ImplicitResponses(t *testing.T) {
 		name                  string
 		exp                   time.Duration
 		expectedStateOverride string
-		readerOverride        StateReader
+		readerOverride        RequestReader
 		withoutImplicit       bool
 		want                  http.HandlerFunc
 		wantStatusCode        int
@@ -98,7 +98,7 @@ func Test_ImplicitResponses(t *testing.T) {
 			wantStatusCode:      http.StatusInternalServerError,
 			wantError:           true,
 			wantRespError:       "internal-callback-error",
-			wantRespDescription: "state is expired",
+			wantRespDescription: "request is expired",
 		},
 		{
 			name:                  "state-not-matching",
@@ -112,7 +112,7 @@ func Test_ImplicitResponses(t *testing.T) {
 		{
 			name:                "state-returns-nil",
 			exp:                 1 * time.Minute,
-			readerOverride:      &testNilStateReader{},
+			readerOverride:      &testNilRequestReader{},
 			wantStatusCode:      http.StatusInternalServerError,
 			wantError:           true,
 			wantRespError:       "internal-callback-error",
@@ -122,26 +122,26 @@ func Test_ImplicitResponses(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			state, err := oidc.NewState(tt.exp, redirect, oidc.WithImplicitFlow())
+			oidcRequest, err := oidc.NewRequest(tt.exp, redirect, oidc.WithImplicitFlow())
 			require.NoError(err)
 
-			tp.SetExpectedAuthNonce(state.Nonce())
+			tp.SetExpectedAuthNonce(oidcRequest.Nonce())
 
 			if tt.expectedStateOverride != "" {
 				tp.SetExpectedState(tt.expectedStateOverride)
 				defer tp.SetExpectedState("")
 			}
-			var reader StateReader
+			var reader RequestReader
 			switch {
 			case tt.readerOverride != nil:
 				reader = tt.readerOverride
 			default:
-				reader = &SingleStateReader{state}
+				reader = &SingleRequestReader{oidcRequest}
 			}
 			callbackSrv.Config.Handler, err = Implicit(ctx, p, reader, testSuccessFn, testFailFn)
 			require.NoError(err)
 
-			authURL, err := p.AuthURL(ctx, state)
+			authURL, err := p.AuthURL(ctx, oidcRequest)
 			require.NoError(err)
 
 			// the TestProvider is returning an html form which is posted
@@ -169,10 +169,10 @@ func Test_ImplicitResponses(t *testing.T) {
 	}
 	t.Run("authen-error", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		state, err := oidc.NewState(1*time.Minute, redirect, oidc.WithImplicitFlow())
+		req, err := oidc.NewRequest(1*time.Minute, redirect, oidc.WithImplicitFlow())
 		require.NoError(err)
-		tp.SetExpectedAuthNonce(state.Nonce())
-		reader := &SingleStateReader{state}
+		tp.SetExpectedAuthNonce(req.Nonce())
+		reader := &SingleRequestReader{req}
 		callbackSrv.Config.Handler, err = Implicit(ctx, p, reader, testSuccessFn, testFailFn)
 		require.NoError(err)
 
@@ -182,7 +182,7 @@ func Test_ImplicitResponses(t *testing.T) {
 		// For this sort of authentication error, the TestProvider returns a
 		// redirect (not the typical html response with a form to be posted by
 		// the browser onload)
-		authURL, err := p.AuthURL(ctx, state)
+		authURL, err := p.AuthURL(ctx, req)
 		require.NoError(err)
 		resp, err := tp.HTTPClient().Get(authURL)
 		require.NoError(err)
@@ -205,14 +205,14 @@ func Test_ImplicitResponses(t *testing.T) {
 		require.NoError(err)
 		tp.SetSigningKeys(k, k.Public(), oidc.ES384, "new-key")
 
-		state, err := oidc.NewState(1*time.Minute, redirect, oidc.WithImplicitFlow())
+		req, err := oidc.NewRequest(1*time.Minute, redirect, oidc.WithImplicitFlow())
 		require.NoError(err)
-		tp.SetExpectedAuthNonce(state.Nonce())
-		reader := &SingleStateReader{state}
+		tp.SetExpectedAuthNonce(req.Nonce())
+		reader := &SingleRequestReader{req}
 		callbackSrv.Config.Handler, err = Implicit(ctx, p, reader, testSuccessFn, testFailFn)
 		require.NoError(err)
 
-		authURL, err := p.AuthURL(ctx, state)
+		authURL, err := p.AuthURL(ctx, req)
 		require.NoError(err)
 
 		// the TestProvider is returning an html form which is posted
@@ -233,14 +233,14 @@ func Test_ImplicitResponses(t *testing.T) {
 	})
 	t.Run("not-implicit-flow", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		state, err := oidc.NewState(1*time.Minute, redirect)
+		oidcReq, err := oidc.NewRequest(1*time.Minute, redirect)
 		require.NoError(err)
-		reader := &SingleStateReader{state}
+		reader := &SingleRequestReader{oidcReq}
 		handler, err := Implicit(ctx, p, reader, testSuccessFn, testFailFn)
 		require.NoError(err)
 
 		reqForm := url.Values{}
-		reqForm.Add("state", state.ID())
+		reqForm.Add("state", oidcReq.State())
 		reqForm.Add("id_token", "dummy-token")
 
 		req, err := http.NewRequest("POST", "/callback", strings.NewReader(reqForm.Encode()))

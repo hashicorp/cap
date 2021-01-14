@@ -248,8 +248,9 @@ func getTestProviderOpts(opt ...Option) testProviderOptions {
 	return opts
 }
 
-// WithTestPort provides an optional port for the test provider. Valid for:
-// TestProvider.StartTestProvider
+// WithTestPort provides an optional port for the test provider.
+//
+// Valid for: TestProvider.StartTestProvider
 func WithTestPort(port int) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*testProviderOptions); ok {

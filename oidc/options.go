@@ -23,7 +23,9 @@ func ApplyOpts(opts interface{}, opt ...Option) {
 }
 
 // WithNow provides an optional func for determining what the current time it
-// is. Valid for: Config, Tk and St
+// is.
+//
+// Valid for: Config, Tk and Request
 func WithNow(now func() time.Time) Option {
 	return func(o interface{}) {
 		if now == nil {
@@ -34,13 +36,15 @@ func WithNow(now func() time.Time) Option {
 			v.withNowFunc = now
 		case *tokenOptions:
 			v.withNowFunc = now
-		case *stOptions:
+		case *reqOptions:
 			v.withNowFunc = now
 		}
 	}
 }
 
-// WithScopes provides an optional list of scopes. Valid for: Config and St
+// WithScopes provides an optional list of scopes.
+//
+// Valid for: Config and Request
 func WithScopes(scopes ...string) Option {
 	return func(o interface{}) {
 		if len(scopes) == 0 {
@@ -51,7 +55,7 @@ func WithScopes(scopes ...string) Option {
 			// configOptions already has the oidc.ScopeOpenID in its defaults.
 			scopes = strutils.RemoveDuplicatesStable(scopes, false)
 			v.withScopes = append(v.withScopes, scopes...)
-		case *stOptions:
+		case *reqOptions:
 			// need to prepend the oidc.ScopeOpenID
 			ts := append([]string{oidc.ScopeOpenID}, scopes...)
 			scopes = strutils.RemoveDuplicatesStable(ts, false)
@@ -60,7 +64,9 @@ func WithScopes(scopes ...string) Option {
 	}
 }
 
-// WithAudiences provides an optional list of audiences.  Valid for: Config and St
+// WithAudiences provides an optional list of audiences.
+//
+//Valid for: Config and Request
 func WithAudiences(auds ...string) Option {
 	return func(o interface{}) {
 		if len(auds) == 0 {
@@ -70,7 +76,7 @@ func WithAudiences(auds ...string) Option {
 		switch v := o.(type) {
 		case *configOptions:
 			v.withAudiences = append(v.withAudiences, auds...)
-		case *stOptions:
+		case *reqOptions:
 			v.withAudiences = append(v.withAudiences, auds...)
 		case *userInfoOptions:
 			v.withAudiences = append(v.withAudiences, auds...)

@@ -9,7 +9,7 @@ var (
 	ErrNilParameter               = errors.New("nil parameter")
 	ErrInvalidCACert              = errors.New("invalid CA certificate")
 	ErrInvalidIssuer              = errors.New("invalid issuer")
-	ErrExpiredState               = errors.New("state is expired")
+	ErrExpiredRequest             = errors.New("request is expired")
 	ErrInvalidResponseState       = errors.New("invalid response state")
 	ErrInvalidSignature           = errors.New("invalid signature")
 	ErrInvalidSubject             = errors.New("invalid subject")

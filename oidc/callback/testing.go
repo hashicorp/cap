@@ -11,13 +11,13 @@ import (
 )
 
 // testSuccessFn is a test SuccessResponseFunc
-func testSuccessFn(stateID string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
+func testSuccessFn(state string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("login successful"))
 }
 
 // testFailFn is a test ErrorResponseFunc
-func testFailFn(stateID string, r *AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
+func testFailFn(state string, r *AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
 	if e != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		j, _ := json.Marshal(&AuthenErrorResponse{
@@ -86,8 +86,8 @@ func testNewConfig(t *testing.T, clientID, clientSecret, allowedRedirectURL stri
 	return c
 }
 
-type testNilStateReader struct{}
+type testNilRequestReader struct{}
 
-func (s *testNilStateReader) Read(ctx context.Context, stateID string) (oidc.State, error) {
+func (s *testNilRequestReader) Read(ctx context.Context, state string) (oidc.Request, error) {
 	return nil, nil
 }

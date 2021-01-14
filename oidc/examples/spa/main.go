@@ -96,7 +96,7 @@ func main() {
 	redirectURL := fmt.Sprintf("http://localhost:%s/callback", env[port].(string))
 	timeout := env[attemptExp].(time.Duration)
 
-	sc := newStateCache()
+	rc := newRequestCache()
 
 	pc, err := oidc.NewConfig(issuer, clientID, clientSecret, []oidc.Alg{oidc.RS256}, []string{redirectURL})
 	if err != nil {
@@ -116,34 +116,34 @@ func main() {
 		return
 	}
 
-	callback, err := CallbackHandler(ctx, p, sc, *useImplicit)
+	callback, err := CallbackHandler(ctx, p, rc, *useImplicit)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error creating callback handler: %s", err)
 		return
 	}
 
-	var stateOptions []oidc.Option
+	var requestOptions []oidc.Option
 	switch {
 	case *useImplicit:
-		stateOptions = append(stateOptions, oidc.WithImplicitFlow())
+		requestOptions = append(requestOptions, oidc.WithImplicitFlow())
 	case *usePKCE:
 		v, err := oidc.NewCodeVerifier()
 		if err != nil {
 			fmt.Fprint(os.Stderr, err.Error())
 			return
 		}
-		stateOptions = append(stateOptions, oidc.WithPKCE(v))
+		requestOptions = append(requestOptions, oidc.WithPKCE(v))
 	}
 	if *maxAge >= 0 {
-		stateOptions = append(stateOptions, oidc.WithMaxAge(uint(*maxAge)))
+		requestOptions = append(requestOptions, oidc.WithMaxAge(uint(*maxAge)))
 	}
 
-	stateOptions = append(stateOptions, oidc.WithScopes(optScopes...))
+	requestOptions = append(requestOptions, oidc.WithScopes(optScopes...))
 
 	// Set up callback handler
 	http.HandleFunc("/callback", callback)
-	http.HandleFunc("/login", LoginHandler(ctx, p, sc, timeout, redirectURL, stateOptions))
-	http.HandleFunc("/success", SuccessHandler(ctx, sc))
+	http.HandleFunc("/login", LoginHandler(ctx, p, rc, timeout, redirectURL, requestOptions))
+	http.HandleFunc("/success", SuccessHandler(ctx, rc))
 
 	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", env[port]))
 	if err != nil {

@@ -20,12 +20,12 @@ func TestAuthCode(t *testing.T) {
 	clientSecret := "test-client-secret"
 	tp := oidc.StartTestProvider(t)
 	p := testNewProvider(t, clientID, clientSecret, "http://alice.com", tp)
-	rw := &SingleStateReader{}
+	rw := &SingleRequestReader{}
 
 	tests := []struct {
 		name      string
 		p         *oidc.Provider
-		rw        StateReader
+		rw        RequestReader
 		sFn       SuccessResponseFunc
 		eFn       ErrorResponseFunc
 		wantErr   bool
@@ -70,7 +70,7 @@ func Test_AuthCodeResponses(t *testing.T) {
 		exp                 time.Duration
 		nonceOverride       string
 		stateOverride       string
-		readerOverride      StateReader
+		readerOverride      RequestReader
 		disableExchange     bool
 		want                http.HandlerFunc
 		wantStatusCode      int
@@ -97,7 +97,7 @@ func Test_AuthCodeResponses(t *testing.T) {
 			wantStatusCode:      http.StatusInternalServerError,
 			wantError:           true,
 			wantRespError:       "internal-callback-error",
-			wantRespDescription: "state is expired",
+			wantRespDescription: "request is expired",
 		},
 		{
 			name:                "state-not-matching",
@@ -111,7 +111,7 @@ func Test_AuthCodeResponses(t *testing.T) {
 		{
 			name:                "state-returns-nil",
 			exp:                 1 * time.Minute,
-			readerOverride:      &testNilStateReader{},
+			readerOverride:      &testNilRequestReader{},
 			wantStatusCode:      http.StatusInternalServerError,
 			wantError:           true,
 			wantRespError:       "internal-callback-error",
@@ -130,14 +130,14 @@ func Test_AuthCodeResponses(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			state, err := oidc.NewState(tt.exp, redirect)
+			oidcRequest, err := oidc.NewRequest(tt.exp, redirect)
 			require.NoError(err)
 
 			switch {
 			case tt.nonceOverride != "":
 				tp.SetExpectedAuthNonce(tt.nonceOverride)
 			default:
-				tp.SetExpectedAuthNonce(state.Nonce())
+				tp.SetExpectedAuthNonce(oidcRequest.Nonce())
 			}
 
 			if tt.stateOverride != "" {
@@ -148,17 +148,17 @@ func Test_AuthCodeResponses(t *testing.T) {
 				tp.SetDisableToken(true)
 				defer tp.SetDisableToken(false)
 			}
-			var reader StateReader
+			var reader RequestReader
 			switch {
 			case tt.readerOverride != nil:
 				reader = tt.readerOverride
 			default:
-				reader = &SingleStateReader{state}
+				reader = &SingleRequestReader{oidcRequest}
 			}
 			callbackSrv.Config.Handler, err = AuthCode(ctx, p, reader, testSuccessFn, testFailFn)
 			require.NoError(err)
 
-			authURL, err := p.AuthURL(ctx, state)
+			authURL, err := p.AuthURL(ctx, oidcRequest)
 			require.NoError(err)
 
 			resp, err := tp.HTTPClient().Get(authURL)

@@ -11,7 +11,7 @@ import (
 	"golang.org/x/text/language"
 )
 
-func TestNewState(t *testing.T) {
+func TestNewRequest(t *testing.T) {
 	t.Parallel()
 	skew := 250 * time.Millisecond
 	defaultExpireIn := 1 * time.Second
@@ -67,7 +67,7 @@ func TestNewState(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			got, err := NewState(tt.expireIn, tt.redirectURL, tt.opts...)
+			got, err := NewRequest(tt.expireIn, tt.redirectURL, tt.opts...)
 			if tt.wantErr {
 				require.Error(err)
 				assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)
@@ -77,8 +77,8 @@ func TestNewState(t *testing.T) {
 			tExp := got.now().Add(tt.expireIn)
 			assert.True(got.expiration.Before(tExp.Add(skew)))
 			assert.True(got.expiration.After(tExp.Add(-skew)))
-			assert.NotEqualf(got.ID(), got.Nonce(), "%s id should not equal %s nonce", got.ID(), got.Nonce())
-			assert.NotEmpty(got.ID())
+			assert.NotEqualf(got.State(), got.Nonce(), "%s id should not equal %s nonce", got.State(), got.Nonce())
+			assert.NotEmpty(got.State())
 			assert.NotEmpty(got.Nonce())
 			testAssertEqualFunc(t, tt.wantNowFunc, got.nowFunc, "now = %p,want %p", tt.wantNowFunc, got.nowFunc)
 			assert.Equalf(got.RedirectURL(), tt.wantRedirectURL, "wanted \"%s\" but got \"%s\"", tt.wantRedirectURL, got.RedirectURL())
@@ -89,39 +89,39 @@ func TestNewState(t *testing.T) {
 	}
 }
 
-func TestState_IsExpired(t *testing.T) {
+func TestRequest_IsExpired(t *testing.T) {
 	t.Parallel()
 	t.Run("not-expired", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		s, err := NewState(2*time.Second, "https://redirect")
+		r, err := NewRequest(2*time.Second, "https://redirect")
 		require.NoError(err)
-		assert.False(s.IsExpired())
+		assert.False(r.IsExpired())
 	})
 	t.Run("expired", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		s, err := NewState(1*time.Nanosecond, "https://redirect")
+		oidcRequest, err := NewRequest(1*time.Nanosecond, "https://redirect")
 		require.NoError(err)
-		assert.True(s.IsExpired())
+		assert.True(oidcRequest.IsExpired())
 	})
 
 }
 
 func Test_WithImplicit(t *testing.T) {
 	t.Parallel()
-	t.Run("stOptions", func(t *testing.T) {
+	t.Run("reqOptions", func(t *testing.T) {
 		t.Parallel()
 		assert := assert.New(t)
-		opts := getStOpts()
-		testOpts := stDefaults()
+		opts := getReqOpts()
+		testOpts := reqDefaults()
 		assert.Equal(opts, testOpts)
 
-		opts = getStOpts(WithImplicitFlow())
-		testOpts = stDefaults()
+		opts = getReqOpts(WithImplicitFlow())
+		testOpts = reqDefaults()
 		testOpts.withImplicitFlow = &implicitFlow{}
 		assert.Equal(opts, testOpts)
 
-		opts = getStOpts(WithImplicitFlow(true))
-		testOpts = stDefaults()
+		opts = getReqOpts(WithImplicitFlow(true))
+		testOpts = reqDefaults()
 		testOpts.withImplicitFlow = &implicitFlow{true}
 		assert.Equal(opts, testOpts)
 	})
@@ -129,18 +129,18 @@ func Test_WithImplicit(t *testing.T) {
 
 func Test_WithPKCE(t *testing.T) {
 	t.Parallel()
-	t.Run("stOptions", func(t *testing.T) {
+	t.Run("reqOptions", func(t *testing.T) {
 		t.Parallel()
 		assert, require := assert.New(t), require.New(t)
-		opts := getStOpts()
-		testOpts := stDefaults()
+		opts := getReqOpts()
+		testOpts := reqDefaults()
 		assert.Equal(opts, testOpts)
 		assert.Nil(testOpts.withVerifier)
 
 		v, err := NewCodeVerifier()
 		require.NoError(err)
-		opts = getStOpts(WithPKCE(v))
-		testOpts = stDefaults()
+		opts = getReqOpts(WithPKCE(v))
+		testOpts = reqDefaults()
 		testOpts.withVerifier = v
 		assert.Equal(opts, testOpts)
 	})
@@ -148,17 +148,17 @@ func Test_WithPKCE(t *testing.T) {
 
 func Test_WithMaxAge(t *testing.T) {
 	t.Parallel()
-	t.Run("stOptions", func(t *testing.T) {
+	t.Run("reqOptions", func(t *testing.T) {
 		t.Parallel()
 		assert := assert.New(t)
-		opts := getStOpts()
-		testOpts := stDefaults()
+		opts := getReqOpts()
+		testOpts := reqDefaults()
 		assert.Equal(opts, testOpts)
 
-		opts = getStOpts(WithMaxAge(1))
-		testOpts = stDefaults()
+		opts = getReqOpts(WithMaxAge(1))
+		testOpts = reqDefaults()
 		// authAfter will be a zero value, since it's not set until the
-		// NewState() factory, when it can determine it's nowFunc
+		// NewRequest() factory, when it can determine it's nowFunc
 		testOpts.withMaxAge = &maxAge{
 			seconds: 1,
 		}
@@ -169,15 +169,15 @@ func Test_WithMaxAge(t *testing.T) {
 
 func Test_WithPrompts(t *testing.T) {
 	t.Parallel()
-	t.Run("stOptions", func(t *testing.T) {
+	t.Run("reqOptions", func(t *testing.T) {
 		t.Parallel()
 		assert := assert.New(t)
-		opts := getStOpts()
-		testOpts := stDefaults()
+		opts := getReqOpts()
+		testOpts := reqDefaults()
 		assert.Equal(opts, testOpts)
 
-		opts = getStOpts(WithPrompts(Login, SelectAccount))
-		testOpts = stDefaults()
+		opts = getReqOpts(WithPrompts(Login, SelectAccount))
+		testOpts = reqDefaults()
 
 		testOpts.withPrompts = []Prompt{
 			Login, SelectAccount,
@@ -189,15 +189,15 @@ func Test_WithPrompts(t *testing.T) {
 
 func Test_WithDisplay(t *testing.T) {
 	t.Parallel()
-	t.Run("stOptions", func(t *testing.T) {
+	t.Run("reqOptions", func(t *testing.T) {
 		t.Parallel()
 		assert := assert.New(t)
-		opts := getStOpts()
-		testOpts := stDefaults()
+		opts := getReqOpts()
+		testOpts := reqDefaults()
 		assert.Equal(opts, testOpts)
 
-		opts = getStOpts(WithDisplay(WAP))
-		testOpts = stDefaults()
+		opts = getReqOpts(WithDisplay(WAP))
+		testOpts = reqDefaults()
 
 		testOpts.withDisplay = WAP
 
@@ -207,15 +207,15 @@ func Test_WithDisplay(t *testing.T) {
 
 func Test_WithUILocales(t *testing.T) {
 	t.Parallel()
-	t.Run("stOptions", func(t *testing.T) {
+	t.Run("reqOptions", func(t *testing.T) {
 		t.Parallel()
 		assert := assert.New(t)
-		opts := getStOpts()
-		testOpts := stDefaults()
+		opts := getReqOpts()
+		testOpts := reqDefaults()
 		assert.Equal(opts, testOpts)
 
-		opts = getStOpts(WithUILocales(language.AmericanEnglish, language.German))
-		testOpts = stDefaults()
+		opts = getReqOpts(WithUILocales(language.AmericanEnglish, language.German))
+		testOpts = reqDefaults()
 
 		testOpts.withUILocales = []language.Tag{
 			language.AmericanEnglish, language.German,
@@ -225,13 +225,13 @@ func Test_WithUILocales(t *testing.T) {
 	})
 }
 
-func Test_WithRequestClaims(t *testing.T) {
+func Test_WithClaims(t *testing.T) {
 	t.Parallel()
-	t.Run("stOptions", func(t *testing.T) {
+	t.Run("reqOptions", func(t *testing.T) {
 		t.Parallel()
 		assert := assert.New(t)
-		opts := getStOpts()
-		testOpts := stDefaults()
+		opts := getReqOpts()
+		testOpts := reqDefaults()
 		assert.Equal(opts, testOpts)
 
 		const reqClaims = `
@@ -253,26 +253,26 @@ func Test_WithRequestClaims(t *testing.T) {
 		   }
 		   `
 
-		opts = getStOpts(WithRequestClaims([]byte(reqClaims)))
-		testOpts = stDefaults()
+		opts = getReqOpts(WithClaims([]byte(reqClaims)))
+		testOpts = reqDefaults()
 
-		testOpts.withRequestClaims = []byte(reqClaims)
+		testOpts.withClaims = []byte(reqClaims)
 		assert.Equal(opts, testOpts)
 	})
 }
 
 func Test_WithACRValues(t *testing.T) {
 	t.Parallel()
-	t.Run("stOptions", func(t *testing.T) {
+	t.Run("reqOptions", func(t *testing.T) {
 		t.Parallel()
 		assert := assert.New(t)
-		opts := getStOpts()
-		testOpts := stDefaults()
+		opts := getReqOpts()
+		testOpts := reqDefaults()
 		assert.Equal(opts, testOpts)
 
 		// https://openid.net/specs/openid-connect-eap-acr-values-1_0.html#acrValues
-		opts = getStOpts(WithACRValues("phr", "phrh"))
-		testOpts = stDefaults()
+		opts = getReqOpts(WithACRValues("phr", "phrh"))
+		testOpts = reqDefaults()
 
 		testOpts.withACRValues = []string{"phr", "phrh"}
 

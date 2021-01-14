@@ -11,18 +11,18 @@ import (
 	"github.com/hashicorp/cap/oidc"
 )
 
-func SuccessHandler(ctx context.Context, sc *stateCache) http.HandlerFunc {
+func SuccessHandler(ctx context.Context, rc *requestCache) http.HandlerFunc {
 	const op = "SuccessHandler"
 	return func(w http.ResponseWriter, r *http.Request) {
-		stateID := r.FormValue("state")
-		s, err := sc.Read(ctx, stateID)
+		state := r.FormValue("state")
+		oidcRequest, err := rc.Read(ctx, state)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error reading state during successful response: %s", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		defer sc.Delete(stateID)
-		extended, ok := s.(extendedState)
+		defer rc.Delete(state)
+		extended, ok := oidcRequest.(extendedRequest)
 		if !ok {
 			err := fmt.Errorf("%s: not an extended state", op)
 			fmt.Fprint(os.Stderr, err)

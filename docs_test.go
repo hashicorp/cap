@@ -32,16 +32,16 @@ func Example_oidc() {
 	}
 	defer p.Done()
 
-	// Create a State for a user's authentication attempt that will use the
-	// authorization code flow.  (See NewState(...) using the WithPKCE and
-	// WithImplicit options for creating a State that uses those flows.)
-	state, err := oidc.NewState(2*time.Minute, "http://your_redirect_url/callback")
+	// Create a Request for a user's authentication attempt that will use the
+	// authorization code flow.  (See NewRequest(...) using the WithPKCE and
+	// WithImplicit options for creating a Request that uses those flows.)
+	oidcRequest, err := oidc.NewRequest(2*time.Minute, "http://your_redirect_url/callback")
 	if err != nil {
 		// handle error
 	}
 
 	// Create an auth URL
-	authURL, err := p.AuthURL(ctx, state)
+	authURL, err := p.AuthURL(ctx, oidcRequest)
 	if err != nil {
 		// handle error
 	}
@@ -51,7 +51,7 @@ func Example_oidc() {
 	callbackHandler := func(w http.ResponseWriter, r *http.Request) {
 		// Exchange a successful authentication's authorization code and
 		// authorization state (received in a callback) for a verified Token.
-		t, err := p.Exchange(ctx, state, r.FormValue("state"), r.FormValue("code"))
+		t, err := p.Exchange(ctx, oidcRequest, r.FormValue("state"), r.FormValue("code"))
 		if err != nil {
 			// handle error
 		}

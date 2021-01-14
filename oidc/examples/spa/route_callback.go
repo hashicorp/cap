@@ -10,42 +10,42 @@ import (
 	"github.com/hashicorp/cap/oidc/callback"
 )
 
-func CallbackHandler(ctx context.Context, p *oidc.Provider, sc *stateCache, withImplicit bool) (http.HandlerFunc, error) {
+func CallbackHandler(ctx context.Context, p *oidc.Provider, rc *requestCache, withImplicit bool) (http.HandlerFunc, error) {
 	if withImplicit {
-		c, err := callback.Implicit(ctx, p, sc, successFn(ctx, sc), failedFn(ctx, sc))
+		c, err := callback.Implicit(ctx, p, rc, successFn(ctx, rc), failedFn(ctx, rc))
 		if err != nil {
 			return nil, fmt.Errorf("CallbackHandler: %w", err)
 		}
 		return c, nil
 	}
-	c, err := callback.AuthCode(ctx, p, sc, successFn(ctx, sc), failedFn(ctx, sc))
+	c, err := callback.AuthCode(ctx, p, rc, successFn(ctx, rc), failedFn(ctx, rc))
 	if err != nil {
 		return nil, fmt.Errorf("CallbackHandler: %w", err)
 	}
 	return c, nil
 }
 
-func successFn(ctx context.Context, sc *stateCache) callback.SuccessResponseFunc {
-	return func(stateID string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
-		s, err := sc.Read(ctx, stateID)
+func successFn(ctx context.Context, rc *requestCache) callback.SuccessResponseFunc {
+	return func(state string, t oidc.Token, w http.ResponseWriter, req *http.Request) {
+		oidcRequest, err := rc.Read(ctx, state)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error reading state during successful response: %s\n", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if err := sc.SetToken(s.ID(), t); err != nil {
+		if err := rc.SetToken(oidcRequest.State(), t); err != nil {
 			fmt.Fprintf(os.Stderr, "error updating state during successful response: %s\n", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		// Redirect to logged in page
-		http.Redirect(w, req, fmt.Sprintf("/success?state=%s", stateID), http.StatusSeeOther)
+		http.Redirect(w, req, fmt.Sprintf("/success?state=%s", state), http.StatusSeeOther)
 	}
 }
 
-func failedFn(ctx context.Context, sc *stateCache) callback.ErrorResponseFunc {
+func failedFn(ctx context.Context, rc *requestCache) callback.ErrorResponseFunc {
 	const op = "failedFn"
-	return func(stateID string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
+	return func(state string, r *callback.AuthenErrorResponse, e error, w http.ResponseWriter, req *http.Request) {
 		var responseErr error
 		defer func() {
 			if _, err := w.Write([]byte(responseErr.Error())); err != nil {
