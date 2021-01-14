@@ -228,7 +228,7 @@ func NewRequest(expireIn time.Duration, redirectURL string, opt ...Option) (*Req
 
 	id, err := NewID(WithPrefix("st"))
 	if err != nil {
-		return nil, fmt.Errorf("%s: unable to generate a request's id: %w", op, err)
+		return nil, fmt.Errorf("%s: unable to generate a request's state: %w", op, err)
 	}
 	if expireIn == 0 || expireIn < 0 {
 		return nil, fmt.Errorf("%s: expireIn not greater than zero: %w", op, ErrInvalidParameter)
