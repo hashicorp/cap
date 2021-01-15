@@ -2,6 +2,7 @@ package jwt
 
 import (
 	"context"
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/tls"
@@ -35,9 +36,9 @@ type JSONWebKeySet struct {
 	remoteJWKS oidc.KeySet
 }
 
-// StaticKeySet verifies JWT signatures using local PEM-encoded public keys.
+// StaticKeySet verifies JWT signatures using local public keys.
 type StaticKeySet struct {
-	publicKeys []interface{}
+	publicKeys []crypto.PublicKey
 }
 
 // NewOIDCDiscoveryKeySet returns a KeySet that verifies JWT signatures using keys from the
@@ -125,25 +126,15 @@ func (ks JSONWebKeySet) VerifySignature(ctx context.Context, token string) (map[
 	return allClaims, nil
 }
 
-// NewStaticKeySet returns a KeySet that verifies JWT signatures using PEM-encoded public keys.
-// The given publicKeys must be of PEM-encoded x509 certificate or PKIX public key forms.
-func NewStaticKeySet(publicKeys []string) (KeySet, error) {
-	parsedPublicKeys := make([]interface{}, 0)
-	for _, k := range publicKeys {
-		key, err := parsePublicKeyPEM([]byte(k))
-		if err != nil {
-			return nil, err
-		}
-		parsedPublicKeys = append(parsedPublicKeys, key)
-	}
-
+// NewStaticKeySet returns a KeySet that verifies JWT signatures using the given publicKeys.
+func NewStaticKeySet(publicKeys []crypto.PublicKey) (KeySet, error) {
 	return StaticKeySet{
-		publicKeys: parsedPublicKeys,
+		publicKeys: publicKeys,
 	}, nil
 }
 
-// VerifySignature parses the given JWT, verifies its signature using local PEM-encoded public keys,
-// and returns the claims in its payload. The given JWT must be of the JWS compact serialization form.
+// VerifySignature parses the given JWT, verifies its signature using local public keys, and
+// returns the claims in its payload. The given JWT must be of the JWS compact serialization form.
 func (ks StaticKeySet) VerifySignature(_ context.Context, token string) (map[string]interface{}, error) {
 	parsedJWT, err := jwt.ParseSigned(token)
 	if err != nil {
@@ -165,9 +156,10 @@ func (ks StaticKeySet) VerifySignature(_ context.Context, token string) (map[str
 	return allClaims, nil
 }
 
-// parsePublicKeyPEM is used to parse RSA and ECDSA public keys from PEMs.
-// It returns a *rsa.PublicKey or *ecdsa.PublicKey.
-func parsePublicKeyPEM(data []byte) (interface{}, error) {
+// ParsePublicKeyPEM is used to parse RSA and ECDSA public keys from PEMs. The given
+// data must be of PEM-encoded x509 certificate or PKIX public key forms. It returns
+// an *rsa.PublicKey or *ecdsa.PublicKey.
+func ParsePublicKeyPEM(data []byte) (crypto.PublicKey, error) {
 	block, data := pem.Decode(data)
 	if block != nil {
 		var rawKey interface{}

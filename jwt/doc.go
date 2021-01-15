@@ -12,7 +12,7 @@ JWT signature verification is supported by providing keys from the following sou
 
  - JSON Web Key Set (JWKS) URL
  - OIDC Discovery mechanism
- - Local PEM-encoded public keys
+ - Local public keys
 
 JWT signature verification supports the following asymmetric algorithms as defined in
 https://www.rfc-editor.org/rfc/rfc7518.html#section-3.1:
