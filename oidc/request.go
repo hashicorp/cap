@@ -205,6 +205,7 @@ var _ Request = (*Req)(nil)
 
 // NewRequest creates a new Request (*Req).
 //  Supports the options:
+//   * WithState
 //   * WithNow
 //   * WithAudiences
 //   * WithScopes
@@ -226,10 +227,18 @@ func NewRequest(expireIn time.Duration, redirectURL string, opt ...Option) (*Req
 		return nil, fmt.Errorf("%s: unable to generate a request's nonce: %w", op, err)
 	}
 
-	id, err := NewID(WithPrefix("st"))
-	if err != nil {
-		return nil, fmt.Errorf("%s: unable to generate a request's state: %w", op, err)
+	var state string
+	switch {
+	case opts.withState != "":
+		state = opts.withState
+	default:
+		var err error
+		state, err = NewID(WithPrefix("st"))
+		if err != nil {
+			return nil, fmt.Errorf("%s: unable to generate a request's state: %w", op, err)
+		}
 	}
+
 	if expireIn == 0 || expireIn < 0 {
 		return nil, fmt.Errorf("%s: expireIn not greater than zero: %w", op, ErrInvalidParameter)
 	}
@@ -237,7 +246,7 @@ func NewRequest(expireIn time.Duration, redirectURL string, opt ...Option) (*Req
 		return nil, fmt.Errorf("%s: requested both implicit flow and authorization code with PKCE: %w", op, ErrInvalidParameter)
 	}
 	r := &Req{
-		state:         id,
+		state:         state,
 		nonce:         nonce,
 		redirectURL:   redirectURL,
 		nowFunc:       opts.withNowFunc,
@@ -418,6 +427,7 @@ type reqOptions struct {
 	withUILocales    []language.Tag
 	withClaims       []byte
 	withACRValues    []string
+	withState        string
 }
 
 // reqDefaults is a handy way to get the defaults at runtime and during unit
@@ -576,6 +586,42 @@ func WithACRValues(values ...string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*reqOptions); ok {
 			o.withACRValues = values
+		}
+	}
+}
+
+// WithState optionally specifies a value to use for the request's state.
+// Typically, state is a random string generated for you when you create
+// a new Request. This option allows you to override that auto-generated value
+// with a specific value of your own choosing.
+//
+// The primary reason for using the state parameter is to mitigate CSRF attacks
+// by using a unique and non-guessable value associated with each authentication
+// request about to be initiated. That value allows you to prevent the attack by
+// confirming that the value coming from the response matches the one you sent.
+// Since the state parameter is a string, you can encode any other information
+// in it.
+//
+// Some care must be taken to not use a state which is longer than your OIDC
+// Provider allows.  The specification places no limit on the length, but there
+// are many practical limitations placed on the length by browsers, proxies and
+// of course your OIDC provider.
+//
+// State should be at least 20 chars long (see:
+// https://tools.ietf.org/html/rfc6749#section-10.10).
+//
+// See NewID(...) for a function that generates a sufficiently
+// random string and supports the WithPrefix(...) option, which can be used
+// prefix your custom state payload.
+//
+// Neither a max or min length is enforced when you use the WithState option.
+//
+// Option is valid for: Request
+//
+func WithState(s string) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*reqOptions); ok {
+			o.withState = s
 		}
 	}
 }

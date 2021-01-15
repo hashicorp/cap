@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/cap/oidc/internal/base62"
+
 	"github.com/coreos/go-oidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -275,6 +277,27 @@ func Test_WithACRValues(t *testing.T) {
 		testOpts = reqDefaults()
 
 		testOpts.withACRValues = []string{"phr", "phrh"}
+
+		assert.Equal(opts, testOpts)
+	})
+}
+
+func Test_WithState(t *testing.T) {
+	t.Parallel()
+	t.Run("reqOptions", func(t *testing.T) {
+		t.Parallel()
+		assert := assert.New(t)
+		opts := getReqOpts()
+		testOpts := reqDefaults()
+		assert.Equal(opts, testOpts)
+
+		s, err := base62.Random(128)
+		require.NoError(t, err)
+
+		opts = getReqOpts(WithState(s))
+		testOpts = reqDefaults()
+
+		testOpts.withState = s
 
 		assert.Equal(opts, testOpts)
 	})
