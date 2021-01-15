@@ -43,7 +43,8 @@ type StaticKeySet struct {
 // NewOIDCDiscoveryKeySet returns a KeySet that verifies JWT signatures using keys from the
 // JSON Web Key Set (JWKS) published in the discovery document at the given discoveryURL.
 // The client used to obtain the remote keys will verify server certificates using the root
-// certificates provided by discoveryCAPEM.
+// certificates provided by discoveryCAPEM. If discoveryCAPEM is not provided, system
+// certificates are used.
 func NewOIDCDiscoveryKeySet(ctx context.Context, discoveryURL string, discoveryCAPEM string) (KeySet, error) {
 	if discoveryURL == "" {
 		return nil, errors.New("discoveryURL must not be empty")
@@ -90,7 +91,8 @@ func (ks OIDCDiscoveryKeySet) VerifySignature(ctx context.Context, token string)
 
 // NewJSONWebKeySet returns a KeySet that verifies JWT signatures using keys from the JSON Web
 // Key Set (JWKS) at the given jwksURL. The client used to obtain the remote JWKS will verify
-// server certificates using the root certificates provided by jwksCAPEM.
+// server certificates using the root certificates provided by jwksCAPEM. If jwksCAPEM is not
+// provided, system certificates are used.
 func NewJSONWebKeySet(ctx context.Context, jwksURL string, jwksCAPEM string) (KeySet, error) {
 	if jwksURL == "" {
 		return nil, errors.New("jwksURL must not be empty")
