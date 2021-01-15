@@ -89,7 +89,8 @@ type Expected struct {
 //  3. It's valid with respect to the current time. This means that the current
 //     time must be within the times (inclusive) given by the "nbf" (Not Before)
 //     and "exp" (Expiration Time) claims and after the time given by the "iat"
-//     (Issued At) claim, with configurable leeway.
+//     (Issued At) claim, with configurable leeway. See Expected.Now() for details
+//     on how the current time is provided for validation.
 func (v *Validator) Validate(ctx context.Context, token string, expected Expected) (map[string]interface{}, error) {
 	// First, verify the signature to ensure subsequent validation is against verified claims
 	allClaims, err := v.keySet.VerifySignature(ctx, token)
