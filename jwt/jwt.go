@@ -47,8 +47,7 @@ type Expected struct {
 
 	// The list of expected JWT "aud" (audience) claim values to match against.
 	// The JWT claim will be considered valid if it matches any of the expected
-	// audiences. If there are no expected audiences, then the presence of any
-	// audience in the JWT will render it invalid.
+	// audiences. If empty, validation is skipped.
 	Audiences []string
 
 	// SigningAlgorithms provides the list of expected JWS "alg" (algorithm) header
@@ -229,24 +228,21 @@ func validateSigningAlgorithm(token string, expectedAlgorithms []string) error {
 	return nil
 }
 
-// validateAudience checks whether any of the audiences in audClaim match those
-// in expectedAudiences. If there are no expected audiences, then the presence
-// of any audience in audClaim is considered an error.
+// validateAudience returns an error if audClaim does not contain any audiences
+// given by expectedAudiences. If expectedAudiences is empty, it skips validation
+// and returns nil.
 func validateAudience(expectedAudiences, audClaim []string) error {
-	if len(expectedAudiences) == 0 && len(audClaim) > 0 {
-		return errors.New("audience claim found in token but expected none")
+	if len(expectedAudiences) == 0 {
+		return nil
 	}
 
-	if len(expectedAudiences) > 0 {
-		for _, v := range expectedAudiences {
-			if contains(audClaim, v) {
-				return nil
-			}
+	for _, v := range expectedAudiences {
+		if contains(audClaim, v) {
+			return nil
 		}
-		return errors.New("audience claim does not match any expected audience")
 	}
 
-	return nil
+	return errors.New("audience claim does not match any expected audience")
 }
 
 func contains(sl []string, st string) bool {
