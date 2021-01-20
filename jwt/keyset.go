@@ -196,10 +196,8 @@ func createCAContext(ctx context.Context, caPEM string) (context.Context, error)
 	}
 
 	tr := cleanhttp.DefaultPooledTransport()
-	if certPool != nil {
-		tr.TLSClientConfig = &tls.Config{
-			RootCAs: certPool,
-		}
+	tr.TLSClientConfig = &tls.Config{
+		RootCAs: certPool,
 	}
 	tc := &http.Client{
 		Transport: tr,
