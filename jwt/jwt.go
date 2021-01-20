@@ -11,9 +11,9 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
-const (
-	defaultLeewaySeconds = 150
-)
+// DefaultLeewaySeconds defines the amount of leeway that's used by default
+// for validating the "nbf" (Not Before) and "exp" (Expiration Time) claims.
+const DefaultLeewaySeconds = 150
 
 // Validator validates JSON Web Tokens (JWT) by providing signature
 // verification and claims set validation.
@@ -139,7 +139,7 @@ func (v *Validator) Validate(ctx context.Context, token string, expected Expecte
 		if expected.ExpirationLeeway.Seconds() < 0 {
 			leeway = 0
 		} else if expected.ExpirationLeeway.Seconds() == 0 {
-			leeway = defaultLeewaySeconds
+			leeway = DefaultLeewaySeconds
 		}
 		*claims.Expiry = jwt.NumericDate(int64(latestStart) + int64(leeway))
 	}
@@ -154,7 +154,7 @@ func (v *Validator) Validate(ctx context.Context, token string, expected Expecte
 			if expected.NotBeforeLeeway.Seconds() < 0 {
 				leeway = 0
 			} else if expected.NotBeforeLeeway.Seconds() == 0 {
-				leeway = defaultLeewaySeconds
+				leeway = DefaultLeewaySeconds
 			}
 			*claims.NotBefore = jwt.NumericDate(int64(*claims.Expiry) - int64(leeway))
 		}
