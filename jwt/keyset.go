@@ -83,13 +83,11 @@ func NewOIDCDiscoveryKeySet(ctx context.Context, issuer string, issuerCAPEM stri
 	}
 
 	// Unmarshal the response body to obtain the issuer and JWKS URL
-	type providerJSON struct {
+	var p struct {
 		Issuer  string `json:"issuer"`
 		JWKSURL string `json:"jwks_uri"`
 	}
-	var p providerJSON
-	err = unmarshalResp(resp, body, &p)
-	if err != nil {
+	if err := unmarshalResp(resp, body, &p); err != nil {
 		return nil, fmt.Errorf("failed to decode OIDC discovery document: %w", err)
 	}
 
