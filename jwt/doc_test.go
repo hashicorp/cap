@@ -61,7 +61,7 @@ func ExampleNewJSONWebKeySet() {
 func ExampleNewOIDCDiscoveryKeySet() {
 	ctx := context.Background()
 
-	keySet, err := jwt.NewOIDCDiscoveryKeySet(ctx, "your_oidc_discovery_url", "your_oidc_discovery_ca_pem")
+	keySet, err := jwt.NewOIDCDiscoveryKeySet(ctx, "your_issuer_url", "your_issuer_ca_pem")
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -42,17 +42,17 @@ type staticKeySet struct {
 }
 
 // NewOIDCDiscoveryKeySet returns a KeySet that verifies JWT signatures using keys from the
-// JSON Web Key Set (JWKS) published in the discovery document at the given discoveryURL.
+// JSON Web Key Set (JWKS) published in the discovery document at the given issuer URL.
 // The client used to obtain the remote keys will verify server certificates using the root
-// certificates provided by discoveryCAPEM. If discoveryCAPEM is not provided, system
-// certificates are used.
-func NewOIDCDiscoveryKeySet(ctx context.Context, discoveryURL string, discoveryCAPEM string) (KeySet, error) {
-	if discoveryURL == "" {
-		return nil, errors.New("discoveryURL must not be empty")
+// certificates provided by issuerCAPEM. If issuerCAPEM is not provided, system certificates
+// are used.
+func NewOIDCDiscoveryKeySet(ctx context.Context, issuer string, issuerCAPEM string) (KeySet, error) {
+	if issuer == "" {
+		return nil, errors.New("issuer must not be empty")
 	}
 
 	// Configure an http client with the given certificates
-	caCtx, err := createCAContext(ctx, discoveryCAPEM)
+	caCtx, err := createCAContext(ctx, issuerCAPEM)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func NewOIDCDiscoveryKeySet(ctx context.Context, discoveryURL string, discoveryC
 	}
 
 	// Create and send the http request for the OIDC discovery document
-	wellKnown := strings.TrimSuffix(discoveryURL, "/") + "/.well-known/openid-configuration"
+	wellKnown := strings.TrimSuffix(issuer, "/") + "/.well-known/openid-configuration"
 	req, err := http.NewRequest(http.MethodGet, wellKnown, nil)
 	if err != nil {
 		return nil, err
@@ -93,10 +93,10 @@ func NewOIDCDiscoveryKeySet(ctx context.Context, discoveryURL string, discoveryC
 		return nil, fmt.Errorf("failed to decode OIDC discovery document: %v", err)
 	}
 
-	// Ensure that the returned issuer matches what was requested by discoveryURL
-	if p.Issuer != discoveryURL {
-		return nil, fmt.Errorf("discoveryURL did not match the returned issuer, expected %q got %q",
-			discoveryURL, p.Issuer)
+	// Ensure that the returned issuer matches what was given by issuer
+	if p.Issuer != issuer {
+		return nil, fmt.Errorf("issuer did not match the returned issuer, expected %q got %q",
+			issuer, p.Issuer)
 	}
 
 	return &jsonWebKeySet{
