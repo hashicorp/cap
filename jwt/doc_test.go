@@ -29,7 +29,7 @@ func ExampleValidator_Validate() {
 		Subject:           "your_expected_subject",
 		ID:                "your_expected_jwt_id",
 		Audiences:         []string{"your_expected_audiences"},
-		SigningAlgorithms: []string{"your_expected_signing_algs"},
+		SigningAlgorithms: []jwt.Alg{jwt.RS256},
 	}
 
 	token := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJleHBfaXNzIiwiZXhwIjoxNTI2MjM5MDIyfQ.XG1xYJcuPMfgu8xkMzVjkYK2WIUyl4-A1Zq1j4Dfr99-PJUN36ZAgi8Fj08modiexXETrg05MqSxkJAE5Czns1IhqEEypx6xfYHSINp0SLKxBFHPA4BCi0IW83T-e225JjjVEGFR_Wo8QM6Rc-qQVJ9bqwKD4kcbQeMACkgGFcgNurtNkOM9vtOEs0Pe9tb4nHYw4ef1stCytTi9GFZwGoHQf0pjpWCpjlxaFIR4vmHQ4YB3w29o_tKN6zqyA2FITnvkzGnaLvdPecJNskRSCPUTRfYcVVNXCOnCvTdpvwK-c4nCs5yGnw3eeFoT6mhQSp39KYti1MpHNQTYwZrLTA"

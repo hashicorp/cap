@@ -52,9 +52,10 @@ type Expected struct {
 
 	// SigningAlgorithms provides the list of expected JWS "alg" (algorithm) header
 	// parameter values to match against. The JWS header parameter will be considered
-	// valid if it matches any of the expected signing algorithms. If empty, defaults
-	// to "RS256" as defined in https://www.rfc-editor.org/rfc/rfc7518.html#section-3.1.
-	SigningAlgorithms []string
+	// valid if it matches any of the expected signing algorithms. The following
+	// algorithms are supported: RS256, RS384, RS512, ES256, ES384, ES512, PS256,
+	// PS384, PS512, EdDSA. If empty, defaults to RS256.
+	SigningAlgorithms []Alg
 
 	// NotBeforeLeeway provides the option to set an amount of leeway to use when
 	// validating the "nbf" (Not Before) claim. If the duration is zero or not
@@ -202,8 +203,14 @@ func (v *Validator) Validate(ctx context.Context, token string, expected Expecte
 
 // validateSigningAlgorithm checks whether the JWS "alg" (Algorithm) header
 // parameter value for the given JWT matches any given in expectedAlgorithms.
-// If expectedAlgorithms is empty, "RS256" will be expected by default.
-func validateSigningAlgorithm(token string, expectedAlgorithms []string) error {
+// If expectedAlgorithms is empty, RS256 will be expected by default.
+func validateSigningAlgorithm(token string, expectedAlgorithms []Alg) error {
+	for _, expected := range expectedAlgorithms {
+		if !supportedAlgorithms[expected] {
+			return fmt.Errorf("unsupported signing algorithm %q", expected)
+		}
+	}
+
 	jws, err := jose.ParseSigned(token)
 	if err != nil {
 		return err
@@ -218,15 +225,17 @@ func validateSigningAlgorithm(token string, expectedAlgorithms []string) error {
 	}
 
 	if len(expectedAlgorithms) == 0 {
-		expectedAlgorithms = []string{string(jose.RS256)}
+		expectedAlgorithms = []Alg{RS256}
 	}
 
-	alg := jws.Signatures[0].Header.Algorithm
-	if !contains(expectedAlgorithms, alg) {
-		return fmt.Errorf("token signed with unexpected algorithm")
+	actual := Alg(jws.Signatures[0].Header.Algorithm)
+	for _, expected := range expectedAlgorithms {
+		if expected == actual {
+			return nil
+		}
 	}
 
-	return nil
+	return fmt.Errorf("token signed with unexpected algorithm")
 }
 
 // validateAudience returns an error if audClaim does not contain any audiences
