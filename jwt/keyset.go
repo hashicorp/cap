@@ -90,7 +90,7 @@ func NewOIDCDiscoveryKeySet(ctx context.Context, issuer string, issuerCAPEM stri
 	var p providerJSON
 	err = unmarshalResp(resp, body, &p)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode OIDC discovery document: %v", err)
+		return nil, fmt.Errorf("failed to decode OIDC discovery document: %w", err)
 	}
 
 	// Ensure that the returned issuer matches what was given by issuer
