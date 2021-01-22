@@ -1,5 +1,7 @@
 package jwt
 
+import "fmt"
+
 // Alg represents asymmetric signing algorithms
 type Alg string
 
@@ -30,4 +32,15 @@ var supportedAlgorithms = map[Alg]bool{
 	PS384: true,
 	PS512: true,
 	EdDSA: true,
+}
+
+// SupportedSigningAlgorithm returns an error if any of the given Algs
+// are not supported signing algorithms.
+func SupportedSigningAlgorithm(algs ...Alg) error {
+	for _, a := range algs {
+		if !supportedAlgorithms[a] {
+			return fmt.Errorf("unsupported signing algorithm %q", a)
+		}
+	}
+	return nil
 }

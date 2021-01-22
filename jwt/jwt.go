@@ -205,10 +205,8 @@ func (v *Validator) Validate(ctx context.Context, token string, expected Expecte
 // parameter value for the given JWT matches any given in expectedAlgorithms.
 // If expectedAlgorithms is empty, RS256 will be expected by default.
 func validateSigningAlgorithm(token string, expectedAlgorithms []Alg) error {
-	for _, expected := range expectedAlgorithms {
-		if !supportedAlgorithms[expected] {
-			return fmt.Errorf("unsupported signing algorithm %q", expected)
-		}
+	if err := SupportedSigningAlgorithm(expectedAlgorithms...); err != nil {
+		return err
 	}
 
 	jws, err := jose.ParseSigned(token)
