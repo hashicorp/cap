@@ -24,6 +24,7 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 	// Generate a key to sign JWTs with throughout most test cases
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
+	tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 
 	// Establish past, now, and future for validation of time related claims
 	now := time.Now()
@@ -49,7 +50,6 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
 				},
 				expected: Expected{
@@ -66,7 +66,6 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
 				},
 				expected: Expected{
@@ -83,7 +82,6 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
 				},
 				expected: Expected{
@@ -100,7 +98,6 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
 				},
 				expected: Expected{
@@ -116,7 +113,6 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS512, testKeyID)
 					return testSignJWT(t, priv, RS512, claims, []byte(testKeyID))
 				},
 				expected: Expected{
@@ -136,7 +132,6 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
 				},
 				expected: Expected{
@@ -160,7 +155,6 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
 				},
 				expected: Expected{},
@@ -173,7 +167,6 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"iat": nowUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
 				},
 				expected: Expected{
@@ -193,7 +186,6 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": nowUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
 				},
 				expected: Expected{
@@ -215,7 +207,6 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
 				},
 				expected: Expected{
@@ -236,7 +227,6 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": nowUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
 				},
 				expected: Expected{
@@ -257,7 +247,6 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
 				},
 				expected: Expected{
@@ -303,6 +292,7 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 	// Generate a key to sign JWTs with throughout most test cases
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
+	tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 
 	// Establish past, now, and future for validation of time related claims
 	now := time.Now()
@@ -328,7 +318,6 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
 				},
 				expected: Expected{
@@ -345,7 +334,6 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
 				},
 				expected: Expected{
@@ -362,7 +350,6 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
 				},
 				expected: Expected{
@@ -379,7 +366,6 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
 				},
 				expected: Expected{
@@ -395,8 +381,7 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS512, testKeyID)
-					return testSignJWT(t, priv, RS512, claims, []byte(testKeyID))
+					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					SigningAlgorithms: []Alg{ES256},
@@ -411,8 +396,6 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
-
 					// Sign the JWT with a key not in the test provider
 					pk, err := rsa.GenerateKey(rand.Reader, 2048)
 					require.NoError(t, err)
@@ -430,7 +413,6 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 					"iss": "https://example.com/",
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
 				},
 				expected: Expected{},
@@ -443,7 +425,6 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 					"nbf": nowUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
 				},
 				expected: Expected{
@@ -460,7 +441,6 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 					"exp": nowUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
 				},
 				expected: Expected{
@@ -478,7 +458,6 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 					"iat": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
 				},
 				expected: Expected{
