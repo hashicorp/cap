@@ -110,5 +110,71 @@ func NewHandler(ctx context.Context, p *oidc.Provider, r callback.RequestReader)
     }
 }
 ```
-  
+
+### [`jwt package`](./jwt) 
+[![Go Reference](https://pkg.go.dev/badge/github.com/hashicorp/cap/jwt.svg)](https://pkg.go.dev/github.com/hashicorp/cap/jwt)
+
+Package jwt provides signature verification and claims set validation for JSON Web Tokens (JWT)
+of the JSON Web Signature (JWS) form.
+
+JWT claims set validation provided by the package includes the option to validate
+all registered claim names defined in [rfc7519#section-4.1](https://tools.ietf.org/html/rfc7519#section-4.1).
+
+JOSE header validation provided by the the package includes the option to validate the "alg"
+(Algorithm) Header Parameter defined in [rfc7515#section-4.1](https://tools.ietf.org/html/rfc7515#section-4.1).
+
+JWT signature verification is supported by providing keys from the following sources:
+
+- JSON Web Key Set (JWKS) URL
+- OIDC Discovery mechanism
+- Local public keys
+
+JWT signature verification supports the following asymmetric algorithms defined in
+[rfc7518.html#section-3.1](https://www.rfc-editor.org/rfc/rfc7518.html#section-3.1):
  
+| Identifier     | Signing Algorithm |
+| -------------- | :---------------- |
+| RS256          | RSASSA-PKCS1-v1_5 using SHA-256 |
+| RS384          | RSASSA-PKCS1-v1_5 using SHA-384 |
+| RS512          | RSASSA-PKCS1-v1_5 using SHA-512 |
+| ES256          | ECDSA using P-256 and SHA-256 |
+| ES384          | ECDSA using P-384 and SHA-384 |
+| ES512          | ECDSA using P-521 and SHA-512 |
+| PS256          | RSASSA-PSS using SHA-256 and MGF1 with SHA-256 |
+| PS384          | RSASSA-PSS using SHA-384 and MGF1 with SHA-384 |
+| PS512          | RSASSA-PSS using SHA-512 and MGF1 with SHA-512 |
+| EdDSA          | Ed25519 using SHA-512 |
+
+<hr>
+
+Example usage of JWT signature verification and claims set validation using keys from a JWKS URL:
+
+```go
+ctx := context.Background()
+
+keySet, err := jwt.NewJSONWebKeySet(ctx, "your_jwks_url", "your_jwks_ca_pem")
+if err != nil {
+	log.Fatal(err)
+}
+
+validator, err := jwt.NewValidator(keySet)
+if err != nil {
+	log.Fatal(err)
+}
+
+expected := jwt.Expected{
+	Issuer:            "your_expected_issuer",
+	Subject:           "your_expected_subject",
+	ID:                "your_expected_jwt_id",
+	Audiences:         []string{"your_expected_audiences"},
+	SigningAlgorithms: []jwt.Alg{jwt.RS256},
+}
+
+token := "header.payload.signature"
+claims, err := validator.Validate(ctx, token, expected)
+if err != nil {
+	log.Fatal(err)
+}
+```
+
+For additional documentation and usage examples, see [jwt/README.md](./jwt).
