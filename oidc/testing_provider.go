@@ -437,7 +437,7 @@ func (p *TestProvider) SetDisableJWKs(disable bool) {
 func (p *TestProvider) SetInvalidJWKS(invalid bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.invalidJWKs = true
+	p.invalidJWKs = invalid
 }
 
 // SetExpectedState sets the value for the state parameter returned from
