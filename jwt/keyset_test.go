@@ -8,6 +8,10 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"math/big"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -693,4 +697,182 @@ func testSignJWT(t *testing.T, key crypto.PrivateKey, alg Alg, claims interface{
 		CompactSerialize()
 	require.NoError(t, err)
 	return raw
+}
+
+func TestParsePublicKeyPEM(t *testing.T) {
+	type args struct {
+		pem func() ([]byte, crypto.PublicKey)
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "parse PKIX RSA public key",
+			args: args{
+				pem: func() ([]byte, crypto.PublicKey) {
+					priv, err := rsa.GenerateKey(rand.Reader, 2048)
+					require.NoError(t, err)
+
+					bytes, err := x509.MarshalPKIXPublicKey(priv.Public())
+					require.NoError(t, err)
+					return pem.EncodeToMemory(&pem.Block{
+						Type:  "PUBLIC KEY",
+						Bytes: bytes,
+					}), priv.Public()
+				},
+			},
+		},
+		{
+			name: "parse PKIX ECDSA public key",
+			args: args{
+				pem: func() ([]byte, crypto.PublicKey) {
+					priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+					require.NoError(t, err)
+
+					bytes, err := x509.MarshalPKIXPublicKey(priv.Public())
+					require.NoError(t, err)
+					return pem.EncodeToMemory(&pem.Block{
+						Type:  "PUBLIC KEY",
+						Bytes: bytes,
+					}), priv.Public()
+				},
+			},
+		},
+		{
+			name: "parse x509 certificate RSA public key",
+			args: args{
+				pem: func() ([]byte, crypto.PublicKey) {
+					priv, err := rsa.GenerateKey(rand.Reader, 2048)
+					require.NoError(t, err)
+
+					template := x509.Certificate{
+						SerialNumber: new(big.Int).SetInt64(123),
+					}
+					cert, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+					require.NoError(t, err)
+					return pem.EncodeToMemory(&pem.Block{
+						Type:  "CERTIFICATE",
+						Bytes: cert,
+					}), priv.Public()
+				},
+			},
+		},
+		{
+			name: "parse x509 certificate ECDSA public key",
+			args: args{
+				pem: func() ([]byte, crypto.PublicKey) {
+					priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+					require.NoError(t, err)
+
+					template := x509.Certificate{
+						SerialNumber: new(big.Int).SetInt64(123),
+					}
+					cert, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+					require.NoError(t, err)
+					return pem.EncodeToMemory(&pem.Block{
+						Type:  "CERTIFICATE",
+						Bytes: cert,
+					}), priv.Public()
+				},
+			},
+		},
+		{
+			name: "malformed PEM",
+			args: args{
+				pem: func() ([]byte, crypto.PublicKey) {
+					return []byte(`"-----BEGIN CERTIFICATE-----"`), nil
+				},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pemBytes, pub := tt.args.pem()
+			got, err := ParsePublicKeyPEM(pemBytes)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, pub, got)
+		})
+	}
+}
+
+func Test_unmarshalResp(t *testing.T) {
+	type args struct {
+		r    *http.Response
+		body []byte
+		v    interface{}
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "valid JSON response",
+			args: args{
+				body: []byte(`{"valid":"json"}`),
+				v: struct {
+					valid string `json:"valid"`
+				}{},
+				r: &http.Response{},
+			},
+		},
+		{
+			name: "invalid JSON response with no content-type header",
+			args: args{
+				body: []byte(`{"invalid":"j}`),
+				v: struct {
+					invalid string `json:"invalid"`
+				}{},
+				r: &http.Response{},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid JSON response with application/json content-type header",
+			args: args{
+				body: []byte(`{"invalid":"j}`),
+				v: struct {
+					invalid string `json:"invalid"`
+				}{},
+				r: &http.Response{
+					Header: map[string][]string{
+						"Content-Type": {"application/json"},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid JSON response with text/html content-type header",
+			args: args{
+				body: []byte(`{"invalid":"j}`),
+				v: struct {
+					invalid string `json:"invalid"`
+				}{},
+				r: &http.Response{
+					Header: map[string][]string{
+						"Content-Type": {"text/html"},
+					},
+				},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := unmarshalResp(tt.args.r, tt.args.body, tt.args.v)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
 }
