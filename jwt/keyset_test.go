@@ -17,8 +17,6 @@ import (
 
 	"github.com/hashicorp/cap/oidc"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 const (
@@ -45,7 +43,7 @@ func Test_jsonWebKeySet_VerifySignature(t *testing.T) {
 					priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 					require.NoError(t, err)
 					tp.SetSigningKeys(priv, priv.Public(), oidc.ES256, testKeyID)
-					return testSignJWT(t, priv, ES256, testJWTClaims(t), []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(ES256), testJWTClaims(t), []byte(testKeyID))
 				},
 			},
 			want: testJWTClaims(t),
@@ -57,7 +55,7 @@ func Test_jsonWebKeySet_VerifySignature(t *testing.T) {
 					priv, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 					require.NoError(t, err)
 					tp.SetSigningKeys(priv, priv.Public(), oidc.ES384, testKeyID)
-					return testSignJWT(t, priv, ES384, testJWTClaims(t), []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(ES384), testJWTClaims(t), []byte(testKeyID))
 				},
 			},
 			want: testJWTClaims(t),
@@ -69,7 +67,7 @@ func Test_jsonWebKeySet_VerifySignature(t *testing.T) {
 					priv, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 					require.NoError(t, err)
 					tp.SetSigningKeys(priv, priv.Public(), oidc.ES512, testKeyID)
-					return testSignJWT(t, priv, ES512, testJWTClaims(t), []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(ES512), testJWTClaims(t), []byte(testKeyID))
 				},
 			},
 			want: testJWTClaims(t),
@@ -81,7 +79,7 @@ func Test_jsonWebKeySet_VerifySignature(t *testing.T) {
 					priv, err := rsa.GenerateKey(rand.Reader, 2048)
 					require.NoError(t, err)
 					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
-					return testSignJWT(t, priv, RS256, testJWTClaims(t), []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), testJWTClaims(t), []byte(testKeyID))
 				},
 			},
 			want: testJWTClaims(t),
@@ -93,7 +91,7 @@ func Test_jsonWebKeySet_VerifySignature(t *testing.T) {
 					priv, err := rsa.GenerateKey(rand.Reader, 3072)
 					require.NoError(t, err)
 					tp.SetSigningKeys(priv, priv.Public(), oidc.RS384, testKeyID)
-					return testSignJWT(t, priv, RS384, testJWTClaims(t), []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS384), testJWTClaims(t), []byte(testKeyID))
 				},
 			},
 			want: testJWTClaims(t),
@@ -105,7 +103,7 @@ func Test_jsonWebKeySet_VerifySignature(t *testing.T) {
 					priv, err := rsa.GenerateKey(rand.Reader, 4096)
 					require.NoError(t, err)
 					tp.SetSigningKeys(priv, priv.Public(), oidc.RS512, testKeyID)
-					return testSignJWT(t, priv, RS512, testJWTClaims(t), []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS512), testJWTClaims(t), []byte(testKeyID))
 				},
 			},
 			want: testJWTClaims(t),
@@ -117,7 +115,7 @@ func Test_jsonWebKeySet_VerifySignature(t *testing.T) {
 					priv, err := rsa.GenerateKey(rand.Reader, 2048)
 					require.NoError(t, err)
 					tp.SetSigningKeys(priv, priv.Public(), oidc.PS256, testKeyID)
-					return testSignJWT(t, priv, PS256, testJWTClaims(t), []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(PS256), testJWTClaims(t), []byte(testKeyID))
 				},
 			},
 			want: testJWTClaims(t),
@@ -129,7 +127,7 @@ func Test_jsonWebKeySet_VerifySignature(t *testing.T) {
 					priv, err := rsa.GenerateKey(rand.Reader, 3072)
 					require.NoError(t, err)
 					tp.SetSigningKeys(priv, priv.Public(), oidc.PS384, testKeyID)
-					return testSignJWT(t, priv, PS384, testJWTClaims(t), []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(PS384), testJWTClaims(t), []byte(testKeyID))
 				},
 			},
 			want: testJWTClaims(t),
@@ -141,7 +139,7 @@ func Test_jsonWebKeySet_VerifySignature(t *testing.T) {
 					priv, err := rsa.GenerateKey(rand.Reader, 4096)
 					require.NoError(t, err)
 					tp.SetSigningKeys(priv, priv.Public(), oidc.PS512, testKeyID)
-					return testSignJWT(t, priv, PS512, testJWTClaims(t), []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(PS512), testJWTClaims(t), []byte(testKeyID))
 				},
 			},
 			want: testJWTClaims(t),
@@ -153,7 +151,7 @@ func Test_jsonWebKeySet_VerifySignature(t *testing.T) {
 					pub, priv, err := ed25519.GenerateKey(rand.Reader)
 					require.NoError(t, err)
 					tp.SetSigningKeys(priv, pub, oidc.EdDSA, testKeyID)
-					return testSignJWT(t, priv, EdDSA, testJWTClaims(t), []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(EdDSA), testJWTClaims(t), []byte(testKeyID))
 				},
 			},
 			want: testJWTClaims(t),
@@ -168,7 +166,7 @@ func Test_jsonWebKeySet_VerifySignature(t *testing.T) {
 
 					priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 					require.NoError(t, err)
-					return testSignJWT(t, priv, ES256, testJWTClaims(t), []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(ES256), testJWTClaims(t), []byte(testKeyID))
 				},
 			},
 			wantErr: true,
@@ -182,7 +180,7 @@ func Test_jsonWebKeySet_VerifySignature(t *testing.T) {
 					tp.SetSigningKeys(priv, priv.Public(), oidc.ES256, testKeyID)
 
 					// Replace the header with information that would change the signature
-					token := testSignJWT(t, priv, ES256, testJWTClaims(t), []byte(testKeyID))
+					token := oidc.TestSignJWT(t, priv, string(ES256), testJWTClaims(t), []byte(testKeyID))
 					parts := strings.Split(token, ".")
 					require.Equal(t, 3, len(parts))
 					parts[0] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
@@ -200,7 +198,7 @@ func Test_jsonWebKeySet_VerifySignature(t *testing.T) {
 					tp.SetSigningKeys(priv, priv.Public(), oidc.ES256, testKeyID)
 
 					// Replace the payload with information that would change the signature
-					token := testSignJWT(t, priv, ES256, testJWTClaims(t), []byte(testKeyID))
+					token := oidc.TestSignJWT(t, priv, string(ES256), testJWTClaims(t), []byte(testKeyID))
 					parts := strings.Split(token, ".")
 					require.Equal(t, 3, len(parts))
 					parts[1] = "eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ"
@@ -226,7 +224,7 @@ func Test_jsonWebKeySet_VerifySignature(t *testing.T) {
 					tp.SetInvalidJWKS(true)
 
 					priv, _, alg, id := tp.SigningKeys()
-					return testSignJWT(t, priv, Alg(alg), testJWTClaims(t), []byte(id))
+					return oidc.TestSignJWT(t, priv, string(alg), testJWTClaims(t), []byte(id))
 				},
 			},
 			wantErr: true,
@@ -239,7 +237,7 @@ func Test_jsonWebKeySet_VerifySignature(t *testing.T) {
 					tp.SetDisableJWKs(true)
 
 					priv, _, alg, id := tp.SigningKeys()
-					return testSignJWT(t, priv, Alg(alg), testJWTClaims(t), []byte(id))
+					return oidc.TestSignJWT(t, priv, string(alg), testJWTClaims(t), []byte(id))
 				},
 			},
 			wantErr: true,
@@ -283,7 +281,7 @@ func Test_staticKeySet_VerifySignature(t *testing.T) {
 				token: func() (string, []crypto.PublicKey) {
 					priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 					require.NoError(t, err)
-					token := testSignJWT(t, priv, ES256, testJWTClaims(t), []byte(testKeyID))
+					token := oidc.TestSignJWT(t, priv, string(ES256), testJWTClaims(t), []byte(testKeyID))
 					return token, []crypto.PublicKey{priv.Public()}
 				},
 			},
@@ -295,7 +293,7 @@ func Test_staticKeySet_VerifySignature(t *testing.T) {
 				token: func() (string, []crypto.PublicKey) {
 					priv, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 					require.NoError(t, err)
-					token := testSignJWT(t, priv, ES384, testJWTClaims(t), []byte(testKeyID))
+					token := oidc.TestSignJWT(t, priv, string(ES384), testJWTClaims(t), []byte(testKeyID))
 					return token, []crypto.PublicKey{priv.Public()}
 				},
 			},
@@ -307,7 +305,7 @@ func Test_staticKeySet_VerifySignature(t *testing.T) {
 				token: func() (string, []crypto.PublicKey) {
 					priv, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 					require.NoError(t, err)
-					token := testSignJWT(t, priv, ES512, testJWTClaims(t), []byte(testKeyID))
+					token := oidc.TestSignJWT(t, priv, string(ES512), testJWTClaims(t), []byte(testKeyID))
 					return token, []crypto.PublicKey{priv.Public()}
 				},
 			},
@@ -319,7 +317,7 @@ func Test_staticKeySet_VerifySignature(t *testing.T) {
 				token: func() (string, []crypto.PublicKey) {
 					priv, err := rsa.GenerateKey(rand.Reader, 2048)
 					require.NoError(t, err)
-					token := testSignJWT(t, priv, RS256, testJWTClaims(t), []byte(testKeyID))
+					token := oidc.TestSignJWT(t, priv, string(RS256), testJWTClaims(t), []byte(testKeyID))
 					return token, []crypto.PublicKey{priv.Public()}
 				},
 			},
@@ -331,7 +329,7 @@ func Test_staticKeySet_VerifySignature(t *testing.T) {
 				token: func() (string, []crypto.PublicKey) {
 					priv, err := rsa.GenerateKey(rand.Reader, 3072)
 					require.NoError(t, err)
-					token := testSignJWT(t, priv, RS384, testJWTClaims(t), []byte(testKeyID))
+					token := oidc.TestSignJWT(t, priv, string(RS384), testJWTClaims(t), []byte(testKeyID))
 					return token, []crypto.PublicKey{priv.Public()}
 				},
 			},
@@ -343,7 +341,7 @@ func Test_staticKeySet_VerifySignature(t *testing.T) {
 				token: func() (string, []crypto.PublicKey) {
 					priv, err := rsa.GenerateKey(rand.Reader, 4096)
 					require.NoError(t, err)
-					token := testSignJWT(t, priv, RS512, testJWTClaims(t), []byte(testKeyID))
+					token := oidc.TestSignJWT(t, priv, string(RS512), testJWTClaims(t), []byte(testKeyID))
 					return token, []crypto.PublicKey{priv.Public()}
 				},
 			},
@@ -355,7 +353,7 @@ func Test_staticKeySet_VerifySignature(t *testing.T) {
 				token: func() (string, []crypto.PublicKey) {
 					priv, err := rsa.GenerateKey(rand.Reader, 2048)
 					require.NoError(t, err)
-					token := testSignJWT(t, priv, PS256, testJWTClaims(t), []byte(testKeyID))
+					token := oidc.TestSignJWT(t, priv, string(PS256), testJWTClaims(t), []byte(testKeyID))
 					return token, []crypto.PublicKey{priv.Public()}
 				},
 			},
@@ -367,7 +365,7 @@ func Test_staticKeySet_VerifySignature(t *testing.T) {
 				token: func() (string, []crypto.PublicKey) {
 					priv, err := rsa.GenerateKey(rand.Reader, 3072)
 					require.NoError(t, err)
-					token := testSignJWT(t, priv, PS384, testJWTClaims(t), []byte(testKeyID))
+					token := oidc.TestSignJWT(t, priv, string(PS384), testJWTClaims(t), []byte(testKeyID))
 					return token, []crypto.PublicKey{priv.Public()}
 				},
 			},
@@ -379,7 +377,7 @@ func Test_staticKeySet_VerifySignature(t *testing.T) {
 				token: func() (string, []crypto.PublicKey) {
 					priv, err := rsa.GenerateKey(rand.Reader, 4096)
 					require.NoError(t, err)
-					token := testSignJWT(t, priv, PS512, testJWTClaims(t), []byte(testKeyID))
+					token := oidc.TestSignJWT(t, priv, string(PS512), testJWTClaims(t), []byte(testKeyID))
 					return token, []crypto.PublicKey{priv.Public()}
 				},
 			},
@@ -391,7 +389,7 @@ func Test_staticKeySet_VerifySignature(t *testing.T) {
 				token: func() (string, []crypto.PublicKey) {
 					pub, priv, err := ed25519.GenerateKey(rand.Reader)
 					require.NoError(t, err)
-					token := testSignJWT(t, priv, EdDSA, testJWTClaims(t), []byte(testKeyID))
+					token := oidc.TestSignJWT(t, priv, string(EdDSA), testJWTClaims(t), []byte(testKeyID))
 					return token, []crypto.PublicKey{pub}
 				},
 			},
@@ -408,7 +406,7 @@ func Test_staticKeySet_VerifySignature(t *testing.T) {
 					rsaPriv, err := rsa.GenerateKey(rand.Reader, 2048)
 					require.NoError(t, err)
 
-					token := testSignJWT(t, rsaPriv, RS256, testJWTClaims(t), []byte(testKeyID))
+					token := oidc.TestSignJWT(t, rsaPriv, string(RS256), testJWTClaims(t), []byte(testKeyID))
 					return token, []crypto.PublicKey{edPub, ecPriv.Public(), rsaPriv.Public()}
 				},
 			},
@@ -425,7 +423,7 @@ func Test_staticKeySet_VerifySignature(t *testing.T) {
 					rsaPriv, err := rsa.GenerateKey(rand.Reader, 2048)
 					require.NoError(t, err)
 
-					token := testSignJWT(t, ecPriv, ES256, testJWTClaims(t), []byte(testKeyID))
+					token := oidc.TestSignJWT(t, ecPriv, string(ES256), testJWTClaims(t), []byte(testKeyID))
 					return token, []crypto.PublicKey{edPub, rsaPriv.Public()}
 				},
 			},
@@ -440,7 +438,7 @@ func Test_staticKeySet_VerifySignature(t *testing.T) {
 					priv2, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 					require.NoError(t, err)
 
-					token := testSignJWT(t, priv1, ES256, testJWTClaims(t), []byte(testKeyID))
+					token := oidc.TestSignJWT(t, priv1, string(ES256), testJWTClaims(t), []byte(testKeyID))
 					return token, []crypto.PublicKey{priv2.Public()}
 				},
 			},
@@ -454,7 +452,7 @@ func Test_staticKeySet_VerifySignature(t *testing.T) {
 					require.NoError(t, err)
 
 					// Replace the header with information that would change the signature
-					token := testSignJWT(t, priv, ES256, testJWTClaims(t), []byte(testKeyID))
+					token := oidc.TestSignJWT(t, priv, string(ES256), testJWTClaims(t), []byte(testKeyID))
 					parts := strings.Split(token, ".")
 					require.Equal(t, 3, len(parts))
 					parts[0] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
@@ -471,7 +469,7 @@ func Test_staticKeySet_VerifySignature(t *testing.T) {
 					require.NoError(t, err)
 
 					// Replace the payload with information that would change the signature
-					token := testSignJWT(t, priv, ES256, testJWTClaims(t), []byte(testKeyID))
+					token := oidc.TestSignJWT(t, priv, string(ES256), testJWTClaims(t), []byte(testKeyID))
 					parts := strings.Split(token, ".")
 					require.Equal(t, 3, len(parts))
 					parts[1] = "eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ"
@@ -678,27 +676,6 @@ func testJWTClaims(t *testing.T) map[string]interface{} {
 	}
 }
 
-func testSignJWT(t *testing.T, key crypto.PrivateKey, alg Alg, claims interface{}, keyID []byte) string {
-	t.Helper()
-
-	hdr := map[jose.HeaderKey]interface{}{}
-	if keyID != nil {
-		hdr["key_id"] = string(keyID)
-	}
-
-	sig, err := jose.NewSigner(
-		jose.SigningKey{Algorithm: jose.SignatureAlgorithm(alg), Key: key},
-		(&jose.SignerOptions{ExtraHeaders: hdr}).WithType("JWT"),
-	)
-	require.NoError(t, err)
-
-	raw, err := jwt.Signed(sig).
-		Claims(claims).
-		CompactSerialize()
-	require.NoError(t, err)
-	return raw
-}
-
 func TestParsePublicKeyPEM(t *testing.T) {
 	type args struct {
 		pem func() ([]byte, crypto.PublicKey)
@@ -818,7 +795,7 @@ func Test_unmarshalResp(t *testing.T) {
 			args: args{
 				body: []byte(`{"valid":"json"}`),
 				v: struct {
-					valid string `json:"valid"`
+					Valid string `json:"valid"`
 				}{},
 				r: &http.Response{},
 			},
@@ -828,7 +805,7 @@ func Test_unmarshalResp(t *testing.T) {
 			args: args{
 				body: []byte(`{"invalid":"j}`),
 				v: struct {
-					invalid string `json:"invalid"`
+					Invalid string `json:"invalid"`
 				}{},
 				r: &http.Response{},
 			},
@@ -839,7 +816,7 @@ func Test_unmarshalResp(t *testing.T) {
 			args: args{
 				body: []byte(`{"invalid":"j}`),
 				v: struct {
-					invalid string `json:"invalid"`
+					Invalid string `json:"invalid"`
 				}{},
 				r: &http.Response{
 					Header: map[string][]string{
@@ -854,7 +831,7 @@ func Test_unmarshalResp(t *testing.T) {
 			args: args{
 				body: []byte(`{"invalid":"j}`),
 				v: struct {
-					invalid string `json:"invalid"`
+					Invalid string `json:"invalid"`
 				}{},
 				r: &http.Response{
 					Header: map[string][]string{

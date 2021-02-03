@@ -50,7 +50,7 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					Issuer: "https://example.com/",
@@ -66,7 +66,7 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					Subject: "alice@example.com",
@@ -82,7 +82,7 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					ID: "abc123",
@@ -98,7 +98,7 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					Audiences: []string{"www.example.com", "www.other.com"},
@@ -113,7 +113,7 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS512, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS512), claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					SigningAlgorithms: []Alg{RS512},
@@ -132,7 +132,7 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					Issuer:            "https://example.com/",
@@ -155,7 +155,7 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{},
 			},
@@ -167,7 +167,7 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"iat": nowUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					// The JWT exp would be invalid with exp leeway < 2 min
@@ -186,7 +186,7 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": nowUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					// The JWT nbf would be invalid with nbf leeway < 2 min
@@ -207,7 +207,7 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					// The JWT nbf would be invalid with clock skew leeway < 2 min
@@ -227,7 +227,7 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": nowUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					// The JWT exp would be invalid with clock skew leeway < 2 min
@@ -247,7 +247,7 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					// The JWT iat would be invalid with clock skew leeway < 2 min
@@ -318,7 +318,7 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					Issuer: "https://wrong.com/",
@@ -334,7 +334,7 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					Subject: "bob@example.com",
@@ -350,7 +350,7 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					ID: "123abc",
@@ -366,7 +366,7 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					Audiences: []string{"www.example.com"},
@@ -381,7 +381,7 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 					"exp": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					SigningAlgorithms: []Alg{ES256},
@@ -399,7 +399,7 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 					// Sign the JWT with a key not in the test provider
 					pk, err := rsa.GenerateKey(rand.Reader, 2048)
 					require.NoError(t, err)
-					return testSignJWT(t, pk, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, pk, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					SigningAlgorithms: []Alg{RS256},
@@ -413,7 +413,7 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 					"iss": "https://example.com/",
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{},
 			},
@@ -425,7 +425,7 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 					"nbf": nowUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					Now: func() time.Time {
@@ -441,7 +441,7 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 					"exp": nowUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					Now: func() time.Time {
@@ -458,7 +458,7 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 					"iat": futureUnix,
 				},
 				token: func(claims map[string]interface{}) string {
-					return testSignJWT(t, priv, RS256, claims, []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 				},
 				expected: Expected{
 					Now: func() time.Time {
@@ -601,7 +601,7 @@ func Test_validateSigningAlgorithm(t *testing.T) {
 			name: "default of RS256 when expected algorithms is empty",
 			args: args{
 				token: func() string {
-					return testSignJWT(t, priv, RS256, testJWTClaims(t), []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), testJWTClaims(t), []byte(testKeyID))
 				},
 				expectedAlgorithms: []Alg{},
 			},
@@ -610,7 +610,7 @@ func Test_validateSigningAlgorithm(t *testing.T) {
 			name: "jwt signed with at least one expected signing algorithm",
 			args: args{
 				token: func() string {
-					return testSignJWT(t, priv, PS384, testJWTClaims(t), []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(PS384), testJWTClaims(t), []byte(testKeyID))
 				},
 				expectedAlgorithms: []Alg{RS256, EdDSA, RS512, PS384, PS256},
 			},
@@ -619,7 +619,7 @@ func Test_validateSigningAlgorithm(t *testing.T) {
 			name: "jwt signed with unexpected algorithm",
 			args: args{
 				token: func() string {
-					return testSignJWT(t, priv, RS256, testJWTClaims(t), []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), testJWTClaims(t), []byte(testKeyID))
 				},
 				expectedAlgorithms: []Alg{RS512, PS384, ES256},
 			},
@@ -629,7 +629,7 @@ func Test_validateSigningAlgorithm(t *testing.T) {
 			name: "unsupported signing algorithm",
 			args: args{
 				token: func() string {
-					return testSignJWT(t, priv, RS256, testJWTClaims(t), []byte(testKeyID))
+					return oidc.TestSignJWT(t, priv, string(RS256), testJWTClaims(t), []byte(testKeyID))
 				},
 				expectedAlgorithms: []Alg{Alg("none")},
 			},
@@ -639,7 +639,7 @@ func Test_validateSigningAlgorithm(t *testing.T) {
 			name: "jwt missing signature",
 			args: args{
 				token: func() string {
-					token := testSignJWT(t, priv, RS256, testJWTClaims(t), []byte(testKeyID))
+					token := oidc.TestSignJWT(t, priv, string(RS256), testJWTClaims(t), []byte(testKeyID))
 					parts := strings.Split(token, ".")
 					require.Equal(t, 3, len(parts))
 					parts[2] = "" // strip the signature
