@@ -437,7 +437,7 @@ func (p *TestProvider) SetDisableJWKs(disable bool) {
 func (p *TestProvider) SetInvalidJWKS(invalid bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.invalidJWKs = true
+	p.invalidJWKs = invalid
 }
 
 // SetExpectedState sets the value for the state parameter returned from
@@ -606,7 +606,7 @@ func (p *TestProvider) issueSignedJWT(opt ...Option) string {
 	if opts.withCHashOf != "" {
 		claims["c_hash"] = p.testHash(opts.withCHashOf)
 	}
-	return TestSignJWT(p.t, p.privKey, p.alg, claims, nil)
+	return TestSignJWT(p.t, p.privKey, string(p.alg), claims, nil)
 }
 
 // testHash will generate an hash using a signature algorithm. It is used to

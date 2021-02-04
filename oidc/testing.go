@@ -35,7 +35,7 @@ func TestGenerateKeys(t *testing.T) (crypto.PublicKey, crypto.PrivateKey) {
 }
 
 // TestSignJWT will bundle the provided claims into a test signed JWT.
-func TestSignJWT(t *testing.T, key crypto.PrivateKey, alg Alg, claims interface{}, keyID []byte) string {
+func TestSignJWT(t *testing.T, key crypto.PrivateKey, alg string, claims interface{}, keyID []byte) string {
 	t.Helper()
 	require := require.New(t)
 
@@ -153,7 +153,7 @@ func testDefaultJWT(t *testing.T, privKey crypto.PrivateKey, expireIn time.Durat
 	for k, v := range additionalClaims {
 		claims[k] = v
 	}
-	testJWT := TestSignJWT(t, privKey, ES256, claims, nil)
+	testJWT := TestSignJWT(t, privKey, string(ES256), claims, nil)
 	return testJWT
 }
 

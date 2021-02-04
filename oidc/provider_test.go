@@ -1324,7 +1324,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			default:
 				tt.args.claims["iss"] = tt.p.config.Issuer
 			}
-			idToken := IDToken(TestSignJWT(t, tt.args.keys.priv, tt.args.keys.alg, tt.args.claims, []byte(tt.args.keys.keyID)))
+			idToken := IDToken(TestSignJWT(t, tt.args.keys.priv, string(tt.args.keys.alg), tt.args.claims, []byte(tt.args.keys.keyID)))
 			_, err := tt.p.VerifyIDToken(ctx, idToken, tt.args.request)
 			if tt.wantErr {
 				require.Error(err)
@@ -1342,7 +1342,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		require.NoError(err)
 		c := defaultClaims()
 		c["iss"] = defaultProvider.config.Issuer
-		idToken := IDToken(TestSignJWT(t, k, ES256, c, []byte(defaultKeys.keyID)))
+		idToken := IDToken(TestSignJWT(t, k, string(ES256), c, []byte(defaultKeys.keyID)))
 		_, err = defaultProvider.VerifyIDToken(ctx, idToken, defaultRequest)
 		require.Error(err)
 		assert.Truef(errors.Is(err, ErrInvalidSignature), "wanted \"%s\" but got \"%s\"", ErrInvalidSignature, err)
@@ -1366,7 +1366,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
 		claims := defaultClaims()
 		claims["iss"] = defaultProvider.config.Issuer
-		idToken := IDToken(TestSignJWT(t, defaultKeys.priv, defaultKeys.alg, claims, []byte(defaultKeys.keyID)))
+		idToken := IDToken(TestSignJWT(t, defaultKeys.priv, string(defaultKeys.alg), claims, []byte(defaultKeys.keyID)))
 		func() {
 			tp.SetDisableJWKs(true)
 			defer tp.SetDisableJWKs(false)
@@ -1374,7 +1374,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			require.Error(err)
 			assert.Truef(errors.Is(err, ErrInvalidJWKs), "wanted \"%s\" but got \"%s\"", ErrInvalidJWKs, err)
 		}()
-		idToken = IDToken(TestSignJWT(t, defaultKeys.priv, defaultKeys.alg, claims, []byte(defaultKeys.keyID)))
+		idToken = IDToken(TestSignJWT(t, defaultKeys.priv, string(defaultKeys.alg), claims, []byte(defaultKeys.keyID)))
 		func() {
 			tp.SetInvalidJWKS(true)
 			defer tp.SetInvalidJWKS(false)
