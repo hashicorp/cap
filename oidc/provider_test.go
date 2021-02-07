@@ -163,11 +163,14 @@ func TestProvider_AuthURL(t *testing.T) {
 	   `
 	customState, err := NewID(WithPrefix("custom_"))
 	require.NoError(t, err)
+	customNonce, err := NewID(WithPrefix("custom_"))
+	require.NoError(t, err)
 
 	allOptsRequest, err := NewRequest(
 		1*time.Minute,
 		redirect,
 		WithState(customState),
+		WithNonce(customNonce),
 		WithAudiences("state-override"),
 		WithScopes("email", "profile"),
 		WithDisplay(WAP),
