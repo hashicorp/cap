@@ -302,3 +302,24 @@ func Test_WithState(t *testing.T) {
 		assert.Equal(opts, testOpts)
 	})
 }
+
+func Test_WithNonce(t *testing.T) {
+	t.Parallel()
+	t.Run("reqOptions", func(t *testing.T) {
+		t.Parallel()
+		assert := assert.New(t)
+		opts := getReqOpts()
+		testOpts := reqDefaults()
+		assert.Equal(opts, testOpts)
+
+		n, err := base62.Random(128)
+		require.NoError(t, err)
+
+		opts = getReqOpts(WithNonce(n))
+		testOpts = reqDefaults()
+
+		testOpts.withNonce = n
+
+		assert.Equal(opts, testOpts)
+	})
+}
