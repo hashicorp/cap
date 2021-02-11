@@ -327,3 +327,281 @@ func TestEncodeCertificates(t *testing.T) {
 		})
 	}
 }
+
+func TestConfig_Hash(t *testing.T) {
+	_, pem := TestGenerateCA(t, []string{"localhost"})
+	newCfg := func(issuer string, clientID string, clientSecret ClientSecret, supported []Alg, allowedRedirectURLs []string, opt ...Option) *Config {
+		c, err := NewConfig(issuer, clientID, clientSecret, supported, allowedRedirectURLs, opt...)
+		require.NoError(t, err)
+		return c
+	}
+	tests := []struct {
+		name      string
+		c1        *Config
+		c2        *Config
+		wantEqual bool
+		wantErr   bool
+	}{
+		{
+			name: "equal",
+			c1: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+			),
+			c2: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+			),
+			wantEqual: true,
+		},
+		{
+			name: "diff-issuer",
+			c1: newCfg(
+				"https://www.bob.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+			),
+			c2: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+			),
+			wantEqual: false,
+		},
+		{
+			name: "diff-client-id",
+			c1: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+			),
+			c2: newCfg(
+				"https://www.alice.com",
+				"diff-client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+			),
+			wantEqual: false,
+		},
+		{
+			name: "diff-secret",
+			c1: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+			),
+			c2: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-not-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+			),
+			wantEqual: false,
+		},
+		{
+			name: "diff-alg",
+			c1: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+			),
+			c2: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256, RS384},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+			),
+			wantEqual: false,
+		},
+		{
+			name: "diff-redirects",
+			c1: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.bob.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+			),
+			c2: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+			),
+			wantEqual: false,
+		},
+		{
+			name: "diff-scope",
+			c1: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+			),
+			c2: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+			),
+			wantEqual: false,
+		},
+		{
+			name: "diff-aud",
+			c1: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+			),
+			c2: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+			),
+			wantEqual: false,
+		},
+		{
+			name: "diff-CA",
+			c1: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+			),
+			c2: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithNow(time.Now),
+			),
+			wantEqual: false,
+		},
+		{
+			name: "diff-now-func",
+			c1: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+			),
+			c2: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(func() time.Time {
+					return time.Now().Add(-1 * time.Minute)
+				}),
+			),
+			wantEqual: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert, require := assert.New(t), require.New(t)
+			got1, err := tt.c1.Hash()
+			if tt.wantErr {
+				require.Error(err)
+				return
+			}
+			require.NoError(err)
+			got2, err := tt.c2.Hash()
+			require.NoError(err)
+			switch tt.wantEqual {
+			case true:
+				assert.Equal(got1, got2)
+			default:
+				assert.NotEqual(got1, got2)
+			}
+
+		})
+	}
+}

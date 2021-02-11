@@ -3,10 +3,15 @@ package oidc
 import (
 	"bytes"
 	"crypto/x509"
+	"encoding/binary"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"hash"
+	"hash/fnv"
 	"net/url"
+	"reflect"
+	"runtime"
 	"strings"
 	"time"
 
@@ -112,6 +117,60 @@ func NewConfig(issuer string, clientID string, clientSecret ClientSecret, suppor
 		return nil, fmt.Errorf("%s: invalid provider config: %w", op, err)
 	}
 	return c, nil
+}
+
+// Hash will produce a hash value for the Config, which is suitable to use for
+// comparing two configurations for equality.
+func (c *Config) Hash() (uint64, error) {
+	var h uint64
+	var err error
+	args := []string{}
+	args = append(args, c.Issuer, c.ClientID, string(c.ClientSecret), c.ProviderCA)
+	for _, a := range c.SupportedSigningAlgs {
+		args = append(args, string(a))
+	}
+	args = append(args, c.Scopes...)
+	args = append(args, c.Audiences...)
+	args = append(args, c.AllowedRedirectURLs...)
+	args = append(args, runtime.FuncForPC(reflect.ValueOf(c.NowFunc).Pointer()).Name())
+	if h, err = hashStrings(args...); err != nil {
+		return 0, fmt.Errorf("hashing error: %w", err)
+	}
+
+	return h, nil
+}
+
+func hashStrings(s ...string) (uint64, error) {
+	hasher := fnv.New64()
+	var h uint64
+	var err error
+	for _, current := range s {
+		hasher.Reset()
+		if _, err = hasher.Write([]byte(current)); err != nil {
+			return 0, err
+		}
+		if h, err = hashUpdateOrdered(hasher, h, hasher.Sum64()); err != nil {
+			return 0, err
+		}
+	}
+	return h, nil
+}
+
+// hashUpdateOrdered is taken directly from
+// https://github.com/mitchellh/hashstructure
+func hashUpdateOrdered(h hash.Hash64, a, b uint64) (uint64, error) {
+	// For ordered updates, use a real hash function
+	h.Reset()
+
+	e1 := binary.Write(h, binary.LittleEndian, a)
+	e2 := binary.Write(h, binary.LittleEndian, b)
+	if e1 != nil {
+		return 0, e1
+	}
+	if e2 != nil {
+		return 0, e2
+	}
+	return h.Sum64(), nil
 }
 
 // Validate the provider configuration.  Among other validations, it verifies
