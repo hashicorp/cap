@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"reflect"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -124,14 +125,32 @@ func NewConfig(issuer string, clientID string, clientSecret ClientSecret, suppor
 func (c *Config) Hash() (uint64, error) {
 	var h uint64
 	var err error
-	args := []string{}
-	args = append(args, c.Issuer, c.ClientID, string(c.ClientSecret), c.ProviderCA)
+
+	algs := make([]string, 0, len(c.SupportedSigningAlgs))
 	for _, a := range c.SupportedSigningAlgs {
-		args = append(args, string(a))
+		algs = append(algs, string(a))
 	}
-	args = append(args, c.Scopes...)
-	args = append(args, c.Audiences...)
-	args = append(args, c.AllowedRedirectURLs...)
+
+	scopes := make([]string, 0, len(c.Scopes))
+	scopes = append(scopes, c.Scopes...)
+
+	audiences := make([]string, 0, len(c.Audiences))
+	audiences = append(audiences, c.Audiences...)
+
+	redirects := make([]string, 0, len(c.AllowedRedirectURLs))
+	redirects = append(redirects, c.AllowedRedirectURLs...)
+
+	sort.Strings(algs)
+	sort.Strings(scopes)
+	sort.Strings(audiences)
+	sort.Strings(redirects)
+
+	args := make([]string, 0, len(algs)+len(scopes)+len(audiences)+len(redirects)+4)
+	args = append(args, c.Issuer, c.ClientID, string(c.ClientSecret), c.ProviderCA)
+	args = append(args, algs...)
+	args = append(args, scopes...)
+	args = append(args, audiences...)
+	args = append(args, redirects...)
 	args = append(args, runtime.FuncForPC(reflect.ValueOf(c.NowFunc).Pointer()).Name())
 	if h, err = hashStrings(args...); err != nil {
 		return 0, fmt.Errorf("hashing error: %w", err)
