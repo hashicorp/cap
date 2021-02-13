@@ -145,13 +145,19 @@ func (c *Config) Hash() (uint64, error) {
 	sort.Strings(audiences)
 	sort.Strings(redirects)
 
-	args := make([]string, 0, len(algs)+len(scopes)+len(audiences)+len(redirects)+4)
-	args = append(args, c.Issuer, c.ClientID, string(c.ClientSecret), c.ProviderCA)
+	args := make([]string, 0, len(algs)+len(scopes)+len(audiences)+len(redirects)+5)
+	args = append(
+		args,
+		c.Issuer,
+		c.ClientID,
+		string(c.ClientSecret),
+		c.ProviderCA,
+		runtime.FuncForPC(reflect.ValueOf(c.NowFunc).Pointer()).Name(),
+	)
 	args = append(args, algs...)
 	args = append(args, scopes...)
 	args = append(args, audiences...)
 	args = append(args, redirects...)
-	args = append(args, runtime.FuncForPC(reflect.ValueOf(c.NowFunc).Pointer()).Name())
 	if h, err = hashStrings(args...); err != nil {
 		return 0, fmt.Errorf("hashing error: %w", err)
 	}
