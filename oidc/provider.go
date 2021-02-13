@@ -115,6 +115,13 @@ func (p *Provider) Done() {
 	}
 }
 
+// ConfigHash will produce a hash value for the provider's Config, which is
+// suitable to use for comparing two configurations for equality, which is
+// important if you're caching the providers
+func (p *Provider) ConfigHash() (uint64, error) {
+	return p.config.Hash()
+}
+
 // AuthURL will generate a URL the caller can use to kick off an OIDC
 // authorization code (with optional PKCE) or an implicit flow with an IdP.
 //
