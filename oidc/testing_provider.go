@@ -136,6 +136,7 @@ type TestProvider struct {
 	expectedState     string
 	customClaims      map[string]interface{}
 	customAudiences   []string
+	supportedScopes   []string
 	omitAuthTimeClaim bool
 	omitIDToken       bool
 	omitAccessToken   bool
@@ -196,6 +197,7 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 			"advisor":       "Faythe",
 			"nosy-neighbor": "Eve",
 		},
+		supportedScopes: []string{"openid"}, // required openid is the default
 	}
 
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -313,6 +315,30 @@ func (p *TestProvider) HTTPClient() *http.Client {
 		Transport: tr,
 	}
 	return p.client
+}
+
+// SetSupportedScopes sets the values for the scopes supported for
+// authorization.  Valid supported scopes are: openid, profile, email,
+// address, phone
+func (p *TestProvider) SetSupportedScopes(scope ...string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.t.Helper()
+	require := require.New(p.t)
+	for _, s := range scope {
+		require.Containsf([]string{"openid", "profile", "email", "address", "phone"}, s, "unsupported scope %q", s)
+	}
+	if !strutils.StrListContains(scope, "openid") {
+		scope = append(scope, "openid")
+	}
+	p.supportedScopes = scope
+}
+
+// SupportedScopes returns the values for the scopes supported.
+func (p *TestProvider) SupportedScopes() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.supportedScopes
 }
 
 // SetExpectedExpiry is for configuring the expected expiry for any JWTs issued
@@ -710,17 +736,21 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 
 		reply := struct {
-			Issuer           string `json:"issuer"`
-			AuthEndpoint     string `json:"authorization_endpoint"`
-			TokenEndpoint    string `json:"token_endpoint"`
-			JWKSURI          string `json:"jwks_uri"`
-			UserinfoEndpoint string `json:"userinfo_endpoint,omitempty"`
+			Issuer           string   `json:"issuer"`
+			AuthEndpoint     string   `json:"authorization_endpoint"`
+			TokenEndpoint    string   `json:"token_endpoint"`
+			JWKSURI          string   `json:"jwks_uri"`
+			UserinfoEndpoint string   `json:"userinfo_endpoint,omitempty"`
+			SupportedAlgs    []string `json:"id_token_signing_alg_values_supported"`
+			SupportedScopes  []string `json:"scopes_supported"`
 		}{
 			Issuer:           p.Addr(),
 			AuthEndpoint:     p.Addr() + authorize,
 			TokenEndpoint:    p.Addr() + token,
 			JWKSURI:          p.Addr() + wellKnownJwks,
 			UserinfoEndpoint: p.Addr() + userInfo,
+			SupportedAlgs:    []string{string(p.alg)},
+			SupportedScopes:  p.supportedScopes,
 		}
 		if p.disableUserInfo {
 			reply.UserinfoEndpoint = ""
@@ -751,9 +781,11 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			p.writeAuthErrorResponse(w, req, redirectURI, state, "unsupported_response_type", "")
 			return
 		}
-		if !strutils.StrListContains(scopes, "openid") {
-			p.writeAuthErrorResponse(w, req, redirectURI, state, "invalid_scope", "")
-			return
+		for _, s := range scopes {
+			if !strutils.StrListContains(p.supportedScopes, s) {
+				p.writeAuthErrorResponse(w, req, redirectURI, state, "invalid_scope", "")
+				return
+			}
 		}
 
 		if p.expectedAuthCode == "" {
