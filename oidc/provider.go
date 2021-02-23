@@ -706,11 +706,11 @@ type DiscoveryInfo struct {
 
 	// UILocalesSupported (OPTIONAL, omitempty): Languages and scripts supported
 	// for the user interface
-	UILocalesSupported []string `json:"ui_locales_supported,,omitempty"`
+	UILocalesSupported []string `json:"ui_locales_supported,omitempty"`
 
 	// ClaimsParameterSupported (OPTIONAL, omitempty): Boolean value specifying whether
 	// the OP supports use of the claims parameter, with true indicating support.
-	ClaimsParameterSupported bool `json:"claims_supported"`
+	ClaimsParameterSupported bool `json:"claims_supported,omitempty"`
 
 	// AcrValuesSupported (OPTIONAL, omitempty): a list of the Authentication
 	// Context Class References that this OP supports
