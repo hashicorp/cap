@@ -10,7 +10,9 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -1425,6 +1427,158 @@ func TestProvider_validRedirect(t *testing.T) {
 			}
 			p.config.AllowedRedirectURLs = tt.allowed
 			require.Truef(t, errors.Is(p.validRedirect(tt.uri), tt.expected), "got [%v] and expected [%v]", p.validRedirect(tt.uri), tt.expected)
+		})
+	}
+}
+
+func TestProvider_DiscoveryInfo(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	tests := []struct {
+		name             string
+		data             string
+		trailingSlashIss bool
+		overrideHeader   string
+		overrideData     string
+		overrideIssuer   string
+		wantAuthURL      string
+		wantTokenURL     string
+		wantUserInfoURL  string
+		wantAlgorithms   []string
+		wantScopes       []string
+		wantErr          bool
+		wantErrContains  string
+	}{
+		{
+			name: "basic_case",
+			data: `{
+				"issuer": "ISSUER",
+				"authorization_endpoint": "https://example.com/auth",
+				"token_endpoint": "https://example.com/token",
+				"jwks_uri": "https://example.com/keys",
+				"id_token_signing_alg_values_supported": ["RS256", "RS384"],
+				"scopes_supported": ["openid", "profile"]
+			}`,
+			wantScopes:     []string{"openid", "profile"},
+			wantAuthURL:    "https://example.com/auth",
+			wantTokenURL:   "https://example.com/token",
+			wantAlgorithms: []string{"RS256", "RS384"},
+		},
+		{
+			name: "basic_case",
+			data: `{
+				"issuer": "ISSUER",
+				"authorization_endpoint": "https://example.com/auth",
+				"token_endpoint": "https://example.com/token",
+				"jwks_uri": "https://example.com/keys",
+				"id_token_signing_alg_values_supported": ["RS256", "RS384"],
+				"scopes_supported": ["openid", "profile"]
+			}`,
+			trailingSlashIss: true,
+			wantScopes:       []string{"openid", "profile"},
+			wantAuthURL:      "https://example.com/auth",
+			wantTokenURL:     "https://example.com/token",
+			wantAlgorithms:   []string{"RS256", "RS384"},
+		},
+		{
+			name: "mismatched_issuer",
+			data: `{
+				"issuer": "ISSUER",
+				"authorization_endpoint": "https://example.com/auth",
+				"token_endpoint": "https://example.com/token",
+				"jwks_uri": "https://example.com/keys",
+				"id_token_signing_alg_values_supported": ["RS256"]
+			}`,
+			overrideData: `{
+				"issuer": "https://example.com",
+				"authorization_endpoint": "https://example.com/auth",
+				"token_endpoint": "https://example.com/token",
+				"jwks_uri": "https://example.com/keys",
+				"id_token_signing_alg_values_supported": ["RS256"]
+			}`,
+			wantErr:         true,
+			wantErrContains: "did not match the issuer",
+		},
+		{
+			name: "bad-json",
+			data: `{
+				"issuer": "ISSUER",
+				"authorization_endpoint": "https://example.com/auth",
+				"token_endpoint": "https://example.com/token",
+				"jwks_uri": "https://example.com/keys",
+				"id_token_signing_alg_values_supported": ["RS256"]
+			}`,
+			overrideData:    `{`,
+			wantErr:         true,
+			wantErrContains: "could not unmarshal it as JSON",
+		},
+		{
+			name: "not-json",
+			data: `{
+				"issuer": "ISSUER",
+				"authorization_endpoint": "https://example.com/auth",
+				"token_endpoint": "https://example.com/token",
+				"jwks_uri": "https://example.com/keys",
+				"id_token_signing_alg_values_supported": ["RS256"]
+			}`,
+			overrideData:    `{`,
+			overrideHeader:  "text/html",
+			wantErr:         true,
+			wantErrContains: "expected Content-Type = application/json",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert, require := assert.New(t), require.New(t)
+			var issuer string
+			hf := func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/.well-known/openid-configuration" {
+					http.NotFound(w, r)
+					return
+				}
+				switch {
+				case tt.overrideHeader != "":
+					w.Header().Set("Content-Type", tt.overrideHeader)
+				default:
+					w.Header().Set("Content-Type", "application/json")
+				}
+				_, _ = io.WriteString(w, strings.ReplaceAll(tt.data, "ISSUER", issuer))
+			}
+			s := httptest.NewServer(http.HandlerFunc(hf))
+			defer s.Close()
+
+			issuer = s.URL
+			if tt.trailingSlashIss {
+				issuer += "/"
+			}
+
+			c := &Config{
+				Issuer:               issuer,
+				ClientID:             "client-id",
+				ClientSecret:         "secret",
+				AllowedRedirectURLs:  []string{"http://localhost:8080/callback"},
+				SupportedSigningAlgs: []Alg{RS256},
+			}
+			p, err := NewProvider(c)
+			require.NoError(err)
+			if tt.overrideData != "" {
+				tt.data = tt.overrideData
+			}
+			info, err := p.DiscoveryInfo(ctx)
+			if tt.wantErr {
+				require.Error(err)
+				if tt.wantErrContains != "" {
+					assert.Contains(err.Error(), tt.wantErrContains)
+				}
+				return
+			}
+			require.NoError(err)
+			assert.Equal(info.AuthURL, tt.wantAuthURL)
+			assert.Equal(info.TokenURL, tt.wantTokenURL)
+			assert.Equal(info.UserInfoURL, tt.wantUserInfoURL)
+			assert.Equal(info.IdTokenSigningAlgsSupported, tt.wantAlgorithms)
+			assert.Equal(info.ScopesSupported, tt.wantScopes)
 		})
 	}
 }

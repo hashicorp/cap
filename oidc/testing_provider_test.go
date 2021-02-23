@@ -59,6 +59,18 @@ func Test_WithTestPort(t *testing.T) {
 	assert.Equal(opts, testOpts)
 }
 
+func TestTestProvider_SetSupportedScopes(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		tp := StartTestProvider(t)
+		require.Contains(tp.supportedScopes, "openid")
+		tp.SetSupportedScopes("email", "profile")
+		assert.Contains(tp.supportedScopes, "openid")
+		assert.Contains(tp.supportedScopes, "email")
+		assert.Contains(tp.supportedScopes, "profile")
+	})
+}
+
 func TestTestProvider_SetExpectedExpiry(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
@@ -383,7 +395,7 @@ func TestTestProvider_authorize(t *testing.T) {
 		},
 		{
 			name:          "bad-scopes",
-			urlParameters: "&scopes=unknown&state=state-value&response_type=code",
+			urlParameters: "&scope=unknown&state=state-value&response_type=code",
 			want:          "invalid_scope",
 		},
 		{
