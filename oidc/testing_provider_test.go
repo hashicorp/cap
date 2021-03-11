@@ -282,6 +282,20 @@ func TestTestProvider_SetUserInfoReply(t *testing.T) {
 	})
 }
 
+func TestTestProvider_SetIDTokenAdditionalClaims(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		assert := assert.New(t)
+		tp := StartTestProvider(t)
+		reply := map[string]interface{}{
+			"name":     "Alice Eve-Bob",
+			"email":    "alice-eve-bob@alice.com",
+			"pronouns": "they/them",
+		}
+		tp.SetIDTokenAdditionalClaims(reply)
+		assert.Equal(reply, tp.replyIDTokenAdditionalClaims)
+		assert.Equal(reply, tp.IDTokenAdditionalClaims())
+	})
+}
 func TestTestProvider_writeJSON(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)

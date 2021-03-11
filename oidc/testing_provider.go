@@ -118,15 +118,20 @@ import (
 //
 //  * UserInfo: SetUserInfoReply sets the UserInfo endpoint response and
 //  UserInfoReply() returns the current response.
+//
+//  * ID Token additional claims: SetIDTokenAdditionalClaims sets the additional
+//  claims returned in an ID Token and IDTokenAdditionalClaims returns the current
+//  additional claims
 type TestProvider struct {
 	httpServer *httptest.Server
 	caCert     string
 
-	jwks                *jose.JSONWebKeySet
-	allowedRedirectURIs []string
-	replySubject        string
-	replyUserinfo       interface{}
-	replyExpiry         time.Duration
+	jwks                         *jose.JSONWebKeySet
+	allowedRedirectURIs          []string
+	replyIDTokenAdditionalClaims map[string]interface{}
+	replySubject                 string
+	replyUserinfo                interface{}
+	replyExpiry                  time.Duration
 
 	mu                sync.Mutex
 	clientID          string
@@ -187,6 +192,10 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 
 		allowedRedirectURIs: []string{
 			"https://example.com",
+		},
+		replyIDTokenAdditionalClaims: map[string]interface{}{
+			"name":  "Alice Doe Smith",
+			"email": "alice@example.com",
 		},
 		replySubject: "alice@example.com",
 		replyUserinfo: map[string]interface{}{
@@ -511,11 +520,27 @@ func (p *TestProvider) SetUserInfoReply(resp interface{}) {
 	p.replyUserinfo = resp
 }
 
-// SetUserInfoReply sets the UserInfo endpoint response.
+// UserInfoReply gets the UserInfo endpoint response.
 func (p *TestProvider) UserInfoReply() interface{} {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.replyUserinfo
+}
+
+// SetIDTokenAdditionalClaims sets the additional claims returned
+// in an ID Token.
+func (p *TestProvider) SetIDTokenAdditionalClaims(additionalClaims map[string]interface{}) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.replyIDTokenAdditionalClaims = additionalClaims
+}
+
+// IDTokenAdditionalClaims gets the additional claims returned
+// in ID Tokens
+func (p *TestProvider) IDTokenAdditionalClaims() map[string]interface{} {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.replyIDTokenAdditionalClaims
 }
 
 // Addr returns the current base URL for the test provider's running webserver,
@@ -616,6 +641,11 @@ func (p *TestProvider) issueSignedJWT(opt ...Option) string {
 		"auth_time": float64(p.nowFunc().Unix()),
 		"iat":       float64(p.nowFunc().Unix()),
 		"aud":       []string{p.clientID},
+	}
+	for k, v := range p.replyIDTokenAdditionalClaims {
+		if k != "sub" {
+			claims[k] = v
+		}
 	}
 	if len(p.customAudiences) != 0 {
 		claims["aud"] = append(claims["aud"].([]string), p.customAudiences...)
