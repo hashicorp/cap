@@ -641,6 +641,7 @@ func (p *TestProvider) issueSignedJWT(opt ...Option) string {
 		"auth_time": float64(p.nowFunc().Unix()),
 		"iat":       float64(p.nowFunc().Unix()),
 		"aud":       []string{p.clientID},
+		"azp":       p.clientID,
 	}
 	for k, v := range p.replyIDTokenAdditionalClaims {
 		if k != "sub" {
