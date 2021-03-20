@@ -71,6 +71,16 @@ func TestTestProvider_SetSupportedScopes(t *testing.T) {
 	})
 }
 
+func TestTestProvider_SetExpectedSubject(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		tp := StartTestProvider(t)
+		require.Equal(tp.ExpectedSubject(), "alice@example.com")
+		tp.SetExpectedSubject("eve@example.com")
+		assert.Equal("eve@example.com", tp.ExpectedSubject())
+	})
+}
+
 func TestTestProvider_SetExpectedExpiry(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
