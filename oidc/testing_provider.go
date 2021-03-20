@@ -72,7 +72,10 @@ import (
 //  * Now: SetNowFunc(...) updates the provider's "now" function and time.Now
 //  is the default.
 //
-//  * Expiry: SetExpectedExpiry( exp time.Duration) updates the expiry and
+//  * Subject: SetExpectedSubject(sub string) configures the expected subject for
+//    any JWTs issued by the provider (the default is "alice@example.com")
+//
+//  * Expiry: SetExpectedExpiry(exp time.Duration) updates the expiry and
 //    now + 5 * time.Second is the default.
 //
 //  * Signing keys: SetSigningKeys(...) updates the keys and a ECDSA P-256 pair
@@ -348,6 +351,23 @@ func (p *TestProvider) SupportedScopes() []string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.supportedScopes
+}
+
+// SetExpectedSubject is for configuring the expected subject for
+// any JWTs issued by the provider (the default is "alice@example.com")
+func (p *TestProvider) SetExpectedSubject(sub string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.replySubject = sub
+}
+
+// ExpectedSubject returns the subject for any JWTs issued by the
+// provider See: SetExpectedSubject(...) to override the default which
+// is "alice@example.com"
+func (p *TestProvider) ExpectedSubject() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.replySubject
 }
 
 // SetExpectedExpiry is for configuring the expected expiry for any JWTs issued
