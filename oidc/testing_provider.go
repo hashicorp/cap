@@ -787,21 +787,25 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 
 		reply := struct {
-			Issuer           string   `json:"issuer"`
-			AuthEndpoint     string   `json:"authorization_endpoint"`
-			TokenEndpoint    string   `json:"token_endpoint"`
-			JWKSURI          string   `json:"jwks_uri"`
-			UserinfoEndpoint string   `json:"userinfo_endpoint,omitempty"`
-			SupportedAlgs    []string `json:"id_token_signing_alg_values_supported"`
-			SupportedScopes  []string `json:"scopes_supported"`
+			Issuer                 string   `json:"issuer"`
+			AuthEndpoint           string   `json:"authorization_endpoint"`
+			TokenEndpoint          string   `json:"token_endpoint"`
+			JWKSURI                string   `json:"jwks_uri"`
+			UserinfoEndpoint       string   `json:"userinfo_endpoint,omitempty"`
+			SupportedAlgs          []string `json:"id_token_signing_alg_values_supported"`
+			SupportedScopes        []string `json:"scopes_supported"`
+			SubjectTypesSupported  []string `json:"subject_types_supported"`
+			ResponseTypesSupported []string `json:"response_types_supported"`
 		}{
-			Issuer:           p.Addr(),
-			AuthEndpoint:     p.Addr() + authorize,
-			TokenEndpoint:    p.Addr() + token,
-			JWKSURI:          p.Addr() + wellKnownJwks,
-			UserinfoEndpoint: p.Addr() + userInfo,
-			SupportedAlgs:    []string{string(p.alg)},
-			SupportedScopes:  p.supportedScopes,
+			Issuer:                 p.Addr(),
+			AuthEndpoint:           p.Addr() + authorize,
+			TokenEndpoint:          p.Addr() + token,
+			JWKSURI:                p.Addr() + wellKnownJwks,
+			UserinfoEndpoint:       p.Addr() + userInfo,
+			SupportedAlgs:          []string{string(p.alg)},
+			SupportedScopes:        p.supportedScopes,
+			SubjectTypesSupported:  []string{"public"},
+			ResponseTypesSupported: []string{"code", "id_token", "token id_token"},
 		}
 		if p.disableUserInfo {
 			reply.UserinfoEndpoint = ""
