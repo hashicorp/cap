@@ -578,6 +578,48 @@ func TestTestProvider_token(t *testing.T) {
 	}
 }
 
+func TestTestProvider_discovery(t *testing.T) {
+	t.Run("/.well-known/openid-configuration", func(t *testing.T) {
+		const openidConfiguration = "/.well-known/openid-configuration"
+		assert, require := assert.New(t), require.New(t)
+		tp := StartTestProvider(t)
+		providerAddr := tp.Addr()
+		_, _, signingAlg, _ := tp.SigningKeys()
+		tp.SupportedScopes()
+
+		resp, err := tp.HTTPClient().Get(tp.Addr() + openidConfiguration)
+		require.NoError(err)
+		if resp.Body != nil {
+			defer resp.Body.Close()
+		}
+		body, err := ioutil.ReadAll(resp.Body)
+		require.NoError(err)
+
+		reply := struct {
+			Issuer                 string   `json:"issuer"`
+			AuthEndpoint           string   `json:"authorization_endpoint"`
+			TokenEndpoint          string   `json:"token_endpoint"`
+			JWKSURI                string   `json:"jwks_uri"`
+			UserinfoEndpoint       string   `json:"userinfo_endpoint,omitempty"`
+			SupportedAlgs          []string `json:"id_token_signing_alg_values_supported"`
+			SupportedScopes        []string `json:"scopes_supported"`
+			SubjectTypesSupported  []string `json:"subject_types_supported"`
+			ResponseTypesSupported []string `json:"response_types_supported"`
+		}{}
+		err = json.Unmarshal(body, &reply)
+		require.NoError(err)
+		assert.Equal(providerAddr, reply.Issuer)
+		assert.Equal(providerAddr+"/authorize", reply.AuthEndpoint)
+		assert.Equal(providerAddr+"/token", reply.TokenEndpoint)
+		assert.Equal(providerAddr+"/.well-known/jwks.json", reply.JWKSURI)
+		assert.Equal(providerAddr+"/userinfo", reply.UserinfoEndpoint)
+		assert.Equal([]string{string(signingAlg)}, reply.SupportedAlgs)
+		assert.Equal(tp.SupportedScopes(), reply.SupportedScopes)
+		assert.Equal([]string{"public"}, reply.SubjectTypesSupported)
+		assert.Equal([]string{"code", "id_token", "token id_token"}, reply.ResponseTypesSupported)
+	})
+}
+
 // startEchoServer starts a test echo http server which will be stopped when the
 // test and its subtests are completed by function registered with t.Cleanup
 func startEchoServer(t *testing.T) *httptest.Server {
