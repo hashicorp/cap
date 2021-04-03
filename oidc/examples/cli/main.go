@@ -113,6 +113,7 @@ func main() {
 		oidcPort := os.Getenv("OIDC_PORT")
 		if oidcPort == "" {
 			fmt.Fprintf(os.Stderr, "env OIDC_PORT is empty")
+			return
 		}
 
 		tp.SetAllowedRedirectURIs([]string{fmt.Sprintf("http://localhost:%s/callback", oidcPort)})
