@@ -333,6 +333,10 @@ func (p *TestProvider) HTTPClient() *http.Client {
 	}
 	require := require.New(p.t)
 
+	if p.caCert == "" {
+		p.client = &http.Client{}
+		return p.client
+	}
 	// use the cleanhttp package to create a "pooled" transport that's better
 	// configured for requests that re-use the same provider host.  Among other
 	// things, this transport supports better concurrency when making requests
