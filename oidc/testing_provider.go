@@ -30,8 +30,14 @@ import (
 	"github.com/hashicorp/cap/oidc/internal/strutils"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/hashicorp/go-hclog"
+	"github.com/patrickmn/go-cache"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/square/go-jose.v2"
+)
+
+var (
+	codeTimeout         = 5 * time.Minute
+	codeCleanupInterval = 1 * time.Minute
 )
 
 // TestProvider is a local http server that supports test provider capabilities
@@ -135,7 +141,8 @@ type TestProvider struct {
 	replyIDTokenAdditionalClaims map[string]interface{}
 	replySubject                 string
 	subjectPasswords             map[string]string
-	replyUserinfo                interface{}
+	codes                        *cache.Cache
+	replyUserinfo                map[string]interface{}
 	replyExpiry                  time.Duration
 
 	mu                sync.Mutex
@@ -216,6 +223,7 @@ func StartTestProvider(t TestingT, opt ...Option) *TestProvider {
 		},
 		supportedScopes:  []string{"openid"},  // required openid is the default
 		subjectPasswords: map[string]string{}, // default is not to use a login form, so no passwords required for subjects
+		codes:            cache.New(codeTimeout, codeCleanupInterval),
 	}
 
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -261,6 +269,7 @@ type testProviderOptions struct {
 	withAtHashOf string
 	withCHashOf  string
 	withNoTLS    bool
+	withSubject  string
 }
 
 // testProviderDefaults is a handy way to get the defaults at runtime and during unit
@@ -275,6 +284,16 @@ func getTestProviderOpts(opt ...Option) testProviderOptions {
 	opts := testProviderDefaults()
 	ApplyOpts(&opts, opt...)
 	return opts
+}
+
+// withTestSubject provides the option to provide a subject
+//
+func withTestSubject(s string) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*testProviderOptions); ok {
+			o.withSubject = s
+		}
+	}
 }
 
 // WithNoTLS provides the option to not use TLS for the test provider.
@@ -588,14 +607,14 @@ func (p *TestProvider) PKCEVerifier() CodeVerifier {
 }
 
 // SetUserInfoReply sets the UserInfo endpoint response.
-func (p *TestProvider) SetUserInfoReply(resp interface{}) {
+func (p *TestProvider) SetUserInfoReply(resp map[string]interface{}) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.replyUserinfo = resp
 }
 
 // UserInfoReply gets the UserInfo endpoint response.
-func (p *TestProvider) UserInfoReply() interface{} {
+func (p *TestProvider) UserInfoReply() map[string]interface{} {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.replyUserinfo
@@ -714,8 +733,15 @@ func (p *TestProvider) writeImplicitResponse(w http.ResponseWriter, state, redir
 func (p *TestProvider) issueSignedJWT(opt ...Option) string {
 	opts := getTestProviderOpts(opt...)
 
+	var sub string
+	switch {
+	case opts.withSubject != "":
+		sub = opts.withSubject
+	default:
+		sub = p.replySubject
+	}
 	claims := map[string]interface{}{
-		"sub":       p.replySubject,
+		"sub":       sub,
 		"iss":       p.Addr(),
 		"nbf":       float64(p.nowFunc().Add(-p.replyExpiry).Unix()),
 		"exp":       float64(p.nowFunc().Add(p.replyExpiry).Unix()),
@@ -901,6 +927,12 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			p.writeAuthErrorResponse(w, req, redirectURI, state, "access_denied", "invalid password")
 			return
 		}
+
+		p.codes.SetDefault(p.expectedAuthCode, &CodeState{
+			sub: uname,
+			exp: time.Now().Add(codeTimeout),
+		})
+
 		var s string
 		switch {
 		case p.expectedState != "":
@@ -1023,7 +1055,10 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
+		err := req.ParseForm()
+		require.NoErrorf(err, "%s: internal error: %w", authorize, err)
 
+		code := req.FormValue("code")
 		switch {
 		case req.FormValue("grant_type") != "authorization_code":
 			_ = p.writeTokenErrorResponse(w, http.StatusBadRequest, "invalid_request", "bad grant_type")
@@ -1031,7 +1066,7 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		case !strutils.StrListContains(p.allowedRedirectURIs, req.FormValue("redirect_uri")):
 			_ = p.writeTokenErrorResponse(w, http.StatusBadRequest, "invalid_request", "redirect_uri is not allowed")
 			return
-		case req.FormValue("code") != p.expectedAuthCode:
+		case code != p.expectedAuthCode:
 			_ = p.writeTokenErrorResponse(w, http.StatusUnauthorized, "invalid_grant", "unexpected auth code")
 			return
 		case req.FormValue("code_verifier") != "" && req.FormValue("code_verifier") != p.pkceVerifier.Verifier():
@@ -1039,8 +1074,22 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		accessToken := p.issueSignedJWT()
-		idToken := p.issueSignedJWT(withTestAtHash(accessToken), withTestCHash(p.expectedAuthCode))
+		var sub string
+		switch {
+		case len(p.subjectPasswords) > 0:
+			s := p.verifyCachedCode(code)
+			if s == nil {
+				_ = p.writeTokenErrorResponse(w, http.StatusUnauthorized, "invalid_request", "ex")
+				return
+			}
+			s.issuedTokens = true
+			p.codes.Set(code, s, time.Until(s.exp))
+			sub = s.sub
+		default:
+			sub = p.replySubject
+		}
+		accessToken := p.issueSignedJWT(withTestSubject(sub))
+		idToken := p.issueSignedJWT(withTestSubject(sub), withTestAtHash(accessToken), withTestCHash(p.expectedAuthCode))
 		reply := struct {
 			AccessToken string `json:"access_token,omitempty"`
 			IDToken     string `json:"id_token,omitempty"`
@@ -1069,17 +1118,50 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-
-		if err := p.writeJSON(w, p.replyUserinfo); err != nil {
-			require.NoErrorf(err, "%s: internal error: %w", userInfo, err)
+		switch {
+		case len(p.subjectPasswords) > 0:
+			const bearSchema = "Bearer "
+			authHeader := req.Header.Get("Authorization")
+			tk := authHeader[len(bearSchema):]
+			var claims map[string]interface{}
+			err := UnmarshalClaims(tk, &claims)
+			require.NoError(err, "%s: internal error: %w", userInfo, err)
+			p.replyUserinfo["sub"] = claims["sub"]
+			if err := p.writeJSON(w, p.replyUserinfo); err != nil {
+				require.NoErrorf(err, "%s: internal error: %w", userInfo, err)
+				return
+			}
+			return
+		default:
+			if err := p.writeJSON(w, p.replyUserinfo); err != nil {
+				require.NoErrorf(err, "%s: internal error: %w", userInfo, err)
+				return
+			}
 			return
 		}
-		return
 
 	default:
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
+}
+
+type CodeState struct {
+	exp          time.Time
+	sub          string
+	issuedTokens bool
+}
+
+func (p *TestProvider) verifyCachedCode(code string) *CodeState {
+	defer p.codes.Delete(code)
+
+	if raw, ok := p.codes.Get(code); ok {
+		if raw.(*CodeState).issuedTokens {
+			return nil
+		}
+		return raw.(*CodeState)
+	}
+	return nil
 }
 
 // httptestNewUnstartedServerWithPort is roughly the same as
