@@ -928,7 +928,7 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		p.codes.SetDefault(p.expectedAuthCode, &CodeState{
+		p.codes.SetDefault(p.expectedAuthCode, &codeState{
 			sub: uname,
 			exp: time.Now().Add(codeTimeout),
 		})
@@ -1146,20 +1146,20 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-type CodeState struct {
+type codeState struct {
 	exp          time.Time
 	sub          string
 	issuedTokens bool
 }
 
-func (p *TestProvider) verifyCachedCode(code string) *CodeState {
+func (p *TestProvider) verifyCachedCode(code string) *codeState {
 	defer p.codes.Delete(code)
 
 	if raw, ok := p.codes.Get(code); ok {
-		if raw.(*CodeState).issuedTokens {
+		if raw.(*codeState).issuedTokens {
 			return nil
 		}
-		return raw.(*CodeState)
+		return raw.(*codeState)
 	}
 	return nil
 }
