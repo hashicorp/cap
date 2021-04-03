@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -17,6 +19,7 @@ import (
 
 	"github.com/hashicorp/cap/oidc"
 	"github.com/hashicorp/cap/oidc/callback"
+	"github.com/hashicorp/go-hclog"
 	"golang.org/x/oauth2"
 )
 
@@ -71,10 +74,16 @@ func main() {
 	usePKCE := flag.Bool("pkce", false, "use the implicit flow")
 	maxAge := flag.Int("max-age", -1, "max age of user authentication")
 	scopes := flag.String("scopes", "", "comma separated list of additional scopes to requests")
+	useTestProvider := flag.Bool("use-test-provider", false, "use the test oidc provider")
 
 	flag.Parse()
 	if *useImplicit && *usePKCE {
 		fmt.Fprint(os.Stderr, "you can't request both: -implicit and -pkce")
+		return
+	}
+
+	if (*useImplicit || *implicitAccessToken || *scopes != "") && *useTestProvider {
+		fmt.Fprint(os.Stderr, "you can't use the implicit flow, PKCE or scopes with the test provider")
 		return
 	}
 
@@ -83,10 +92,46 @@ func main() {
 		optScopes[i] = strings.TrimSpace(optScopes[i])
 	}
 
-	env, err := envConfig(*useImplicit || *usePKCE)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n\n", err)
-		return
+	var env map[string]interface{}
+	var tp *oidc.TestProvider
+	if *useTestProvider {
+		l, err := oidc.NewTestingLogger(hclog.New(nil))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n\n", err)
+			return
+		}
+		tp = oidc.StartTestProvider(l, oidc.WithNoTLS())
+		tp.SetSubjectPasswords(map[string]string{"alice": "fido"})
+		// Generate a key to sign JWTs with throughout most test cases
+		priv, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n\n", err)
+			return
+		}
+		tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, "test-key-id")
+
+		oidcPort := os.Getenv("OIDC_PORT")
+		if oidcPort == "" {
+			fmt.Fprintf(os.Stderr, "env OIDC_PORT is empty")
+		}
+
+		tp.SetAllowedRedirectURIs([]string{fmt.Sprintf("http://localhost:%s/callback", oidcPort)})
+		tp.SetClientCreds("test-rp", "fido")
+
+		env = map[string]interface{}{
+			clientID:     "test-rp",
+			clientSecret: "fido",
+			issuer:       tp.Addr(),
+			port:         oidcPort,
+			attemptExp:   time.Duration(2 * time.Minute),
+		}
+	} else {
+		var err error
+		env, err = envConfig(*useImplicit || *usePKCE)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n\n", err)
+			return
+		}
 	}
 
 	// handle ctrl-c while waiting for the callback
@@ -139,6 +184,10 @@ func main() {
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return
+	}
+
+	if *useTestProvider {
+		tp.SetExpectedAuthNonce(oidcRequest.Nonce())
 	}
 
 	successFn, successCh := success()
