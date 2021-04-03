@@ -13,6 +13,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"hash"
 	"io/ioutil"
@@ -24,11 +25,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"testing"
 	"time"
 
 	"github.com/hashicorp/cap/oidc/internal/strutils"
 	"github.com/hashicorp/go-cleanhttp"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/square/go-jose.v2"
 )
@@ -162,7 +163,7 @@ type TestProvider struct {
 	keyID   string
 	alg     Alg
 
-	t *testing.T
+	t TestingT
 
 	client *http.Client
 }
@@ -176,11 +177,14 @@ func (p *TestProvider) Stop() {
 }
 
 // StartTestProvider creates and starts a running TestProvider http server.  The
-// WithPort option is supported.  The TestProvider will be shutdown when the
+// WithNoTLS and WithPort options are supported.  If the TestingT parameter
+// supports a CleanupT interface, then TestProvider will be shutdown when the
 // test and all it's subtests complete via a registered function with
 // t.Cleanup(...).
-func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
-	t.Helper()
+func StartTestProvider(t TestingT, opt ...Option) *TestProvider {
+	if v, ok := interface{}(t).(HelperT); ok {
+		v.Helper()
+	}
 	require := require.New(t)
 	opts := getTestProviderOpts(opt...)
 
@@ -227,15 +231,23 @@ func StartTestProvider(t *testing.T, opt ...Option) *TestProvider {
 	}
 	p.httpServer = httptestNewUnstartedServerWithPort(t, p, opts.withPort)
 	p.httpServer.Config.ErrorLog = log.New(ioutil.Discard, "", 0)
-	p.httpServer.StartTLS()
-	t.Cleanup(p.Stop)
+	if opts.withNoTLS {
+		p.httpServer.Start()
+	} else {
+		p.httpServer.StartTLS()
+	}
+	if v, ok := interface{}(t).(CleanupT); ok {
+		v.Cleanup(p.Stop)
+	}
 
-	cert := p.httpServer.Certificate()
+	if !opts.withNoTLS {
+		cert := p.httpServer.Certificate()
 
-	var buf bytes.Buffer
-	err = pem.Encode(&buf, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
-	require.NoError(err)
-	p.caCert = buf.String()
+		var buf bytes.Buffer
+		err = pem.Encode(&buf, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+		require.NoError(err)
+		p.caCert = buf.String()
+	}
 
 	return p
 }
@@ -246,6 +258,7 @@ type testProviderOptions struct {
 	withPort     int
 	withAtHashOf string
 	withCHashOf  string
+	withNoTLS    bool
 }
 
 // testProviderDefaults is a handy way to get the defaults at runtime and during unit
@@ -260,6 +273,17 @@ func getTestProviderOpts(opt ...Option) testProviderOptions {
 	opts := testProviderDefaults()
 	ApplyOpts(&opts, opt...)
 	return opts
+}
+
+// WithNoTLS provides the option to not use TLS for the test provider.
+//
+// Valid for: TestProvider.StartTestProvider
+func WithNoTLS() Option {
+	return func(o interface{}) {
+		if o, ok := o.(*testProviderOptions); ok {
+			o.withNoTLS = true
+		}
+	}
 }
 
 // WithTestPort provides an optional port for the test provider.
@@ -304,7 +328,9 @@ func (p *TestProvider) HTTPClient() *http.Client {
 	if p.client != nil {
 		return p.client
 	}
-	p.t.Helper()
+	if v, ok := interface{}(p.t).(HelperT); ok {
+		v.Helper()
+	}
 	require := require.New(p.t)
 
 	// use the cleanhttp package to create a "pooled" transport that's better
@@ -335,7 +361,9 @@ func (p *TestProvider) HTTPClient() *http.Client {
 func (p *TestProvider) SetSupportedScopes(scope ...string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.t.Helper()
+	if v, ok := interface{}(p.t).(HelperT); ok {
+		v.Helper()
+	}
 	require := require.New(p.t)
 	for _, s := range scope {
 		require.Containsf([]string{"openid", "profile", "email", "address", "phone"}, s, "unsupported scope %q", s)
@@ -440,7 +468,9 @@ func (p *TestProvider) SetCustomAudience(customAudiences ...string) {
 func (p *TestProvider) SetNowFunc(n func() time.Time) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.t.Helper()
+	if v, ok := interface{}(p.t).(HelperT); ok {
+		v.Helper()
+	}
 	require := require.New(p.t)
 	require.NotNilf(n, "TestProvider.SetNowFunc: time func is nil")
 	p.nowFunc = n
@@ -521,7 +551,9 @@ func (p *TestProvider) SetDisableImplicit(disable bool) {
 func (p *TestProvider) SetPKCEVerifier(verifier CodeVerifier) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.t.Helper()
+	if v, ok := interface{}(p.t).(HelperT); ok {
+		v.Helper()
+	}
 	require.NotNil(p.t, verifier)
 	p.pkceVerifier = verifier
 }
@@ -569,7 +601,8 @@ func (p *TestProvider) IDTokenAdditionalClaims() map[string]interface{} {
 func (p *TestProvider) Addr() string { return p.httpServer.URL }
 
 // CACert returns the pem-encoded CA certificate used by the test provider's
-// HTTPS server.
+// HTTPS server.  If the TestProvider was started the WithNoTLS option, then
+// this will return an empty string
 func (p *TestProvider) CACert() string { return p.caCert }
 
 // SigningKeys returns the test provider's keys used to sign JWTs, its Alg and
@@ -585,7 +618,9 @@ func (p *TestProvider) SetSigningKeys(privKey crypto.PrivateKey, pubKey crypto.P
 	const op = "TestProvider.SetSigningKeys"
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.t.Helper()
+	if v, ok := interface{}(p.t).(HelperT); ok {
+		v.Helper()
+	}
 	require := require.New(p.t)
 	require.NotNilf(privKey, "%s: private key is nil")
 	require.NotNilf(pubKey, "%s: public key is empty")
@@ -607,7 +642,9 @@ func (p *TestProvider) SetSigningKeys(privKey crypto.PrivateKey, pubKey crypto.P
 
 func (p *TestProvider) writeJSON(w http.ResponseWriter, out interface{}) error {
 	const op = "TestProvider.writeJSON"
-	p.t.Helper()
+	if v, ok := interface{}(p.t).(HelperT); ok {
+		v.Helper()
+	}
 	require := require.New(p.t)
 	require.NotNilf(w, "%s: http.ResponseWriter is nil")
 	enc := json.NewEncoder(w)
@@ -617,7 +654,9 @@ func (p *TestProvider) writeJSON(w http.ResponseWriter, out interface{}) error {
 // writeImplicitResponse will write the required form data response for an
 // implicit flow response to the OIDC authorize endpoint
 func (p *TestProvider) writeImplicitResponse(w http.ResponseWriter, state, redirectURL string) error {
-	p.t.Helper()
+	if v, ok := interface{}(p.t).(HelperT); ok {
+		v.Helper()
+	}
 	require := require.New(p.t)
 	require.NotNilf(w, "%s: http.ResponseWriter is nil")
 
@@ -690,7 +729,9 @@ func (p *TestProvider) issueSignedJWT(opt ...Option) string {
 // test at_hash and c_hash id_token claims. This is helpful internally, but
 // intentionally not exported.
 func (p *TestProvider) testHash(data string) string {
-	p.t.Helper()
+	if v, ok := interface{}(p.t).(HelperT); ok {
+		v.Helper()
+	}
 	require := require.New(p.t)
 	require.NotEmptyf(data, "testHash: data to hash is empty")
 	var h hash.Hash
@@ -716,7 +757,9 @@ func (p *TestProvider) testHash(data string) string {
 // writeAuthErrorResponse writes a standard OIDC authentication error response.
 // See: https://openid.net/specs/openid-connect-core-1_0.html#AuthError
 func (p *TestProvider) writeAuthErrorResponse(w http.ResponseWriter, req *http.Request, redirectURL, state, errorCode, errorMessage string) {
-	p.t.Helper()
+	if v, ok := interface{}(p.t).(HelperT); ok {
+		v.Helper()
+	}
 	require := require.New(p.t)
 	require.NotNilf(w, "%s: http.ResponseWriter is nil")
 	require.NotNilf(req, "%s: http.Request is nil")
@@ -769,7 +812,9 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	p.t.Helper()
+	if v, ok := interface{}(p.t).(HelperT); ok {
+		v.Helper()
+	}
 	require := require.New(p.t)
 	require.NotNilf(w, "%s: http.ResponseWriter is nil")
 	require.NotNilf(req, "%s: http.Request is nil")
@@ -979,8 +1024,10 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // httptestNewUnstartedServerWithPort is roughly the same as
 // httptest.NewUnstartedServer() but allows the caller to explicitly choose the
 // port if desired.
-func httptestNewUnstartedServerWithPort(t *testing.T, handler http.Handler, port int) *httptest.Server {
-	t.Helper()
+func httptestNewUnstartedServerWithPort(t TestingT, handler http.Handler, port int) *httptest.Server {
+	if v, ok := interface{}(t).(HelperT); ok {
+		v.Helper()
+	}
 	require := require.New(t)
 	require.NotNil(handler)
 	if port == 0 {
@@ -994,4 +1041,43 @@ func httptestNewUnstartedServerWithPort(t *testing.T, handler http.Handler, port
 		Listener: l,
 		Config:   &http.Server{Handler: handler},
 	}
+}
+
+// TestingT defines a very slim interface required by the TestProvider and any
+// test functions it uses.
+type TestingT interface {
+	Errorf(format string, args ...interface{})
+	FailNow()
+}
+
+// CleanupT defines an single function interface for a testing.Cleanup(func()).
+type CleanupT interface{ Cleanup(func()) }
+
+// HelperT defines a single function interface for a testing.Helper()
+type HelperT interface{ Helper() }
+
+// TestingLogger defines a logger that will implement the TestingT interface so
+// it can be used with StartTestProvider(...) as its t TestingT parameter.
+type TestingLogger struct {
+	Logger hclog.Logger
+}
+
+// NewTestingLogger makes a new TestingLogger
+func NewTestingLogger(logger hclog.Logger) (*TestingLogger, error) {
+	if logger == nil {
+		return nil, errors.New("missing logger")
+	}
+	return &TestingLogger{
+		Logger: logger,
+	}, nil
+}
+
+// Errorf will output the error to the log
+func (l *TestingLogger) Errorf(format string, args ...interface{}) {
+	l.Logger.Error(format, args...)
+}
+
+// FailNow will panic
+func (l *TestingLogger) FailNow() {
+	panic("testing.T failed, see logs for output (if any)")
 }
