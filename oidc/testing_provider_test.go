@@ -13,31 +13,56 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func Test_StartTestProvider(t *testing.T) {
 	t.Parallel()
-	assert, require := assert.New(t), require.New(t)
-	port := func() int {
-		addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
-		require.NoError(err)
-		l, err := net.ListenTCP("tcp", addr)
-		require.NoError(err)
-		defer l.Close()
-		return l.Addr().(*net.TCPAddr).Port
-	}()
+	t.Run("simple", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		port := func() int {
+			addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+			require.NoError(err)
+			l, err := net.ListenTCP("tcp", addr)
+			require.NoError(err)
+			defer l.Close()
+			return l.Addr().(*net.TCPAddr).Port
+		}()
 
-	tp := StartTestProvider(t, WithTestPort(port))
-	url, err := url.Parse(tp.Addr())
-	require.NoError(err)
-	assert.Equal(strconv.Itoa(port), url.Port())
+		tp := StartTestProvider(t, WithTestPort(port))
+		url, err := url.Parse(tp.Addr())
+		require.NoError(err)
+		assert.Equal(strconv.Itoa(port), url.Port())
 
-	client := tp.HTTPClient()
-	resp, err := client.Get(tp.Addr() + "/.well-known/jwks.json")
-	require.NoError(err)
-	assert.Equal(http.StatusOK, resp.StatusCode)
+		client := tp.HTTPClient()
+		resp, err := client.Get(tp.Addr() + "/.well-known/jwks.json")
+		require.NoError(err)
+		assert.Equal(http.StatusOK, resp.StatusCode)
+	})
+	t.Run("WithNoTLS", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		tp := StartTestProvider(t, WithNoTLS())
+		url, err := url.Parse(tp.Addr())
+		require.NoError(err)
+		assert.Equalf("http", url.Scheme, "expected http and got: %s", url.Scheme)
+
+		client := tp.HTTPClient()
+		resp, err := client.Get(tp.Addr() + "/.well-known/jwks.json")
+		require.NoError(err)
+		assert.Equal(http.StatusOK, resp.StatusCode)
+	})
+	t.Run("WithTestingLogger", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		l, err := NewTestingLogger(hclog.New(nil))
+		require.NoError(err)
+		tp := StartTestProvider(l)
+		client := tp.HTTPClient()
+		resp, err := client.Get(tp.Addr() + "/.well-known/jwks.json")
+		require.NoError(err)
+		assert.Equal(http.StatusOK, resp.StatusCode)
+	})
 }
 
 func Test_HTTPClient(t *testing.T) {
