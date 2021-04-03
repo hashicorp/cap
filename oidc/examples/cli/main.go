@@ -101,7 +101,10 @@ func main() {
 			return
 		}
 		tp = oidc.StartTestProvider(l, oidc.WithNoTLS())
-		tp.SetSubjectPasswords(map[string]string{"alice": "fido"})
+		tp.SetSubjectPasswords(map[string]string{
+			"alice": "fido",
+			"eve":   "alice",
+		})
 		// Generate a key to sign JWTs with throughout most test cases
 		priv, err := rsa.GenerateKey(rand.Reader, 2048)
 		if err != nil {
