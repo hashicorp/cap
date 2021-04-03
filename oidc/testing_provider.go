@@ -134,6 +134,7 @@ type TestProvider struct {
 	allowedRedirectURIs          []string
 	replyIDTokenAdditionalClaims map[string]interface{}
 	replySubject                 string
+	subjectPasswords             map[string]string
 	replyUserinfo                interface{}
 	replyExpiry                  time.Duration
 
@@ -213,7 +214,8 @@ func StartTestProvider(t TestingT, opt ...Option) *TestProvider {
 			"advisor":       "Faythe",
 			"nosy-neighbor": "Eve",
 		},
-		supportedScopes: []string{"openid"}, // required openid is the default
+		supportedScopes:  []string{"openid"},  // required openid is the default
+		subjectPasswords: map[string]string{}, // default is not to use a login form, so no passwords required for subjects
 	}
 
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -400,6 +402,22 @@ func (p *TestProvider) ExpectedSubject() string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.replySubject
+}
+
+// SetSubjectPasswords is for configuring subject passwords when you wish to
+// have login prompts for interactive testing.
+func (p *TestProvider) SetSubjectPasswords(subjectPasswords map[string]string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.subjectPasswords = subjectPasswords
+}
+
+// SubjectPasswords returns the current subject passwords when you wish to have
+// login prompts for interactive testing.
+func (p *TestProvider) SubjectPasswords() map[string]string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.subjectPasswords
 }
 
 // SetExpectedExpiry is for configuring the expected expiry for any JWTs issued
@@ -812,6 +830,7 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		token               = "/token"
 		userInfo            = "/userinfo"
 		wellKnownJwks       = "/.well-known/jwks.json"
+		login               = "/login"
 	)
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -864,6 +883,37 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		require.NoErrorf(err, "%s: internal error: %w", openidConfiguration, err)
 
 		return
+	case login:
+		// support for a login form for interactive testing.
+		err := req.ParseForm()
+		require.NoErrorf(err, "%s: internal error: %w", authorize, err)
+		uname := req.FormValue("uname")
+		psw := req.FormValue("psw")
+		state := req.FormValue("state")
+		redirectURI := req.FormValue("redirect_uri")
+
+		subPsw, ok := p.subjectPasswords[uname]
+		if !ok {
+			p.writeAuthErrorResponse(w, req, redirectURI, state, "access_denied", "invalid user name")
+			return
+		}
+		if subPsw != psw {
+			p.writeAuthErrorResponse(w, req, redirectURI, state, "access_denied", "invalid password")
+			return
+		}
+		var s string
+		switch {
+		case p.expectedState != "":
+			s = p.expectedState
+		default:
+			s = state
+		}
+
+		redirectURI += "?state=" + url.QueryEscape(s) +
+			"&code=" + url.QueryEscape(p.expectedAuthCode)
+
+		http.Redirect(w, req, redirectURI, http.StatusFound)
+		return
 	case authorize:
 		// Supports both the authorization code and implicit flows
 		// See: https://openid.net/specs/openid-connect-core-1_0.html#AuthorizationEndpoint
@@ -880,6 +930,13 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		state := req.FormValue("state")
 		redirectURI := req.FormValue("redirect_uri")
 		respMode := req.FormValue("response_mode")
+
+		// if subjectPasswords are configured, then we're doing interactive
+		// testing and we need to create a login form.
+		if len(p.subjectPasswords) > 0 {
+			_ = p.writeLoginPage(w, state, redirectURI)
+			return
+		}
 
 		if respType != "code" && !strings.Contains(respType, "id_token") {
 			p.writeAuthErrorResponse(w, req, redirectURI, state, "unsupported_response_type", "")
@@ -1084,4 +1141,110 @@ func (l *TestingLogger) Errorf(format string, args ...interface{}) {
 // FailNow will panic
 func (l *TestingLogger) FailNow() {
 	panic("testing.T failed, see logs for output (if any)")
+}
+
+func (p *TestProvider) writeLoginPage(w http.ResponseWriter, state, redirectURI string) error {
+	// this is horrible CSS/HTML. I'd welcome help with a better implementation
+	// for these bits.
+	const loginCss = `<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body {font-family: Arial, Helvetica, sans-serif;}
+form {border: 3px solid #f1f1f1;}
+
+input[type=text], input[type=password] {
+  width: 100%;
+  padding: 12px 20px;
+  margin: 8px 0;
+  display: inline-block;
+  border: 1px solid #ccc;
+  box-sizing: border-box;
+}
+
+button {
+  background-color: #4CAF50;
+  color: white;
+  padding: 14px 20px;
+  margin: 8px 0;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+}
+
+button:hover {
+  opacity: 0.8;
+}
+
+.cancelbtn {
+  width: auto;
+  padding: 10px 18px;
+  background-color: #f44336;
+}
+
+
+.container {
+  padding: 16px;
+}
+
+span.psw {
+  float: right;
+  padding-top: 16px;
+}
+
+/* Change styles for span and cancel button on extra small screens */
+@media screen and (max-width: 300px) {
+  span.psw {
+     display: block;
+     float: none;
+  }
+  .cancelbtn {
+     width: 100%;
+  }
+}
+</style>
+</head>
+`
+	const loginForm = `
+<html>
+<body>
+
+<h2>Login</h2>
+
+<form action="/login" method="post">
+  <div class="container">
+    <label for="uname"><b>Username</b></label>
+    <input type="text" placeholder="Enter Username" name="uname" required>
+
+    <label for="psw"><b>Password</b></label>
+    <input type="password" placeholder="Enter Password" name="psw" required>
+        
+    <button type="submit">Login</button>
+  </div>
+
+  <div class="container" style="background-color:#f1f1f1">
+    <button type="button" class="cancelbtn">Cancel</button>
+	<input type="hidden" name="state" id=state" value="%s"/>
+	<input type="hidden" name="redirect_uri" value="%s" />
+  </div>
+</form>
+
+
+</body>
+</html>
+`
+
+	if v, ok := interface{}(p.t).(HelperT); ok {
+		v.Helper()
+	}
+	require := require.New(p.t)
+	require.NotNilf(w, "%s: http.ResponseWriter is nil")
+
+	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
+	if _, err := w.Write([]byte(loginCss + fmt.Sprintf(loginForm, state, redirectURI))); err != nil {
+		return err
+	}
+
+	return nil
 }
