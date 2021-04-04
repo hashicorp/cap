@@ -82,6 +82,11 @@ var (
 //  * Subject: SetExpectedSubject(sub string) configures the expected subject for
 //    any JWTs issued by the provider (the default is "alice@example.com")
 //
+//  * Subject Passwords: SetSubjectPasswords(...) configures a subject/password
+//    dictionary. If configured, then an interactive Login form is presented by
+//    the /authorize endpoint and the TestProvider becomes an interactive test
+//    provider using the provided subject/password dictionary.
+//
 //  * Expiry: SetExpectedExpiry(exp time.Duration) updates the expiry and
 //    now + 5 * time.Second is the default.
 //
