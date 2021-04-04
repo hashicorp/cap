@@ -101,6 +101,7 @@ func main() {
 			return
 		}
 		tp = oidc.StartTestProvider(l, oidc.WithNoTLS())
+		defer tp.Stop()
 		tp.SetSubjectPasswords(map[string]string{
 			"alice": "fido",
 			"eve":   "alice",
