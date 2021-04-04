@@ -436,7 +436,11 @@ func (p *TestProvider) SetSubjectPasswords(subjectPasswords map[string]string) {
 func (p *TestProvider) SubjectPasswords() map[string]string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return p.subjectPasswords
+	clone := map[string]string{}
+	for v, k := range p.subjectPasswords {
+		clone[k] = v
+	}
+	return clone
 }
 
 // SetExpectedExpiry is for configuring the expected expiry for any JWTs issued
@@ -918,6 +922,7 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		state := req.FormValue("state")
 		redirectURI := req.FormValue("redirect_uri")
 
+		// p.mu.Lock() called at top of func... so this map access if okay.
 		subPsw, ok := p.subjectPasswords[uname]
 		if !ok {
 			p.writeAuthErrorResponse(w, req, redirectURI, state, "access_denied", "invalid user name")
