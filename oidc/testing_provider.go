@@ -2,6 +2,7 @@ package oidc
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -30,7 +31,6 @@ import (
 	"github.com/hashicorp/cap/oidc/internal/strutils"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/hashicorp/go-hclog"
-	"github.com/patrickmn/go-cache"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/square/go-jose.v2"
 )
@@ -136,12 +136,15 @@ type TestProvider struct {
 	httpServer *httptest.Server
 	caCert     string
 
+	startContext context.Context
+	startCancel  context.CancelFunc
+
 	jwks                         *jose.JSONWebKeySet
 	allowedRedirectURIs          []string
 	replyIDTokenAdditionalClaims map[string]interface{}
 	replySubject                 string
 	subjectPasswords             map[string]string
-	codes                        *cache.Cache
+	codes                        map[string]*codeState
 	replyUserinfo                map[string]interface{}
 	replyExpiry                  time.Duration
 
@@ -182,6 +185,7 @@ func (p *TestProvider) Stop() {
 	if p.client != nil {
 		p.client.CloseIdleConnections()
 	}
+	p.startCancel()
 }
 
 // StartTestProvider creates and starts a running TestProvider http server.  The
@@ -223,7 +227,7 @@ func StartTestProvider(t TestingT, opt ...Option) *TestProvider {
 		},
 		supportedScopes:  []string{"openid"},  // required openid is the default
 		subjectPasswords: map[string]string{}, // default is not to use a login form, so no passwords required for subjects
-		codes:            cache.New(codeTimeout, codeCleanupInterval),
+		codes:            map[string]*codeState{},
 	}
 
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -258,6 +262,8 @@ func StartTestProvider(t TestingT, opt ...Option) *TestProvider {
 		require.NoError(err)
 		p.caCert = buf.String()
 	}
+	p.startContext, p.startCancel = context.WithCancel(context.Background())
+	p.startCachedCodesCleanupTicking(p.startContext)
 
 	return p
 }
@@ -933,10 +939,11 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		p.codes.SetDefault(p.expectedAuthCode, &codeState{
+		// p.mu.Lock() called at top of func... so this map access if okay.
+		p.codes[p.expectedAuthCode] = &codeState{
 			sub: uname,
 			exp: time.Now().Add(codeTimeout),
-		})
+		}
 
 		var s string
 		switch {
@@ -1081,6 +1088,7 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		var sub string
 		switch {
+		// p.mu.Lock() called at top of func... so this map access if okay.
 		case len(p.subjectPasswords) > 0:
 			s := p.verifyCachedCode(code)
 			if s == nil {
@@ -1088,7 +1096,7 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				return
 			}
 			s.issuedTokens = true
-			p.codes.Set(code, s, time.Until(s.exp))
+			p.codes[code] = s
 			sub = s.sub
 		default:
 			sub = p.replySubject
@@ -1124,6 +1132,7 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		switch {
+		// p.mu.Lock() called at top of func... so this map access if okay.
 		case len(p.subjectPasswords) > 0:
 			const bearSchema = "Bearer "
 			authHeader := req.Header.Get("Authorization")
@@ -1157,16 +1166,44 @@ type codeState struct {
 	issuedTokens bool
 }
 
+// verifyCachedCode is not concurrency safe by itself.  Its TestProvider must be
+// locked/unlocked externally to this function for it to be safe.
 func (p *TestProvider) verifyCachedCode(code string) *codeState {
-	defer p.codes.Delete(code)
-
-	if raw, ok := p.codes.Get(code); ok {
-		if raw.(*codeState).issuedTokens {
+	defer delete(p.codes, code)
+	if s, ok := p.codes[code]; ok {
+		if s.issuedTokens || time.Now().After(s.exp) {
 			return nil
 		}
-		return raw.(*codeState)
+		return s
 	}
 	return nil
+}
+
+func (p *TestProvider) startCachedCodesCleanupTicking(cancelCtx context.Context) {
+	go func() {
+		interval := 1 * time.Minute
+		timer := time.NewTimer(0)
+		for {
+			select {
+			case <-cancelCtx.Done():
+				if v, ok := interface{}(p.t).(InfofT); ok {
+					v.Infof("cleanup of cached codes shutting down", nil)
+				}
+				return
+			case <-timer.C:
+				func() {
+					p.mu.Lock()
+					defer p.mu.Unlock()
+					for k, v := range p.codes {
+						if time.Now().After(v.exp) {
+							delete(p.codes, k)
+						}
+					}
+					timer.Reset(interval)
+				}()
+			}
+		}
+	}()
 }
 
 // httptestNewUnstartedServerWithPort is roughly the same as
@@ -1223,6 +1260,16 @@ func NewTestingLogger(logger hclog.Logger) (*TestingLogger, error) {
 // Errorf will output the error to the log
 func (l *TestingLogger) Errorf(format string, args ...interface{}) {
 	l.Logger.Error(format, args...)
+}
+
+// InfofT defines a single function interface for a Info(format string, args ...interface{})
+type InfofT interface {
+	Infof(format string, args ...interface{})
+}
+
+// Infof will output the info to the log
+func (l *TestingLogger) Infof(format string, args ...interface{}) {
+	l.Logger.Info(format, args...)
 }
 
 // FailNow will panic
