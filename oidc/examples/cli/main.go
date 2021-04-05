@@ -134,7 +134,7 @@ func main() {
 			SigningKey: &oidc.TestSigningKey{
 				PrivKey: priv,
 				PubKey:  priv.Public(),
-				Alg:     oidc.RS256,
+				Alg:     oidc.ES384,
 			},
 			AllowedRedirectURIs: []string{fmt.Sprintf("http://localhost:%s/callback", oidcPort)},
 			ClientID:            &id,
@@ -169,7 +169,7 @@ func main() {
 	clientID := env[clientID].(string)
 	clientSecret := oidc.ClientSecret(env[clientSecret].(string))
 	redirectURL := fmt.Sprintf("http://localhost:%s/callback", env[port].(string))
-	pc, err := oidc.NewConfig(issuer, clientID, clientSecret, []oidc.Alg{oidc.RS256}, []string{redirectURL})
+	pc, err := oidc.NewConfig(issuer, clientID, clientSecret, []oidc.Alg{oidc.ES384}, []string{redirectURL})
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return
