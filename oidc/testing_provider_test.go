@@ -101,7 +101,7 @@ func Test_WithTestDefaults(t *testing.T) {
 	t.Parallel()
 	assert, require := assert.New(t), require.New(t)
 	// Generate a key to sign JWTs with throughout most test cases
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	priv, err := rsa.GenerateKey(rand.Reader, 4096)
 	require.NoError(err)
 	oidcPort := "2222"
 	id, secret := "test-rp", "fido"

@@ -1203,7 +1203,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			}(),
 			args: args{
 				keys: func() keys {
-					k, err := rsa.GenerateKey(rand.Reader, 2048)
+					k, err := rsa.GenerateKey(rand.Reader, 4096)
 					require.NoError(t, err)
 					return keys{priv: k, pub: &k.PublicKey, alg: RS256, keyID: "valid-RS256"}
 				}(),
@@ -1220,7 +1220,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			}(),
 			args: args{
 				keys: func() keys {
-					k, err := rsa.GenerateKey(rand.Reader, 2048)
+					k, err := rsa.GenerateKey(rand.Reader, 4096)
 					require.NoError(t, err)
 					return keys{priv: k, pub: &k.PublicKey, alg: RS384, keyID: "valid-RS384"}
 				}(),
@@ -1237,7 +1237,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			}(),
 			args: args{
 				keys: func() keys {
-					k, err := rsa.GenerateKey(rand.Reader, 2048)
+					k, err := rsa.GenerateKey(rand.Reader, 4096)
 					require.NoError(t, err)
 					return keys{priv: k, pub: &k.PublicKey, alg: RS512, keyID: "valid-RS512"}
 				}(),
@@ -1254,7 +1254,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			}(),
 			args: args{
 				keys: func() keys {
-					k, err := rsa.GenerateKey(rand.Reader, 2048)
+					k, err := rsa.GenerateKey(rand.Reader, 4096)
 					require.NoError(t, err)
 					return keys{priv: k, pub: &k.PublicKey, alg: PS256, keyID: "valid-PS256"}
 				}(),
@@ -1271,7 +1271,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			}(),
 			args: args{
 				keys: func() keys {
-					k, err := rsa.GenerateKey(rand.Reader, 2048)
+					k, err := rsa.GenerateKey(rand.Reader, 4096)
 					require.NoError(t, err)
 					return keys{priv: k, pub: &k.PublicKey, alg: PS384, keyID: "valid-PS384"}
 				}(),
@@ -1288,7 +1288,7 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			}(),
 			args: args{
 				keys: func() keys {
-					k, err := rsa.GenerateKey(rand.Reader, 2048)
+					k, err := rsa.GenerateKey(rand.Reader, 4096)
 					require.NoError(t, err)
 					return keys{priv: k, pub: &k.PublicKey, alg: PS512, keyID: "valid-PS512"}
 				}(),

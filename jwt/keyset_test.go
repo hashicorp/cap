@@ -76,7 +76,7 @@ func Test_jsonWebKeySet_VerifySignature(t *testing.T) {
 			name: "verify jwt with RS256 signature",
 			args: args{
 				token: func() string {
-					priv, err := rsa.GenerateKey(rand.Reader, 2048)
+					priv, err := rsa.GenerateKey(rand.Reader, 4096)
 					require.NoError(t, err)
 					tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 					return oidc.TestSignJWT(t, priv, string(RS256), testJWTClaims(t), []byte(testKeyID))
@@ -112,7 +112,7 @@ func Test_jsonWebKeySet_VerifySignature(t *testing.T) {
 			name: "verify jwt with PS256 signature",
 			args: args{
 				token: func() string {
-					priv, err := rsa.GenerateKey(rand.Reader, 2048)
+					priv, err := rsa.GenerateKey(rand.Reader, 4096)
 					require.NoError(t, err)
 					tp.SetSigningKeys(priv, priv.Public(), oidc.PS256, testKeyID)
 					return oidc.TestSignJWT(t, priv, string(PS256), testJWTClaims(t), []byte(testKeyID))
@@ -315,7 +315,7 @@ func Test_staticKeySet_VerifySignature(t *testing.T) {
 			name: "verify jwt with RS256 signature",
 			args: args{
 				token: func() (string, []crypto.PublicKey) {
-					priv, err := rsa.GenerateKey(rand.Reader, 2048)
+					priv, err := rsa.GenerateKey(rand.Reader, 4096)
 					require.NoError(t, err)
 					token := oidc.TestSignJWT(t, priv, string(RS256), testJWTClaims(t), []byte(testKeyID))
 					return token, []crypto.PublicKey{priv.Public()}
@@ -351,7 +351,7 @@ func Test_staticKeySet_VerifySignature(t *testing.T) {
 			name: "verify jwt with PS256 signature",
 			args: args{
 				token: func() (string, []crypto.PublicKey) {
-					priv, err := rsa.GenerateKey(rand.Reader, 2048)
+					priv, err := rsa.GenerateKey(rand.Reader, 4096)
 					require.NoError(t, err)
 					token := oidc.TestSignJWT(t, priv, string(PS256), testJWTClaims(t), []byte(testKeyID))
 					return token, []crypto.PublicKey{priv.Public()}
@@ -403,7 +403,7 @@ func Test_staticKeySet_VerifySignature(t *testing.T) {
 					require.NoError(t, err)
 					ecPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 					require.NoError(t, err)
-					rsaPriv, err := rsa.GenerateKey(rand.Reader, 2048)
+					rsaPriv, err := rsa.GenerateKey(rand.Reader, 4096)
 					require.NoError(t, err)
 
 					token := oidc.TestSignJWT(t, rsaPriv, string(RS256), testJWTClaims(t), []byte(testKeyID))
@@ -420,7 +420,7 @@ func Test_staticKeySet_VerifySignature(t *testing.T) {
 					require.NoError(t, err)
 					ecPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 					require.NoError(t, err)
-					rsaPriv, err := rsa.GenerateKey(rand.Reader, 2048)
+					rsaPriv, err := rsa.GenerateKey(rand.Reader, 4096)
 					require.NoError(t, err)
 
 					token := oidc.TestSignJWT(t, ecPriv, string(ES256), testJWTClaims(t), []byte(testKeyID))
@@ -635,7 +635,7 @@ func TestNewStaticKeySet(t *testing.T) {
 			name: "valid public keys",
 			args: args{
 				publicKeys: func() []crypto.PublicKey {
-					priv, err := rsa.GenerateKey(rand.Reader, 2048)
+					priv, err := rsa.GenerateKey(rand.Reader, 4096)
 					require.NoError(t, err)
 					return []crypto.PublicKey{priv.Public()}
 				},
@@ -689,7 +689,7 @@ func TestParsePublicKeyPEM(t *testing.T) {
 			name: "parse PKIX RSA public key",
 			args: args{
 				pem: func() ([]byte, crypto.PublicKey) {
-					priv, err := rsa.GenerateKey(rand.Reader, 2048)
+					priv, err := rsa.GenerateKey(rand.Reader, 4096)
 					require.NoError(t, err)
 
 					bytes, err := x509.MarshalPKIXPublicKey(priv.Public())
@@ -721,7 +721,7 @@ func TestParsePublicKeyPEM(t *testing.T) {
 			name: "parse x509 certificate RSA public key",
 			args: args{
 				pem: func() ([]byte, crypto.PublicKey) {
-					priv, err := rsa.GenerateKey(rand.Reader, 2048)
+					priv, err := rsa.GenerateKey(rand.Reader, 4096)
 					require.NoError(t, err)
 
 					template := x509.Certificate{

@@ -101,7 +101,7 @@ func main() {
 			return
 		}
 		// Generate a key to sign JWTs with throughout most test cases
-		priv, err := rsa.GenerateKey(rand.Reader, 2048)
+		priv, err := rsa.GenerateKey(rand.Reader, 4096)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s\n\n", err)
 			return

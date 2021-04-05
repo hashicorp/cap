@@ -122,7 +122,7 @@ func TestIDToken_VerifyAccessToken(t *testing.T) {
 			name: "RS256",
 			alg:  RS256,
 			priKey: func() crypto.PrivateKey {
-				k, err := rsa.GenerateKey(rand.Reader, 2048)
+				k, err := rsa.GenerateKey(rand.Reader, 4096)
 				require.NoError(t, err)
 				return k
 			}(),
@@ -142,7 +142,7 @@ func TestIDToken_VerifyAccessToken(t *testing.T) {
 			name: "PS256",
 			alg:  PS256,
 			priKey: func() crypto.PrivateKey {
-				k, err := rsa.GenerateKey(rand.Reader, 2048)
+				k, err := rsa.GenerateKey(rand.Reader, 4096)
 				require.NoError(t, err)
 				return k
 			}(),
@@ -152,7 +152,7 @@ func TestIDToken_VerifyAccessToken(t *testing.T) {
 			name: "RS384",
 			alg:  RS384,
 			priKey: func() crypto.PrivateKey {
-				k, err := rsa.GenerateKey(rand.Reader, 2048)
+				k, err := rsa.GenerateKey(rand.Reader, 4096)
 				require.NoError(t, err)
 				return k
 			}(),
@@ -172,7 +172,7 @@ func TestIDToken_VerifyAccessToken(t *testing.T) {
 			name: "PS384",
 			alg:  PS384,
 			priKey: func() crypto.PrivateKey {
-				k, err := rsa.GenerateKey(rand.Reader, 2048)
+				k, err := rsa.GenerateKey(rand.Reader, 4096)
 				require.NoError(t, err)
 				return k
 			}(),
@@ -182,7 +182,7 @@ func TestIDToken_VerifyAccessToken(t *testing.T) {
 			name: "RS512",
 			alg:  RS512,
 			priKey: func() crypto.PrivateKey {
-				k, err := rsa.GenerateKey(rand.Reader, 2048)
+				k, err := rsa.GenerateKey(rand.Reader, 4096)
 				require.NoError(t, err)
 				return k
 			}(),
@@ -202,7 +202,7 @@ func TestIDToken_VerifyAccessToken(t *testing.T) {
 			name: "PS512",
 			alg:  PS512,
 			priKey: func() crypto.PrivateKey {
-				k, err := rsa.GenerateKey(rand.Reader, 2048)
+				k, err := rsa.GenerateKey(rand.Reader, 4096)
 				require.NoError(t, err)
 				return k
 			}(),
@@ -236,7 +236,7 @@ func TestIDToken_VerifyAccessToken(t *testing.T) {
 	}
 	t.Run("missing-at-hash", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		k, err := rsa.GenerateKey(rand.Reader, 2048)
+		k, err := rsa.GenerateKey(rand.Reader, 4096)
 		require.NoError(err)
 		claims := claimsFn()
 		testJWT := TestSignJWT(t, k, string(RS256), claims, nil)
@@ -247,7 +247,7 @@ func TestIDToken_VerifyAccessToken(t *testing.T) {
 	})
 	t.Run("at-hash-not-equal", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		k, err := rsa.GenerateKey(rand.Reader, 2048)
+		k, err := rsa.GenerateKey(rand.Reader, 4096)
 		require.NoError(err)
 		claims := claimsFn()
 		claims["at_hash"] = testHash(t, RS256, "this-isn't-going-to-match")
@@ -287,7 +287,7 @@ func TestIDToken_VerifyAuthorizationCode(t *testing.T) {
 			name: "RS256",
 			alg:  RS256,
 			priKey: func() crypto.PrivateKey {
-				k, err := rsa.GenerateKey(rand.Reader, 2048)
+				k, err := rsa.GenerateKey(rand.Reader, 4096)
 				require.NoError(t, err)
 				return k
 			}(),
@@ -322,7 +322,7 @@ func TestIDToken_VerifyAuthorizationCode(t *testing.T) {
 	}
 	t.Run("missing-c-hash", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		k, err := rsa.GenerateKey(rand.Reader, 2048)
+		k, err := rsa.GenerateKey(rand.Reader, 4096)
 		require.NoError(err)
 		claims := claimsFn()
 		testJWT := TestSignJWT(t, k, string(RS256), claims, nil)
@@ -333,7 +333,7 @@ func TestIDToken_VerifyAuthorizationCode(t *testing.T) {
 	})
 	t.Run("c-hash-not-equal", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		k, err := rsa.GenerateKey(rand.Reader, 2048)
+		k, err := rsa.GenerateKey(rand.Reader, 4096)
 		require.NoError(err)
 		claims := claimsFn()
 		claims["c_hash"] = testHash(t, RS256, "this-isn't-going-to-match")
