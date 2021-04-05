@@ -78,8 +78,18 @@ func Test_HTTPClient(t *testing.T) {
 func Test_WithTestPort(t *testing.T) {
 	t.Parallel()
 	assert := assert.New(t)
-	opts := getTestProviderOpts(WithTestPort(8080))
-	testOpts := testProviderDefaults()
+	opts := getTestProviderOpts(t, WithTestPort(8080))
+	testOpts := testProviderDefaults(t)
+	testOpts.withDefaults.PKCEVerifier = opts.withDefaults.PKCEVerifier
+
+	// funcs are difficult to compare, so we'll special case them
+	testAssertEqualFunc(t, opts.withDefaults.NowFunc, testOpts.withDefaults.NowFunc, "not equal")
+	opts.withDefaults.NowFunc = nil
+	testOpts.withDefaults.NowFunc = nil
+
+	// keys are generated for default opts, so let's handle that
+	testOpts.withDefaults.SigningKey.PrivKey = opts.withDefaults.SigningKey.PrivKey
+	testOpts.withDefaults.SigningKey.PubKey = opts.withDefaults.SigningKey.PubKey
 	testOpts.withPort = 8080
 	assert.Equal(opts, testOpts)
 }
@@ -161,7 +171,7 @@ func TestTestProvider_SetCustomClaims(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
 		tp := StartTestProvider(t)
-		require.Equal(map[string]interface{}{}, tp.customClaims)
+		require.Equal(map[string]interface{}{"email": "alice@example.com", "name": "Alice Doe Smith"}, tp.customClaims)
 		custom := map[string]interface{}{"what_is_your_favorite_color": "blue... no green!"}
 		tp.SetCustomClaims(custom)
 		assert.Equal(custom, tp.customClaims)
@@ -317,20 +327,6 @@ func TestTestProvider_SetUserInfoReply(t *testing.T) {
 	})
 }
 
-func TestTestProvider_SetIDTokenAdditionalClaims(t *testing.T) {
-	t.Run("simple", func(t *testing.T) {
-		assert := assert.New(t)
-		tp := StartTestProvider(t)
-		reply := map[string]interface{}{
-			"name":     "Alice Eve-Bob",
-			"email":    "alice-eve-bob@alice.com",
-			"pronouns": "they/them",
-		}
-		tp.SetIDTokenAdditionalClaims(reply)
-		assert.Equal(reply, tp.replyIDTokenAdditionalClaims)
-		assert.Equal(reply, tp.IDTokenAdditionalClaims())
-	})
-}
 func TestTestProvider_writeJSON(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)

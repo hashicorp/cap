@@ -144,14 +144,13 @@ type TestProvider struct {
 	startContext context.Context
 	startCancel  context.CancelFunc
 
-	jwks                         *jose.JSONWebKeySet
-	allowedRedirectURIs          []string
-	replyIDTokenAdditionalClaims map[string]interface{}
-	replySubject                 string
-	subjectPasswords             map[string]string
-	codes                        map[string]*codeState
-	replyUserinfo                map[string]interface{}
-	replyExpiry                  time.Duration
+	jwks                *jose.JSONWebKeySet
+	allowedRedirectURIs []string
+	replySubject        string
+	subjectPasswords    map[string]string
+	codes               map[string]*codeState
+	replyUserinfo       map[string]interface{}
+	replyExpiry         time.Duration
 
 	mu                sync.Mutex
 	clientID          string
@@ -194,52 +193,34 @@ func (p *TestProvider) Stop() {
 }
 
 // StartTestProvider creates and starts a running TestProvider http server.  The
-// WithNoTLS and WithPort options are supported.  If the TestingT parameter
-// supports a CleanupT interface, then TestProvider will be shutdown when the
-// test and all it's subtests complete via a registered function with
-// t.Cleanup(...).
+// WithTestDefaults, WithNoTLS and WithPort options are supported.  If the
+// TestingT parameter supports a CleanupT interface, then TestProvider will be
+// shutdown when the test and all it's subtests complete via a registered
+// function with t.Cleanup(...).
 func StartTestProvider(t TestingT, opt ...Option) *TestProvider {
 	if v, ok := interface{}(t).(HelperT); ok {
 		v.Helper()
 	}
 	require := require.New(t)
-	opts := getTestProviderOpts(opt...)
-
-	v, err := NewCodeVerifier()
-	require.NoError(err)
+	opts := getTestProviderOpts(t, opt...)
 	p := &TestProvider{
-		t:            t,
-		nowFunc:      time.Now,
-		pkceVerifier: v,
-		customClaims: map[string]interface{}{},
-		replyExpiry:  5 * time.Second,
-
-		allowedRedirectURIs: []string{
-			"https://example.com",
-		},
-		replyIDTokenAdditionalClaims: map[string]interface{}{
-			"name":  "Alice Doe Smith",
-			"email": "alice@example.com",
-		},
-		replySubject: "alice@example.com",
-		replyUserinfo: map[string]interface{}{
-			"sub":           "alice@example.com",
-			"dob":           "1978",
-			"friend":        "bob",
-			"nickname":      "A",
-			"advisor":       "Faythe",
-			"nosy-neighbor": "Eve",
-		},
-		supportedScopes:  []string{"openid"},  // required openid is the default
-		subjectPasswords: map[string]string{}, // default is not to use a login form, so no passwords required for subjects
-		codes:            map[string]*codeState{},
+		t:                   t,
+		nowFunc:             opts.withDefaults.NowFunc,
+		pkceVerifier:        opts.withDefaults.PKCEVerifier,
+		replyExpiry:         opts.withDefaults.Expiry,
+		allowedRedirectURIs: opts.withDefaults.AllowedRedirectURIs,
+		customClaims:        opts.withDefaults.CustomClaims,
+		replySubject:        opts.withDefaults.ExpectedSubject,
+		replyUserinfo:       opts.withDefaults.UserInfoReply,
+		supportedScopes:     opts.withDefaults.SupportedScopes,
+		subjectPasswords:    opts.withDefaults.SubjectPasswords, // default is not to use a login form, so no passwords required for subjects
+		codes:               map[string]*codeState{},
+		invalidJWKs:         opts.withDefaults.InvalidJWKS,
+		privKey:             opts.withDefaults.SigningKey.PrivKey,
+		pubKey:              opts.withDefaults.SigningKey.PubKey,
+		alg:                 opts.withDefaults.SigningKey.Alg,
+		keyID:               strconv.Itoa(int(time.Now().Unix())),
 	}
-
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	require.NoError(err)
-	p.pubKey, p.privKey = &priv.PublicKey, priv
-	p.alg = ES256
-	p.keyID = strconv.Itoa(int(time.Now().Unix()))
 	p.jwks = &jose.JSONWebKeySet{
 		Keys: []jose.JSONWebKey{
 			{
@@ -263,7 +244,7 @@ func StartTestProvider(t TestingT, opt ...Option) *TestProvider {
 		cert := p.httpServer.Certificate()
 
 		var buf bytes.Buffer
-		err = pem.Encode(&buf, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+		err := pem.Encode(&buf, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
 		require.NoError(err)
 		p.caCert = buf.String()
 	}
@@ -281,18 +262,57 @@ type testProviderOptions struct {
 	withCHashOf  string
 	withNoTLS    bool
 	withSubject  string
+	withDefaults *TestProviderDefaults
 }
 
 // testProviderDefaults is a handy way to get the defaults at runtime and during unit
 // tests.
-func testProviderDefaults() testProviderOptions {
-	return testProviderOptions{}
+func testProviderDefaults(t TestingT) testProviderOptions {
+	require := require.New(t)
+	v, err := NewCodeVerifier()
+	require.NoError(err)
+
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(err)
+
+	return testProviderOptions{
+		withDefaults: &TestProviderDefaults{
+			SigningKey: &TestSigningKey{
+				PrivKey: priv,
+				PubKey:  &priv.PublicKey,
+				Alg:     ES256,
+			},
+			NowFunc:      time.Now,
+			PKCEVerifier: v,
+			Expiry:       5 * time.Second,
+			AllowedRedirectURIs: []string{
+				"https://example.com",
+			},
+			CustomClaims: map[string]interface{}{
+				"name":  "Alice Doe Smith",
+				"email": "alice@example.com",
+			},
+			ExpectedSubject: "alice@example.com",
+			UserInfoReply: map[string]interface{}{
+				"sub":           "alice@example.com",
+				"dob":           "1978",
+				"friend":        "bob",
+				"nickname":      "A",
+				"advisor":       "Faythe",
+				"nosy-neighbor": "Eve",
+			},
+			SupportedScopes:  []string{"openid"},  // required openid is the default
+			SubjectPasswords: map[string]string{}, // default is not to use a login form, so no passwords required for subjects
+			InvalidJWKS:      false,
+		},
+	}
+
 }
 
 // getTestProviderOpts gets the test provider defaults and applies the opt
 // overrides passed in
-func getTestProviderOpts(opt ...Option) testProviderOptions {
-	opts := testProviderDefaults()
+func getTestProviderOpts(t TestingT, opt ...Option) testProviderOptions {
+	opts := testProviderDefaults(t)
 	ApplyOpts(&opts, opt...)
 	return opts
 }
@@ -307,9 +327,54 @@ func withTestSubject(s string) Option {
 	}
 }
 
+type TestSigningKey struct {
+	Alg     Alg
+	PrivKey crypto.PrivateKey
+	PubKey  crypto.PublicKey
+}
+
+// TestProviderDefaults define a type for composing all the defaults for
+// StartTestProvider(...)
+type TestProviderDefaults struct {
+	ClientID             string // ClientID for test relying party
+	ClientSecret         string //  ClientSecret for test relying party
+	ExpectedSubject      string // ExpectedSubject configures the expected subject for any JWTs issued by the provider (the default is "alice@example.com")
+	ExpectedCode         string
+	ExpectedState        string
+	ExpectedNonce        string
+	AllowedRedirectURIs  []string
+	SubjectPasswords     map[string]string
+	UserInfoReply        map[string]interface{}
+	SupportedScopes      []string
+	CustomAudiences      []string
+	CustomClaims         map[string]interface{}
+	SigningKey           *TestSigningKey
+	Expiry               time.Duration
+	NowFunc              func() time.Time
+	PKCEVerifier         CodeVerifier
+	OmitAuthTime         bool
+	OmitIDTokens         bool
+	OmitAccessTokens     bool
+	DisableTokenEndpoint bool
+	DisableImplicitFlow  bool
+	InvalidJWKS          bool // InvalidJWKS makes the JWKs endpoint return an invalid response
+}
+
+// WithTestDefaults provides an option to provide a set of defaults to
+// StartTestProvider(...) which make it much more composable.
+//
+// Valid for: StartTestProvider(...)
+func WithTestDefaults(defaults *TestProviderDefaults) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*testProviderOptions); ok {
+			o.withDefaults = defaults
+		}
+	}
+}
+
 // WithNoTLS provides the option to not use TLS for the test provider.
 //
-// Valid for: TestProvider.StartTestProvider
+// Valid for: StartTestProvider(...)
 func WithNoTLS() Option {
 	return func(o interface{}) {
 		if o, ok := o.(*testProviderOptions); ok {
@@ -635,22 +700,6 @@ func (p *TestProvider) UserInfoReply() map[string]interface{} {
 	return p.replyUserinfo
 }
 
-// SetIDTokenAdditionalClaims sets the additional claims returned
-// in an ID Token.
-func (p *TestProvider) SetIDTokenAdditionalClaims(additionalClaims map[string]interface{}) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.replyIDTokenAdditionalClaims = additionalClaims
-}
-
-// IDTokenAdditionalClaims gets the additional claims returned
-// in ID Tokens
-func (p *TestProvider) IDTokenAdditionalClaims() map[string]interface{} {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.replyIDTokenAdditionalClaims
-}
-
 // Addr returns the current base URL for the test provider's running webserver,
 // which can be used as an OIDC issuer for discovery and is also used for the
 // iss claim when issuing JWTs.
@@ -746,7 +795,7 @@ func (p *TestProvider) writeImplicitResponse(w http.ResponseWriter, state, redir
 }
 
 func (p *TestProvider) issueSignedJWT(opt ...Option) string {
-	opts := getTestProviderOpts(opt...)
+	opts := getTestProviderOpts(p.t, opt...)
 
 	var sub string
 	switch {
@@ -764,11 +813,6 @@ func (p *TestProvider) issueSignedJWT(opt ...Option) string {
 		"iat":       float64(p.nowFunc().Unix()),
 		"aud":       []string{p.clientID},
 		"azp":       p.clientID,
-	}
-	for k, v := range p.replyIDTokenAdditionalClaims {
-		if k != "sub" {
-			claims[k] = v
-		}
 	}
 	if len(p.customAudiences) != 0 {
 		claims["aud"] = append(claims["aud"].([]string), p.customAudiences...)
