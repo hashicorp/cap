@@ -193,7 +193,6 @@ func (p *TestProvider) Stop() {
 // values in TestProvider; these are simply overrides.
 type TestSubject struct {
 	Password     string
-	Subject      string
 	UserInfo     map[string]interface{}
 	CustomClaims map[string]interface{}
 }
@@ -1001,6 +1000,12 @@ func (p *TestProvider) issueSignedJWT(opt ...Option) string {
 	for k, v := range p.customClaims {
 		claims[k] = v
 	}
+	info, ok := p.subjectInfo[sub]
+	if ok {
+		for k, v := range info.CustomClaims {
+			claims[k] = v
+		}
+	}
 	if opts.withAtHashOf != "" {
 		claims["at_hash"] = p.testHash(opts.withAtHashOf)
 	}
@@ -1366,6 +1371,21 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			var claims map[string]interface{}
 			err := UnmarshalClaims(tk, &claims)
 			require.NoError(err, "%s: internal error: %w", userInfo, err)
+			sub, ok := claims["sub"].(string)
+			if !ok {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			if p.subjectInfo[sub].UserInfo != nil {
+				if _, ok := p.subjectInfo[sub].UserInfo["sub"]; !ok {
+					p.subjectInfo[sub].UserInfo["sub"] = sub
+				}
+				if err := p.writeJSON(w, p.subjectInfo[sub].UserInfo); err != nil {
+					require.NoErrorf(err, "%s: internal error: %w", userInfo, err)
+					return
+				}
+				return
+			}
 			p.replyUserinfo["sub"] = claims["sub"]
 			if err := p.writeJSON(w, p.replyUserinfo); err != nil {
 				require.NoErrorf(err, "%s: internal error: %w", userInfo, err)
