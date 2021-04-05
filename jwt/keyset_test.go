@@ -635,7 +635,7 @@ func TestNewStaticKeySet(t *testing.T) {
 			name: "valid public keys",
 			args: args{
 				publicKeys: func() []crypto.PublicKey {
-					priv, err := rsa.GenerateKey(rand.Reader, 4096)
+					priv, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 					require.NoError(t, err)
 					return []crypto.PublicKey{priv.Public()}
 				},

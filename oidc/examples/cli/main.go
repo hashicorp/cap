@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/rsa"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -101,7 +102,7 @@ func main() {
 			return
 		}
 		// Generate a key to sign JWTs with throughout most test cases
-		priv, err := rsa.GenerateKey(rand.Reader, 4096)
+		priv, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s\n\n", err)
 			return

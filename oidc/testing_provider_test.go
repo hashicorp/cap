@@ -1,8 +1,9 @@
 package oidc
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/rsa"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -101,7 +102,7 @@ func Test_WithTestDefaults(t *testing.T) {
 	t.Parallel()
 	assert, require := assert.New(t), require.New(t)
 	// Generate a key to sign JWTs with throughout most test cases
-	priv, err := rsa.GenerateKey(rand.Reader, 4096)
+	priv, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	require.NoError(err)
 	oidcPort := "2222"
 	id, secret := "test-rp", "fido"
