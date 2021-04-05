@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -246,7 +245,6 @@ func Test_ImplicitResponses(t *testing.T) {
 		req, err := http.NewRequest("POST", "/callback", strings.NewReader(reqForm.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		require.NoError(err)
-		fmt.Println(req)
 
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, req)

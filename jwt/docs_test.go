@@ -78,7 +78,7 @@ func ExampleNewOIDCDiscoveryKeySet() {
 func ExampleNewStaticKeySet() {
 	ctx := context.Background()
 
-	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		log.Fatal(err)
 	}

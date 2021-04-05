@@ -1,6 +1,9 @@
 package oidc
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -8,36 +11,62 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func Test_StartTestProvider(t *testing.T) {
 	t.Parallel()
-	assert, require := assert.New(t), require.New(t)
-	port := func() int {
-		addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
-		require.NoError(err)
-		l, err := net.ListenTCP("tcp", addr)
-		require.NoError(err)
-		defer l.Close()
-		return l.Addr().(*net.TCPAddr).Port
-	}()
+	t.Run("simple", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		port := func() int {
+			addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+			require.NoError(err)
+			l, err := net.ListenTCP("tcp", addr)
+			require.NoError(err)
+			defer l.Close()
+			return l.Addr().(*net.TCPAddr).Port
+		}()
 
-	tp := StartTestProvider(t, WithTestPort(port))
-	url, err := url.Parse(tp.Addr())
-	require.NoError(err)
-	assert.Equal(strconv.Itoa(port), url.Port())
+		tp := StartTestProvider(t, WithTestPort(port))
+		url, err := url.Parse(tp.Addr())
+		require.NoError(err)
+		assert.Equal(strconv.Itoa(port), url.Port())
 
-	client := tp.HTTPClient()
-	resp, err := client.Get(tp.Addr() + "/.well-known/jwks.json")
-	require.NoError(err)
-	assert.Equal(http.StatusOK, resp.StatusCode)
+		client := tp.HTTPClient()
+		resp, err := client.Get(tp.Addr() + "/.well-known/jwks.json")
+		require.NoError(err)
+		assert.Equal(http.StatusOK, resp.StatusCode)
+	})
+	t.Run("WithNoTLS", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		tp := StartTestProvider(t, WithNoTLS())
+		url, err := url.Parse(tp.Addr())
+		require.NoError(err)
+		assert.Equalf("http", url.Scheme, "expected http and got: %s", url.Scheme)
+
+		client := tp.HTTPClient()
+		resp, err := client.Get(tp.Addr() + "/.well-known/jwks.json")
+		require.NoError(err)
+		assert.Equal(http.StatusOK, resp.StatusCode)
+	})
+	t.Run("WithTestingLogger", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		l, err := NewTestingLogger(hclog.New(nil))
+		require.NoError(err)
+		tp := StartTestProvider(l)
+		client := tp.HTTPClient()
+		resp, err := client.Get(tp.Addr() + "/.well-known/jwks.json")
+		require.NoError(err)
+		assert.Equal(http.StatusOK, resp.StatusCode)
+	})
 }
 
 func Test_HTTPClient(t *testing.T) {
@@ -50,12 +79,117 @@ func Test_HTTPClient(t *testing.T) {
 	require.NoError(err)
 	assert.Equal(http.StatusOK, resp.StatusCode)
 }
+
 func Test_WithTestPort(t *testing.T) {
 	t.Parallel()
 	assert := assert.New(t)
-	opts := getTestProviderOpts(WithTestPort(8080))
-	testOpts := testProviderDefaults()
+	opts := getTestProviderOpts(t, WithTestPort(8080))
+	testOpts := testProviderDefaults(t)
+	testOpts.withDefaults.PKCEVerifier = opts.withDefaults.PKCEVerifier
+
+	// funcs are difficult to compare, so we'll special case them
+	testAssertEqualFunc(t, opts.withDefaults.NowFunc, testOpts.withDefaults.NowFunc, "not equal")
+	opts.withDefaults.NowFunc = nil
+	testOpts.withDefaults.NowFunc = nil
+
+	// keys are generated for default opts, so let's handle that
+	testOpts.withDefaults.SigningKey.PrivKey = opts.withDefaults.SigningKey.PrivKey
+	testOpts.withDefaults.SigningKey.PubKey = opts.withDefaults.SigningKey.PubKey
 	testOpts.withPort = 8080
+	assert.Equal(opts, testOpts)
+}
+
+func Test_WithTestDefaults(t *testing.T) {
+	t.Parallel()
+	assert, require := assert.New(t), require.New(t)
+	// Generate a key to sign JWTs with throughout most test cases
+	priv, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+	require.NoError(err)
+	oidcPort := "2222"
+	id, secret := "test-rp", "fido"
+	expectedCode, err := NewID()
+	require.NoError(err)
+	expectedNonce, err := NewID()
+	require.NoError(err)
+	expectedState, err := NewID()
+	require.NoError(err)
+	userInfoReply := map[string]interface{}{"sub": "alice"}
+	supportedScopes := []string{"alice"}
+	customAudiences := []string{"custom"}
+	customClaims := map[string]interface{}{"sub": "eve"}
+	expiry := 10 * time.Hour
+	expectedSub := "bob"
+	v, err := NewCodeVerifier()
+	require.NoError(err)
+	nowFunc := func() time.Time { return time.Now().Add(10 * time.Second) }
+
+	opts := getTestProviderOpts(t, WithTestDefaults(&TestProviderDefaults{
+		ExpectedCode:  &expectedCode,
+		ExpectedNonce: &expectedNonce,
+		ExpectedState: &expectedState,
+		SubjectInfo: map[string]*TestSubject{
+			"alice": {Password: "fido"},
+		},
+		SigningKey: &TestSigningKey{
+			PrivKey: priv,
+			PubKey:  priv.Public(),
+			Alg:     RS256,
+		},
+		AllowedRedirectURIs:  []string{fmt.Sprintf("http://localhost:%s/callback", oidcPort)},
+		ClientID:             &id,
+		ClientSecret:         &secret,
+		UserInfoReply:        userInfoReply,
+		SupportedScopes:      supportedScopes,
+		CustomAudiences:      customAudiences,
+		CustomClaims:         customClaims,
+		Expiry:               &expiry,
+		ExpectedSubject:      &expectedSub,
+		InvalidJWKS:          true,
+		OmitAuthTime:         true,
+		OmitIDTokens:         true,
+		OmitAccessTokens:     true,
+		DisableTokenEndpoint: true,
+		DisableImplicitFlow:  true,
+		DisableJWKs:          true,
+		PKCEVerifier:         v,
+		NowFunc:              nowFunc,
+	}))
+	testOpts := testProviderDefaults(t)
+	// funcs are difficult to compare, so we'll special case them
+	testOpts.withDefaults.NowFunc = nowFunc
+	testAssertEqualFunc(t, opts.withDefaults.NowFunc, testOpts.withDefaults.NowFunc, "not equal")
+	opts.withDefaults.NowFunc = nil
+	testOpts.withDefaults.NowFunc = nil
+
+	testOpts.withDefaults.ExpectedCode = &expectedCode
+	testOpts.withDefaults.ExpectedNonce = &expectedNonce
+	testOpts.withDefaults.SubjectInfo = map[string]*TestSubject{
+		"alice": {Password: "fido"},
+	}
+	testOpts.withDefaults.SigningKey = &TestSigningKey{
+		PrivKey: priv,
+		PubKey:  priv.Public(),
+		Alg:     RS256,
+	}
+	testOpts.withDefaults.AllowedRedirectURIs = []string{fmt.Sprintf("http://localhost:%s/callback", oidcPort)}
+	testOpts.withDefaults.ClientID = &id
+	testOpts.withDefaults.ClientSecret = &secret
+	testOpts.withDefaults.ExpectedState = &expectedState
+	testOpts.withDefaults.PKCEVerifier = opts.withDefaults.PKCEVerifier
+	testOpts.withDefaults.UserInfoReply = userInfoReply
+	testOpts.withDefaults.SupportedScopes = supportedScopes
+	testOpts.withDefaults.CustomAudiences = customAudiences
+	testOpts.withDefaults.CustomClaims = customClaims
+	testOpts.withDefaults.Expiry = &expiry
+	testOpts.withDefaults.ExpectedSubject = &expectedSub
+	testOpts.withDefaults.InvalidJWKS = true
+	testOpts.withDefaults.OmitAuthTime = true
+	testOpts.withDefaults.OmitIDTokens = true
+	testOpts.withDefaults.OmitAccessTokens = true
+	testOpts.withDefaults.DisableTokenEndpoint = true
+	testOpts.withDefaults.DisableImplicitFlow = true
+	testOpts.withDefaults.DisableJWKs = true
+	testOpts.withDefaults.PKCEVerifier = v
 	assert.Equal(opts, testOpts)
 }
 
@@ -90,6 +224,7 @@ func TestTestProvider_SetExpectedExpiry(t *testing.T) {
 		assert.Equal(5*time.Minute, tp.replyExpiry)
 	})
 }
+
 func TestTestProvider_SetClientCreds(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
@@ -112,6 +247,7 @@ func TestTestProvider_SetExpectedAuthCode(t *testing.T) {
 		assert.Equal("blue", tp.expectedAuthCode)
 	})
 }
+
 func TestTestProvider_SetExpectedAuthNonce(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
@@ -136,7 +272,7 @@ func TestTestProvider_SetCustomClaims(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
 		tp := StartTestProvider(t)
-		require.Equal(map[string]interface{}{}, tp.customClaims)
+		require.Equal(map[string]interface{}{"email": "alice@example.com", "name": "Alice Doe Smith"}, tp.customClaims)
 		custom := map[string]interface{}{"what_is_your_favorite_color": "blue... no green!"}
 		tp.SetCustomClaims(custom)
 		assert.Equal(custom, tp.customClaims)
@@ -182,6 +318,7 @@ func TestTestProvider_SetOmitIDTokens(t *testing.T) {
 		assert.Equal(true, tp.omitIDToken)
 	})
 }
+
 func TestTestProvider_SetOmitAccessTokens(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
@@ -292,20 +429,21 @@ func TestTestProvider_SetUserInfoReply(t *testing.T) {
 	})
 }
 
-func TestTestProvider_SetIDTokenAdditionalClaims(t *testing.T) {
+func TestTestProvider_SetSubjectInfo(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		assert := assert.New(t)
 		tp := StartTestProvider(t)
-		reply := map[string]interface{}{
-			"name":     "Alice Eve-Bob",
-			"email":    "alice-eve-bob@alice.com",
-			"pronouns": "they/them",
+		subPasswords := map[string]*TestSubject{
+			"alice": {Password: "fido"},
+			"eve":   {Password: "cat"},
 		}
-		tp.SetIDTokenAdditionalClaims(reply)
-		assert.Equal(reply, tp.replyIDTokenAdditionalClaims)
-		assert.Equal(reply, tp.IDTokenAdditionalClaims())
+		tp.SetSubjectInfo(subPasswords)
+		assert.True(reflect.DeepEqual(subPasswords, tp.subjectInfo))
+		resp := tp.SubjectInfo()
+		assert.True(reflect.DeepEqual(subPasswords, resp))
 	})
 }
+
 func TestTestProvider_writeJSON(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
@@ -349,10 +487,6 @@ func TestTestProvider_writeImplicitResponse(t *testing.T) {
 
 func TestTestProvider_writeAuthErrorResponse(t *testing.T) {
 	tp := StartTestProvider(t)
-	type body struct {
-		Code string `json:"error"`
-		Desc string `json:"error_description,omitempty"`
-	}
 	t.Run("simple", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
 		rr := httptest.NewRecorder()
@@ -370,6 +504,7 @@ func TestTestProvider_writeAuthErrorResponse(t *testing.T) {
 		assert.Equal("/redirectURL?state=state&error=error_code&error_description=error_message", location.String())
 	})
 }
+
 func TestTestProvider_writeTokenErrorResponse(t *testing.T) {
 	tp := StartTestProvider(t)
 	type body struct {
@@ -403,10 +538,6 @@ func TestTestProvider_writeTokenErrorResponse(t *testing.T) {
 func TestTestProvider_authorize(t *testing.T) {
 	tp := StartTestProvider(t)
 	echo := startEchoServer(t)
-	type errResp struct {
-		Code string `json:"error"`
-		Desc string `json:"error_description,omitempty"`
-	}
 	tests := []struct {
 		name          string
 		urlParameters string
@@ -483,10 +614,6 @@ func TestTestProvider_token(t *testing.T) {
 		code        string
 		grantType   string
 		redirectURI string
-	}
-	type errResp struct {
-		Code string `json:"error"`
-		Desc string `json:"error_description,omitempty"`
 	}
 	tests := []struct {
 		name               string

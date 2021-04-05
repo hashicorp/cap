@@ -22,7 +22,7 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate a key to sign JWTs with throughout most test cases
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	priv, err := rsa.GenerateKey(rand.Reader, 4096)
 	require.NoError(t, err)
 	tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 
@@ -290,7 +290,7 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate a key to sign JWTs with throughout most test cases
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	priv, err := rsa.GenerateKey(rand.Reader, 4096)
 	require.NoError(t, err)
 	tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 
@@ -397,7 +397,7 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 				},
 				token: func(claims map[string]interface{}) string {
 					// Sign the JWT with a key not in the test provider
-					pk, err := rsa.GenerateKey(rand.Reader, 2048)
+					pk, err := rsa.GenerateKey(rand.Reader, 4096)
 					require.NoError(t, err)
 					return oidc.TestSignJWT(t, pk, string(RS256), claims, []byte(testKeyID))
 				},
@@ -585,7 +585,7 @@ func Test_validateAudience(t *testing.T) {
 }
 
 func Test_validateSigningAlgorithm(t *testing.T) {
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	priv, err := rsa.GenerateKey(rand.Reader, 4096)
 	require.NoError(t, err)
 
 	type args struct {

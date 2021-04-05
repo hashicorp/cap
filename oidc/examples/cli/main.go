@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -14,6 +17,7 @@ import (
 
 	"github.com/hashicorp/cap/oidc"
 	"github.com/hashicorp/cap/oidc/callback"
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/cap/util"
 	"golang.org/x/oauth2"
 )
@@ -69,10 +73,16 @@ func main() {
 	usePKCE := flag.Bool("pkce", false, "use the implicit flow")
 	maxAge := flag.Int("max-age", -1, "max age of user authentication")
 	scopes := flag.String("scopes", "", "comma separated list of additional scopes to requests")
+	useTestProvider := flag.Bool("use-test-provider", false, "use the test oidc provider")
 
 	flag.Parse()
 	if *useImplicit && *usePKCE {
 		fmt.Fprint(os.Stderr, "you can't request both: -implicit and -pkce")
+		return
+	}
+
+	if (*useImplicit || *implicitAccessToken || *scopes != "") && *useTestProvider {
+		fmt.Fprint(os.Stderr, "you can't use the implicit flow, PKCE or scopes with the test provider")
 		return
 	}
 
@@ -81,10 +91,91 @@ func main() {
 		optScopes[i] = strings.TrimSpace(optScopes[i])
 	}
 
-	env, err := envConfig(*useImplicit || *usePKCE)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n\n", err)
-		return
+	var env map[string]interface{}
+	var tp *oidc.TestProvider
+	if *useTestProvider {
+		l, err := oidc.NewTestingLogger(hclog.New(nil))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n\n", err)
+			return
+		}
+		// Generate a key to sign JWTs with throughout most test cases
+		priv, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n\n", err)
+			return
+		}
+		oidcPort := os.Getenv("OIDC_PORT")
+		if oidcPort == "" {
+			fmt.Fprintf(os.Stderr, "env OIDC_PORT is empty")
+			return
+		}
+
+		id, secret := "test-rp", "fido"
+		expectedCode, err := oidc.NewID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "unable to generate code: %s", err.Error())
+			return
+		}
+		expectedNonce, err := oidc.NewID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "unable to generate nonce: %s", err.Error())
+			return
+		}
+		tp = oidc.StartTestProvider(l, oidc.WithNoTLS(), oidc.WithTestDefaults(&oidc.TestProviderDefaults{
+			ExpectedCode:  &expectedCode,
+			ExpectedNonce: &expectedNonce,
+			CustomClaims:  map[string]interface{}{},
+			SubjectInfo: map[string]*oidc.TestSubject{
+				"alice": {
+					Password: "fido",
+					UserInfo: map[string]interface{}{
+						"email":  "alice@example.com",
+						"name":   "alice smith",
+						"friend": "eve",
+					},
+					CustomClaims: map[string]interface{}{
+						"email": "alice@example.com",
+						"name":  "alice smith",
+					},
+				},
+				"eve": {
+					Password: "alice",
+					UserInfo: map[string]interface{}{
+						"email":  "eve@example.com",
+						"name":   "eve smith",
+						"friend": "alice",
+					},
+					CustomClaims: map[string]interface{}{
+						"email": "eve@example.com",
+						"name":  "eve smith",
+					},
+				},
+			},
+			SigningKey: &oidc.TestSigningKey{
+				PrivKey: priv,
+				PubKey:  priv.Public(),
+				Alg:     oidc.ES384,
+			},
+			AllowedRedirectURIs: []string{fmt.Sprintf("http://localhost:%s/callback", oidcPort)},
+			ClientID:            &id,
+			ClientSecret:        &secret,
+		}))
+		defer tp.Stop()
+		env = map[string]interface{}{
+			clientID:     id,
+			clientSecret: secret,
+			issuer:       tp.Addr(),
+			port:         oidcPort,
+			attemptExp:   time.Duration(2 * time.Minute),
+		}
+	} else {
+		var err error
+		env, err = envConfig(*useImplicit || *usePKCE)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n\n", err)
+			return
+		}
 	}
 
 	// handle ctrl-c while waiting for the callback
@@ -99,7 +190,7 @@ func main() {
 	clientID := env[clientID].(string)
 	clientSecret := oidc.ClientSecret(env[clientSecret].(string))
 	redirectURL := fmt.Sprintf("http://localhost:%s/callback", env[port].(string))
-	pc, err := oidc.NewConfig(issuer, clientID, clientSecret, []oidc.Alg{oidc.RS256}, []string{redirectURL})
+	pc, err := oidc.NewConfig(issuer, clientID, clientSecret, []oidc.Alg{oidc.ES384}, []string{redirectURL})
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return
@@ -137,6 +228,10 @@ func main() {
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return
+	}
+
+	if *useTestProvider {
+		tp.SetExpectedAuthNonce(oidcRequest.Nonce())
 	}
 
 	successFn, successCh := success()
