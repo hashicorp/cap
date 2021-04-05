@@ -1,6 +1,8 @@
 package oidc
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -8,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -91,6 +94,100 @@ func Test_WithTestPort(t *testing.T) {
 	testOpts.withDefaults.SigningKey.PrivKey = opts.withDefaults.SigningKey.PrivKey
 	testOpts.withDefaults.SigningKey.PubKey = opts.withDefaults.SigningKey.PubKey
 	testOpts.withPort = 8080
+	assert.Equal(opts, testOpts)
+}
+
+func Test_WithTestDefaults(t *testing.T) {
+	t.Parallel()
+	assert, require := assert.New(t), require.New(t)
+	// Generate a key to sign JWTs with throughout most test cases
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(err)
+	oidcPort := "2222"
+	id, secret := "test-rp", "fido"
+	expectedCode, err := NewID()
+	require.NoError(err)
+	expectedNonce, err := NewID()
+	require.NoError(err)
+	expectedState, err := NewID()
+	require.NoError(err)
+	userInfoReply := map[string]interface{}{"sub": "alice"}
+	supportedScopes := []string{"alice"}
+	customAudiences := []string{"custom"}
+	customClaims := map[string]interface{}{"sub": "eve"}
+	expiry := 10 * time.Hour
+	expectedSub := "bob"
+	v, err := NewCodeVerifier()
+	require.NoError(err)
+	nowFunc := func() time.Time { return time.Now().Add(10 * time.Second) }
+
+	opts := getTestProviderOpts(t, WithTestDefaults(&TestProviderDefaults{
+		ExpectedCode:  &expectedCode,
+		ExpectedNonce: &expectedNonce,
+		ExpectedState: &expectedState,
+		SubjectPasswords: map[string]string{
+			"alice": "fido",
+		},
+		SigningKey: &TestSigningKey{
+			PrivKey: priv,
+			PubKey:  priv.Public(),
+			Alg:     RS256,
+		},
+		AllowedRedirectURIs:  []string{fmt.Sprintf("http://localhost:%s/callback", oidcPort)},
+		ClientID:             &id,
+		ClientSecret:         &secret,
+		UserInfoReply:        userInfoReply,
+		SupportedScopes:      supportedScopes,
+		CustomAudiences:      customAudiences,
+		CustomClaims:         customClaims,
+		Expiry:               &expiry,
+		ExpectedSubject:      &expectedSub,
+		InvalidJWKS:          true,
+		OmitAuthTime:         true,
+		OmitIDTokens:         true,
+		OmitAccessTokens:     true,
+		DisableTokenEndpoint: true,
+		DisableImplicitFlow:  true,
+		DisableJWKs:          true,
+		PKCEVerifier:         v,
+		NowFunc:              nowFunc,
+	}))
+	testOpts := testProviderDefaults(t)
+	// funcs are difficult to compare, so we'll special case them
+	testOpts.withDefaults.NowFunc = nowFunc
+	testAssertEqualFunc(t, opts.withDefaults.NowFunc, testOpts.withDefaults.NowFunc, "not equal")
+	opts.withDefaults.NowFunc = nil
+	testOpts.withDefaults.NowFunc = nil
+
+	testOpts.withDefaults.ExpectedCode = &expectedCode
+	testOpts.withDefaults.ExpectedNonce = &expectedNonce
+	testOpts.withDefaults.SubjectPasswords = map[string]string{
+		"alice": "fido",
+	}
+	testOpts.withDefaults.SigningKey = &TestSigningKey{
+		PrivKey: priv,
+		PubKey:  priv.Public(),
+		Alg:     RS256,
+	}
+	testOpts.withDefaults.AllowedRedirectURIs = []string{fmt.Sprintf("http://localhost:%s/callback", oidcPort)}
+	testOpts.withDefaults.ClientID = &id
+	testOpts.withDefaults.ClientSecret = &secret
+	testOpts.withDefaults.ExpectedState = &expectedState
+	testOpts.withDefaults.PKCEVerifier = opts.withDefaults.PKCEVerifier
+	testOpts.withDefaults.UserInfoReply = userInfoReply
+	testOpts.withDefaults.SupportedScopes = supportedScopes
+	testOpts.withDefaults.CustomAudiences = customAudiences
+	testOpts.withDefaults.CustomClaims = customClaims
+	testOpts.withDefaults.Expiry = &expiry
+	testOpts.withDefaults.ExpectedSubject = &expectedSub
+	testOpts.withDefaults.InvalidJWKS = true
+	testOpts.withDefaults.OmitAuthTime = true
+	testOpts.withDefaults.OmitIDTokens = true
+	testOpts.withDefaults.OmitAccessTokens = true
+	testOpts.withDefaults.DisableTokenEndpoint = true
+	testOpts.withDefaults.DisableImplicitFlow = true
+	testOpts.withDefaults.DisableJWKs = true
+	testOpts.withDefaults.PKCEVerifier = v
 	assert.Equal(opts, testOpts)
 }
 
@@ -324,6 +421,21 @@ func TestTestProvider_SetUserInfoReply(t *testing.T) {
 		tp.SetUserInfoReply(reply)
 		assert.Equal(reply, tp.replyUserinfo)
 		assert.Equal(reply, tp.UserInfoReply())
+	})
+}
+
+func TestTestProvider_SetSubjectPasswords(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		assert := assert.New(t)
+		tp := StartTestProvider(t)
+		subPasswords := map[string]string{
+			"alice": "fido",
+			"eve":   "cat",
+		}
+		tp.SetSubjectPasswords(subPasswords)
+		assert.True(reflect.DeepEqual(subPasswords, tp.subjectPasswords))
+		resp := tp.SubjectPasswords()
+		assert.True(reflect.DeepEqual(subPasswords, resp))
 	})
 }
 
