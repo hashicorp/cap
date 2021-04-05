@@ -82,7 +82,7 @@ var (
 //  * Subject: SetExpectedSubject(sub string) configures the expected subject for
 //    any JWTs issued by the provider (the default is "alice@example.com")
 //
-//  * Subject Passwords: SetSubjectPasswords(...) configures a subject/password
+//  * Subject Passwords: SetSubjectInfo(...) configures a subject/password
 //    dictionary. If configured, then an interactive Login form is presented by
 //    the /authorize endpoint and the TestProvider becomes an interactive test
 //    provider using the provided subject/password dictionary.
@@ -143,7 +143,7 @@ type TestProvider struct {
 	jwks                *jose.JSONWebKeySet
 	allowedRedirectURIs []string
 	replySubject        string
-	subjectPasswords    map[string]string
+	subjectInfo         map[string]*TestSubject
 	codes               map[string]*codeState
 	replyUserinfo       map[string]interface{}
 	replyExpiry         time.Duration
@@ -188,6 +188,15 @@ func (p *TestProvider) Stop() {
 	p.startCancel()
 }
 
+// TestSubject is a struct that contains various values for customizing per-user
+// responses via SubjectInfo in TestProvider. See the description of those
+// values in TestProvider; these are simply overrides.
+type TestSubject struct {
+	Password     string
+	UserInfo     map[string]interface{}
+	CustomClaims map[string]interface{}
+}
+
 // StartTestProvider creates and starts a running TestProvider http server.  The
 // WithTestDefaults, WithNoTLS and WithPort options are supported.  If the
 // TestingT parameter supports a CleanupT interface, then TestProvider will be
@@ -218,7 +227,7 @@ func StartTestProvider(t TestingT, opt ...Option) *TestProvider {
 		nowFunc:             opts.withDefaults.NowFunc,
 		pkceVerifier:        opts.withDefaults.PKCEVerifier,
 		replySubject:        *opts.withDefaults.ExpectedSubject,
-		subjectPasswords:    opts.withDefaults.SubjectPasswords, // default is not to use a login form, so no passwords required for subjects
+		subjectInfo:         opts.withDefaults.SubjectInfo, // default is not to use a login form, so no passwords required for subjects
 		codes:               map[string]*codeState{},
 		invalidJWKs:         opts.withDefaults.InvalidJWKS,
 		omitAuthTimeClaim:   opts.withDefaults.OmitAuthTime,
@@ -319,12 +328,11 @@ func testProviderDefaults(t TestingT) testProviderOptions {
 				"advisor":       "Faythe",
 				"nosy-neighbor": "Eve",
 			},
-			SupportedScopes:  []string{"openid"},  // required openid is the default
-			SubjectPasswords: map[string]string{}, // default is not to use a login form, so no passwords required for subjects
-			InvalidJWKS:      false,
+			SupportedScopes: []string{"openid"},        // required openid is the default
+			SubjectInfo:     map[string]*TestSubject{}, // default is not to use a login form, so no passwords required for subjects
+			InvalidJWKS:     false,
 		},
 	}
-
 }
 
 // getTestProviderOpts gets the test provider defaults and applies the opt
@@ -451,11 +459,11 @@ type TestProviderDefaults struct {
 	// JWKs are returned by default.
 	InvalidJWKS bool
 
-	// SubjectPasswords configures a subject/password dictionary. If configured,
+	// SubjectInfo configures a subject/password dictionary. If configured,
 	// then an interactive Login form is presented by the /authorize endpoint
 	// and the TestProvider becomes an interactive test provider using the
 	// provided subject/password dictionary.
-	SubjectPasswords map[string]string
+	SubjectInfo map[string]*TestSubject
 }
 
 // WithTestDefaults provides an option to provide a set of defaults to
@@ -511,8 +519,8 @@ func WithTestDefaults(defaults *TestProviderDefaults) Option {
 				if defaults.ExpectedSubject != nil {
 					o.withDefaults.ExpectedSubject = defaults.ExpectedSubject
 				}
-				if defaults.SubjectPasswords != nil {
-					o.withDefaults.SubjectPasswords = defaults.SubjectPasswords
+				if defaults.SubjectInfo != nil {
+					o.withDefaults.SubjectInfo = defaults.SubjectInfo
 				}
 				if defaults.InvalidJWKS {
 					o.withDefaults.InvalidJWKS = defaults.InvalidJWKS
@@ -668,21 +676,21 @@ func (p *TestProvider) ExpectedSubject() string {
 	return p.replySubject
 }
 
-// SetSubjectPasswords is for configuring subject passwords when you wish to
+// SetSubjectInfo is for configuring subject passwords when you wish to
 // have login prompts for interactive testing.
-func (p *TestProvider) SetSubjectPasswords(subjectPasswords map[string]string) {
+func (p *TestProvider) SetSubjectInfo(subjectInfo map[string]*TestSubject) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.subjectPasswords = subjectPasswords
+	p.subjectInfo = subjectInfo
 }
 
-// SubjectPasswords returns the current subject passwords when you wish to have
+// SubjectInfo returns the current subject passwords when you wish to have
 // login prompts for interactive testing.
-func (p *TestProvider) SubjectPasswords() map[string]string {
+func (p *TestProvider) SubjectInfo() map[string]*TestSubject {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	clone := map[string]string{}
-	for k, v := range p.subjectPasswords {
+	clone := map[string]*TestSubject{}
+	for k, v := range p.subjectInfo {
 		clone[k] = v
 	}
 	return clone
@@ -992,6 +1000,12 @@ func (p *TestProvider) issueSignedJWT(opt ...Option) string {
 	for k, v := range p.customClaims {
 		claims[k] = v
 	}
+	info, ok := p.subjectInfo[sub]
+	if ok {
+		for k, v := range info.CustomClaims {
+			claims[k] = v
+		}
+	}
 	if opts.withAtHashOf != "" {
 		claims["at_hash"] = p.testHash(opts.withAtHashOf)
 	}
@@ -1076,7 +1090,6 @@ func (p *TestProvider) writeTokenErrorResponse(w http.ResponseWriter, statusCode
 
 // ServeHTTP implements the test provider's http.Handler.
 func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-
 	// define all the endpoints supported
 	const (
 		openidConfiguration = "/.well-known/openid-configuration"
@@ -1147,12 +1160,12 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		redirectURI := req.FormValue("redirect_uri")
 
 		// p.mu.Lock() called at top of func... so this map access if okay.
-		subPsw, ok := p.subjectPasswords[uname]
+		subInfo, ok := p.subjectInfo[uname]
 		if !ok {
 			p.writeAuthErrorResponse(w, req, redirectURI, state, "access_denied", "invalid user name")
 			return
 		}
-		if subPsw != psw {
+		if subInfo.Password != psw {
 			p.writeAuthErrorResponse(w, req, redirectURI, state, "access_denied", "invalid password")
 			return
 		}
@@ -1193,9 +1206,9 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		redirectURI := req.FormValue("redirect_uri")
 		respMode := req.FormValue("response_mode")
 
-		// if subjectPasswords are configured, then we're doing interactive
+		// if subjectInfo are configured, then we're doing interactive
 		// testing and we need to create a login form.
-		if len(p.subjectPasswords) > 0 {
+		if len(p.subjectInfo) > 0 {
 			_ = p.writeLoginPage(w, state, redirectURI)
 			return
 		}
@@ -1306,8 +1319,8 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		var sub string
 		switch {
-		// p.mu.Lock() called at top of func... so this map access if okay.
-		case len(p.subjectPasswords) > 0:
+		// p.mu.Lock() called at top of func... so this map access is okay.
+		case len(p.subjectInfo) > 0:
 			s := p.verifyCachedCode(code)
 			if s == nil {
 				_ = p.writeTokenErrorResponse(w, http.StatusUnauthorized, "invalid_request", fmt.Sprintf("invalid code: %s", code))
@@ -1351,13 +1364,28 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		switch {
 		// p.mu.Lock() called at top of func... so this map access if okay.
-		case len(p.subjectPasswords) > 0:
+		case len(p.subjectInfo) > 0:
 			const bearSchema = "Bearer "
 			authHeader := req.Header.Get("Authorization")
 			tk := authHeader[len(bearSchema):]
 			var claims map[string]interface{}
 			err := UnmarshalClaims(tk, &claims)
 			require.NoError(err, "%s: internal error: %w", userInfo, err)
+			sub, ok := claims["sub"].(string)
+			if !ok {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			if p.subjectInfo[sub].UserInfo != nil {
+				if _, ok := p.subjectInfo[sub].UserInfo["sub"]; !ok {
+					p.subjectInfo[sub].UserInfo["sub"] = sub
+				}
+				if err := p.writeJSON(w, p.subjectInfo[sub].UserInfo); err != nil {
+					require.NoErrorf(err, "%s: internal error: %w", userInfo, err)
+					return
+				}
+				return
+			}
 			p.replyUserinfo["sub"] = claims["sub"]
 			if err := p.writeJSON(w, p.replyUserinfo); err != nil {
 				require.NoErrorf(err, "%s: internal error: %w", userInfo, err)
