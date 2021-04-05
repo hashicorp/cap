@@ -78,6 +78,7 @@ func Test_HTTPClient(t *testing.T) {
 	require.NoError(err)
 	assert.Equal(http.StatusOK, resp.StatusCode)
 }
+
 func Test_WithTestPort(t *testing.T) {
 	t.Parallel()
 	assert := assert.New(t)
@@ -125,8 +126,8 @@ func Test_WithTestDefaults(t *testing.T) {
 		ExpectedCode:  &expectedCode,
 		ExpectedNonce: &expectedNonce,
 		ExpectedState: &expectedState,
-		SubjectPasswords: map[string]string{
-			"alice": "fido",
+		SubjectInfo: map[string]*TestSubject{
+			"alice": {Password: "fido"},
 		},
 		SigningKey: &TestSigningKey{
 			PrivKey: priv,
@@ -161,8 +162,8 @@ func Test_WithTestDefaults(t *testing.T) {
 
 	testOpts.withDefaults.ExpectedCode = &expectedCode
 	testOpts.withDefaults.ExpectedNonce = &expectedNonce
-	testOpts.withDefaults.SubjectPasswords = map[string]string{
-		"alice": "fido",
+	testOpts.withDefaults.SubjectInfo = map[string]*TestSubject{
+		"alice": {Password: "fido"},
 	}
 	testOpts.withDefaults.SigningKey = &TestSigningKey{
 		PrivKey: priv,
@@ -222,6 +223,7 @@ func TestTestProvider_SetExpectedExpiry(t *testing.T) {
 		assert.Equal(5*time.Minute, tp.replyExpiry)
 	})
 }
+
 func TestTestProvider_SetClientCreds(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
@@ -244,6 +246,7 @@ func TestTestProvider_SetExpectedAuthCode(t *testing.T) {
 		assert.Equal("blue", tp.expectedAuthCode)
 	})
 }
+
 func TestTestProvider_SetExpectedAuthNonce(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
@@ -314,6 +317,7 @@ func TestTestProvider_SetOmitIDTokens(t *testing.T) {
 		assert.Equal(true, tp.omitIDToken)
 	})
 }
+
 func TestTestProvider_SetOmitAccessTokens(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
@@ -424,17 +428,17 @@ func TestTestProvider_SetUserInfoReply(t *testing.T) {
 	})
 }
 
-func TestTestProvider_SetSubjectPasswords(t *testing.T) {
+func TestTestProvider_SetSubjectInfo(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		assert := assert.New(t)
 		tp := StartTestProvider(t)
-		subPasswords := map[string]string{
-			"alice": "fido",
-			"eve":   "cat",
+		subPasswords := map[string]*TestSubject{
+			"alice": {Password: "fido"},
+			"eve":   {Password: "cat"},
 		}
-		tp.SetSubjectPasswords(subPasswords)
-		assert.True(reflect.DeepEqual(subPasswords, tp.subjectPasswords))
-		resp := tp.SubjectPasswords()
+		tp.SetSubjectInfo(subPasswords)
+		assert.True(reflect.DeepEqual(subPasswords, tp.subjectInfo))
+		resp := tp.SubjectInfo()
 		assert.True(reflect.DeepEqual(subPasswords, resp))
 	})
 }
@@ -482,10 +486,6 @@ func TestTestProvider_writeImplicitResponse(t *testing.T) {
 
 func TestTestProvider_writeAuthErrorResponse(t *testing.T) {
 	tp := StartTestProvider(t)
-	type body struct {
-		Code string `json:"error"`
-		Desc string `json:"error_description,omitempty"`
-	}
 	t.Run("simple", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
 		rr := httptest.NewRecorder()
@@ -503,6 +503,7 @@ func TestTestProvider_writeAuthErrorResponse(t *testing.T) {
 		assert.Equal("/redirectURL?state=state&error=error_code&error_description=error_message", location.String())
 	})
 }
+
 func TestTestProvider_writeTokenErrorResponse(t *testing.T) {
 	tp := StartTestProvider(t)
 	type body struct {
@@ -536,10 +537,6 @@ func TestTestProvider_writeTokenErrorResponse(t *testing.T) {
 func TestTestProvider_authorize(t *testing.T) {
 	tp := StartTestProvider(t)
 	echo := startEchoServer(t)
-	type errResp struct {
-		Code string `json:"error"`
-		Desc string `json:"error_description,omitempty"`
-	}
 	tests := []struct {
 		name          string
 		urlParameters string
@@ -616,10 +613,6 @@ func TestTestProvider_token(t *testing.T) {
 		code        string
 		grantType   string
 		redirectURI string
-	}
-	type errResp struct {
-		Code string `json:"error"`
-		Desc string `json:"error_description,omitempty"`
 	}
 	tests := []struct {
 		name               string

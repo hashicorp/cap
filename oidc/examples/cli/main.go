@@ -126,9 +126,9 @@ func main() {
 		tp = oidc.StartTestProvider(l, oidc.WithNoTLS(), oidc.WithTestDefaults(&oidc.TestProviderDefaults{
 			ExpectedCode:  &expectedCode,
 			ExpectedNonce: &expectedNonce,
-			SubjectPasswords: map[string]string{
-				"alice": "fido",
-				"eve":   "alice",
+			SubjectInfo: map[string]*oidc.TestSubject{
+				"alice": {Password: "fido"},
+				"eve":   {Password: "alice"},
 			},
 			SigningKey: &oidc.TestSigningKey{
 				PrivKey: priv,
