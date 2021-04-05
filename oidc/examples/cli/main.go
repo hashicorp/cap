@@ -8,19 +8,17 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
-	"runtime"
 	"strings"
 	"time"
 
 	"github.com/hashicorp/cap/oidc"
 	"github.com/hashicorp/cap/oidc/callback"
 	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/cap/util"
 	"golang.org/x/oauth2"
 )
 
@@ -272,7 +270,7 @@ func main() {
 
 	// Open the default browser to the callback URL.
 	fmt.Fprintf(os.Stderr, "Complete the login via your OIDC provider. Launching browser to:\n\n    %s\n\n\n", authURL)
-	if err := openURL(authURL); err != nil {
+	if err := util.OpenURL(authURL); err != nil {
 		fmt.Fprintf(os.Stderr, "Error attempting to automatically open browser: '%s'.\nPlease visit the authorization URL manually.", err)
 	}
 
@@ -364,41 +362,6 @@ func failed() (callback.ErrorResponseFunc, <-chan error) {
 		}
 		responseErr = fmt.Errorf("%s: unknown error from callback", op)
 	}, doneCh
-}
-
-// openURL opens the specified URL in the default browser of the user.
-// source: https://github.com/hashicorp/vault-plugin-auth-jw
-func openURL(url string) error {
-	var cmd string
-	var args []string
-
-	switch {
-	case "windows" == runtime.GOOS || isWSL():
-		cmd = "cmd.exe"
-		args = []string{"/c", "start"}
-		url = strings.Replace(url, "&", "^&", -1)
-	case "darwin" == runtime.GOOS:
-		cmd = "open"
-	default: // "linux", "freebsd", "openbsd", "netbsd"
-		cmd = "xdg-open"
-	}
-	args = append(args, url)
-	return exec.Command(cmd, args...).Start()
-}
-
-// isWSL tests if the binary is being run in Windows Subsystem for Linux
-// source: https://github.com/hashicorp/vault-plugin-auth-jwt
-func isWSL() bool {
-	const op = "isWSL"
-	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
-		return false
-	}
-	data, err := ioutil.ReadFile("/proc/version")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s: unable to read /proc/version.\n", op)
-		return false
-	}
-	return strings.Contains(strings.ToLower(string(data)), "microsoft")
 }
 
 type respToken struct {
