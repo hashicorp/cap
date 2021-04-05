@@ -470,7 +470,7 @@ func WithTestDefaults(defaults *TestProviderDefaults) Option {
 					o.withDefaults.ClientID = defaults.ClientID
 				}
 				if defaults.ClientSecret != nil {
-					o.withDefaults.ClientSecret = defaults.ClientID
+					o.withDefaults.ClientSecret = defaults.ClientSecret
 				}
 				if defaults.ExpectedCode != nil {
 					o.withDefaults.ExpectedCode = defaults.ExpectedCode
@@ -529,8 +529,11 @@ func WithTestDefaults(defaults *TestProviderDefaults) Option {
 				if defaults.DisableTokenEndpoint {
 					o.withDefaults.DisableTokenEndpoint = defaults.DisableTokenEndpoint
 				}
-				if defaults.InvalidJWKS {
+				if defaults.DisableImplicitFlow {
 					o.withDefaults.DisableImplicitFlow = defaults.DisableImplicitFlow
+				}
+				if defaults.DisableJWKs {
+					o.withDefaults.DisableJWKs = defaults.DisableJWKs
 				}
 
 			}
@@ -679,7 +682,7 @@ func (p *TestProvider) SubjectPasswords() map[string]string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	clone := map[string]string{}
-	for v, k := range p.subjectPasswords {
+	for k, v := range p.subjectPasswords {
 		clone[k] = v
 	}
 	return clone
