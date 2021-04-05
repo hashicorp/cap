@@ -100,32 +100,49 @@ func main() {
 			fmt.Fprintf(os.Stderr, "%s\n\n", err)
 			return
 		}
-		tp = oidc.StartTestProvider(l, oidc.WithNoTLS())
-		defer tp.Stop()
-		tp.SetSubjectPasswords(map[string]string{
-			"alice": "fido",
-			"eve":   "alice",
-		})
 		// Generate a key to sign JWTs with throughout most test cases
 		priv, err := rsa.GenerateKey(rand.Reader, 2048)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s\n\n", err)
 			return
 		}
-		tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, "test-key-id")
-
 		oidcPort := os.Getenv("OIDC_PORT")
 		if oidcPort == "" {
 			fmt.Fprintf(os.Stderr, "env OIDC_PORT is empty")
 			return
 		}
 
-		tp.SetAllowedRedirectURIs([]string{fmt.Sprintf("http://localhost:%s/callback", oidcPort)})
-		tp.SetClientCreds("test-rp", "fido")
-
+		id, secret := "test-rp", "fido"
+		expectedCode, err := oidc.NewID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "unable to generate code: %s", err.Error())
+			return
+		}
+		expectedNonce, err := oidc.NewID()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "unable to generate nonce: %s", err.Error())
+			return
+		}
+		tp = oidc.StartTestProvider(l, oidc.WithNoTLS(), oidc.WithTestDefaults(&oidc.TestProviderDefaults{
+			ExpectedCode:  &expectedCode,
+			ExpectedNonce: &expectedNonce,
+			SubjectPasswords: map[string]string{
+				"alice": "fido",
+				"eve":   "alice",
+			},
+			SigningKey: &oidc.TestSigningKey{
+				PrivKey: priv,
+				PubKey:  priv.Public(),
+				Alg:     oidc.RS256,
+			},
+			AllowedRedirectURIs: []string{fmt.Sprintf("http://localhost:%s/callback", oidcPort)},
+			ClientID:            &id,
+			ClientSecret:        &secret,
+		}))
+		defer tp.Stop()
 		env = map[string]interface{}{
-			clientID:     "test-rp",
-			clientSecret: "fido",
+			clientID:     id,
+			clientSecret: secret,
 			issuer:       tp.Addr(),
 			port:         oidcPort,
 			attemptExp:   time.Duration(2 * time.Minute),
