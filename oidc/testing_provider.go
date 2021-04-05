@@ -201,20 +201,33 @@ func StartTestProvider(t TestingT, opt ...Option) *TestProvider {
 	opts := getTestProviderOpts(t, opt...)
 	p := &TestProvider{
 		t:                   t,
-		nowFunc:             opts.withDefaults.NowFunc,
-		pkceVerifier:        opts.withDefaults.PKCEVerifier,
-		replyExpiry:         opts.withDefaults.Expiry,
+		clientID:            *opts.withDefaults.ClientID,
+		clientSecret:        *opts.withDefaults.ClientSecret,
+		expectedAuthCode:    *opts.withDefaults.ExpectedCode,
+		expectedState:       *opts.withDefaults.ExpectedState,
+		expectedAuthNonce:   *opts.withDefaults.ExpectedNonce,
 		allowedRedirectURIs: opts.withDefaults.AllowedRedirectURIs,
-		customClaims:        opts.withDefaults.CustomClaims,
-		replySubject:        opts.withDefaults.ExpectedSubject,
 		replyUserinfo:       opts.withDefaults.UserInfoReply,
 		supportedScopes:     opts.withDefaults.SupportedScopes,
-		subjectPasswords:    opts.withDefaults.SubjectPasswords, // default is not to use a login form, so no passwords required for subjects
-		codes:               map[string]*codeState{},
-		invalidJWKs:         opts.withDefaults.InvalidJWKS,
+		customAudiences:     opts.withDefaults.CustomAudiences,
+		customClaims:        opts.withDefaults.CustomClaims,
 		privKey:             opts.withDefaults.SigningKey.PrivKey,
 		pubKey:              opts.withDefaults.SigningKey.PubKey,
 		alg:                 opts.withDefaults.SigningKey.Alg,
+		replyExpiry:         *opts.withDefaults.Expiry,
+		nowFunc:             opts.withDefaults.NowFunc,
+		pkceVerifier:        opts.withDefaults.PKCEVerifier,
+		replySubject:        *opts.withDefaults.ExpectedSubject,
+		subjectPasswords:    opts.withDefaults.SubjectPasswords, // default is not to use a login form, so no passwords required for subjects
+		codes:               map[string]*codeState{},
+		invalidJWKs:         opts.withDefaults.InvalidJWKS,
+		omitAuthTimeClaim:   opts.withDefaults.OmitAuthTime,
+		omitIDToken:         opts.withDefaults.OmitIDTokens,
+		omitAccessToken:     opts.withDefaults.OmitAccessTokens,
+		disableToken:        opts.withDefaults.DisableTokenEndpoint,
+		disableImplicit:     opts.withDefaults.DisableImplicitFlow,
+		disableUserInfo:     opts.withDefaults.DisableUserInfo,
+		disableJWKs:         opts.withDefaults.DisableJWKs,
 		keyID:               strconv.Itoa(int(time.Now().Unix())),
 	}
 	p.jwks = &jose.JSONWebKeySet{
@@ -271,8 +284,17 @@ func testProviderDefaults(t TestingT) testProviderOptions {
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(err)
 
+	exp := 5 * time.Second
+	sub := "alice@example.com"
+	emptyString := ""
 	return testProviderOptions{
 		withDefaults: &TestProviderDefaults{
+			ClientID:      &emptyString,
+			ClientSecret:  &emptyString,
+			ExpectedCode:  &emptyString,
+			ExpectedState: &emptyString,
+			ExpectedNonce: &emptyString,
+
 			SigningKey: &TestSigningKey{
 				PrivKey: priv,
 				PubKey:  &priv.PublicKey,
@@ -280,7 +302,7 @@ func testProviderDefaults(t TestingT) testProviderOptions {
 			},
 			NowFunc:      time.Now,
 			PKCEVerifier: v,
-			Expiry:       5 * time.Second,
+			Expiry:       &exp,
 			AllowedRedirectURIs: []string{
 				"https://example.com",
 			},
@@ -288,7 +310,7 @@ func testProviderDefaults(t TestingT) testProviderOptions {
 				"name":  "Alice Doe Smith",
 				"email": "alice@example.com",
 			},
-			ExpectedSubject: "alice@example.com",
+			ExpectedSubject: &sub,
 			UserInfoReply: map[string]interface{}{
 				"sub":           "alice@example.com",
 				"dob":           "1978",
@@ -335,26 +357,26 @@ type TestSigningKey struct {
 // StartTestProvider(...)
 type TestProviderDefaults struct {
 	// ClientID for test relying party which is empty by default
-	ClientID string
+	ClientID *string
 
 	//  ClientSecret for test relying party which is empty by default
-	ClientSecret string
+	ClientSecret *string
 
 	// ExpectedSubject configures the expected subject for any JWTs issued by
 	// the provider (the default is "alice@example.com")
-	ExpectedSubject string
+	ExpectedSubject *string
 
 	// ExpectedCode configures the auth code required by the /authorize endpoint
 	// and the code is empty by default
-	ExpectedCode string
+	ExpectedCode *string
 
 	// ExpectedState configures the value for the state parameter returned from
 	// the /authorize endpoint which is empty by default
-	ExpectedState string
+	ExpectedState *string
 
 	// ExpectedAuthNonce configures the nonce value required for /authorize
 	// endpoint which is empty by default
-	ExpectedNonce string
+	ExpectedNonce *string
 
 	// AllowedRedirectURIs configures the allowed redirect URIs for the OIDC
 	// workflow which is "https://example.com" by default
@@ -383,7 +405,7 @@ type TestProviderDefaults struct {
 
 	// Expiry configures the expiry for JWTs returned and now + 5 * time.Second
 	// is the default
-	Expiry time.Duration
+	Expiry *time.Duration
 
 	// NowFunc configures how the test provider will determine the current time
 	// The default is time.Now()
@@ -417,6 +439,14 @@ type TestProviderDefaults struct {
 	// return a 401 http status. The implicit flow is allowed by default
 	DisableImplicitFlow bool
 
+	// DisableUserInfo disables userinfo responses, causing it to return a 404
+	// http status. The userinfo endpoint is enabled by default
+	DisableUserInfo bool
+
+	// DisableJWKs disables the JWKs endpoint, causing it to 404.  It is enabled
+	// by default
+	DisableJWKs bool
+
 	// InvalidJWKS makes the JWKs endpoint return an invalid response. Valid
 	// JWKs are returned by default.
 	InvalidJWKS bool
@@ -435,7 +465,75 @@ type TestProviderDefaults struct {
 func WithTestDefaults(defaults *TestProviderDefaults) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*testProviderOptions); ok {
-			o.withDefaults = defaults
+			if defaults != nil {
+				if defaults.ClientID != nil {
+					o.withDefaults.ClientID = defaults.ClientID
+				}
+				if defaults.ClientSecret != nil {
+					o.withDefaults.ClientSecret = defaults.ClientID
+				}
+				if defaults.ExpectedCode != nil {
+					o.withDefaults.ExpectedCode = defaults.ExpectedCode
+				}
+				if defaults.ExpectedState != nil {
+					o.withDefaults.ExpectedState = defaults.ExpectedState
+				}
+				if defaults.ExpectedNonce != nil {
+					o.withDefaults.ExpectedNonce = defaults.ExpectedNonce
+				}
+				if defaults.AllowedRedirectURIs != nil {
+					o.withDefaults.AllowedRedirectURIs = defaults.AllowedRedirectURIs
+				}
+				if defaults.UserInfoReply != nil {
+					o.withDefaults.UserInfoReply = defaults.UserInfoReply
+				}
+				if defaults.SupportedScopes != nil {
+					o.withDefaults.SupportedScopes = defaults.SupportedScopes
+				}
+				if defaults.CustomAudiences != nil {
+					o.withDefaults.CustomAudiences = defaults.CustomAudiences
+				}
+				if defaults.CustomClaims != nil {
+					o.withDefaults.CustomClaims = defaults.CustomClaims
+				}
+				if defaults.SigningKey != nil {
+					o.withDefaults.SigningKey = defaults.SigningKey
+				}
+				if defaults.Expiry != nil {
+					o.withDefaults.Expiry = defaults.Expiry
+				}
+				if defaults.NowFunc != nil {
+					o.withDefaults.NowFunc = defaults.NowFunc
+				}
+				if defaults.PKCEVerifier != nil {
+					o.withDefaults.PKCEVerifier = defaults.PKCEVerifier
+				}
+				if defaults.ExpectedSubject != nil {
+					o.withDefaults.ExpectedSubject = defaults.ExpectedSubject
+				}
+				if defaults.SubjectPasswords != nil {
+					o.withDefaults.SubjectPasswords = defaults.SubjectPasswords
+				}
+				if defaults.InvalidJWKS {
+					o.withDefaults.InvalidJWKS = defaults.InvalidJWKS
+				}
+				if defaults.OmitAuthTime {
+					o.withDefaults.OmitAuthTime = defaults.OmitAuthTime
+				}
+				if defaults.OmitIDTokens {
+					o.withDefaults.OmitIDTokens = defaults.OmitIDTokens
+				}
+				if defaults.OmitAccessTokens {
+					o.withDefaults.OmitAccessTokens = defaults.OmitAccessTokens
+				}
+				if defaults.DisableTokenEndpoint {
+					o.withDefaults.DisableTokenEndpoint = defaults.DisableTokenEndpoint
+				}
+				if defaults.InvalidJWKS {
+					o.withDefaults.DisableImplicitFlow = defaults.DisableImplicitFlow
+				}
+
+			}
 		}
 	}
 }
@@ -1209,7 +1307,7 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		case len(p.subjectPasswords) > 0:
 			s := p.verifyCachedCode(code)
 			if s == nil {
-				_ = p.writeTokenErrorResponse(w, http.StatusUnauthorized, "invalid_request", "ex")
+				_ = p.writeTokenErrorResponse(w, http.StatusUnauthorized, "invalid_request", fmt.Sprintf("invalid code: %s", code))
 				return
 			}
 			s.issuedTokens = true
