@@ -133,10 +133,6 @@ var (
 //
 //  * UserInfo: SetUserInfoReply sets the UserInfo endpoint response and
 //  UserInfoReply() returns the current response.
-//
-//  * ID Token additional claims: SetIDTokenAdditionalClaims sets the additional
-//  claims returned in an ID Token and IDTokenAdditionalClaims returns the current
-//  additional claims
 type TestProvider struct {
 	httpServer *httptest.Server
 	caCert     string
@@ -327,6 +323,8 @@ func withTestSubject(s string) Option {
 	}
 }
 
+// TestSigningKey defines a type for specifying a test signing key and algorithm
+// when providing TestProviderDefaults
 type TestSigningKey struct {
 	Alg     Alg
 	PrivKey crypto.PrivateKey
@@ -336,28 +334,98 @@ type TestSigningKey struct {
 // TestProviderDefaults define a type for composing all the defaults for
 // StartTestProvider(...)
 type TestProviderDefaults struct {
-	ClientID             string // ClientID for test relying party
-	ClientSecret         string //  ClientSecret for test relying party
-	ExpectedSubject      string // ExpectedSubject configures the expected subject for any JWTs issued by the provider (the default is "alice@example.com")
-	ExpectedCode         string
-	ExpectedState        string
-	ExpectedNonce        string
-	AllowedRedirectURIs  []string
-	SubjectPasswords     map[string]string
-	UserInfoReply        map[string]interface{}
-	SupportedScopes      []string
-	CustomAudiences      []string
-	CustomClaims         map[string]interface{}
-	SigningKey           *TestSigningKey
-	Expiry               time.Duration
-	NowFunc              func() time.Time
-	PKCEVerifier         CodeVerifier
-	OmitAuthTime         bool
-	OmitIDTokens         bool
-	OmitAccessTokens     bool
+	// ClientID for test relying party which is empty by default
+	ClientID string
+
+	//  ClientSecret for test relying party which is empty by default
+	ClientSecret string
+
+	// ExpectedSubject configures the expected subject for any JWTs issued by
+	// the provider (the default is "alice@example.com")
+	ExpectedSubject string
+
+	// ExpectedCode configures the auth code required by the /authorize endpoint
+	// and the code is empty by default
+	ExpectedCode string
+
+	// ExpectedState configures the value for the state parameter returned from
+	// the /authorize endpoint which is empty by default
+	ExpectedState string
+
+	// ExpectedAuthNonce configures the nonce value required for /authorize
+	// endpoint which is empty by default
+	ExpectedNonce string
+
+	// AllowedRedirectURIs configures the allowed redirect URIs for the OIDC
+	// workflow which is "https://example.com" by default
+	AllowedRedirectURIs []string
+
+	// UserInfoReply configures the UserInfo endpoint response.  There is a
+	// basic response for sub == "alice@example.com" by default.
+	UserInfoReply map[string]interface{}
+
+	// SupportedScopes configures the supported scopes which is "openid" by
+	// default
+	SupportedScopes []string
+
+	// CustomAudiences configures what audience value to embed in the JWT issued
+	// by the OIDC workflow.  By default only the ClientId is in the aud claim
+	// returned.
+	CustomAudiences []string
+
+	// CustomClaims configures the custom claims added to JWTs returned.  By
+	// default there are no additional custom claims
+	CustomClaims map[string]interface{}
+
+	// SigningKey configures the signing key and algorithm for JWTs returned.
+	// By default an ES256 key is generated and used.
+	SigningKey *TestSigningKey
+
+	// Expiry configures the expiry for JWTs returned and now + 5 * time.Second
+	// is the default
+	Expiry time.Duration
+
+	// NowFunc configures how the test provider will determine the current time
+	// The default is time.Now()
+	NowFunc func() time.Time
+
+	// PKCEVerifier(oidc.CodeVerifier) configures the PKCE code_verifier
+	PKCEVerifier CodeVerifier
+
+	// OmitAuthTime turn on/off the omitting of an auth_time claim from
+	// id_tokens from the /token endpoint.  If set to true, the test provider will
+	// not include the auth_time claim in issued id_tokens from the /token
+	// endpoint.  The default is false, so auth_time will be included
+	OmitAuthTime bool
+
+	// OmitIDTokens turn on/off the omitting of id_tokens from the /token
+	// endpoint. If set to true, the test provider will not omit (issue) id_tokens
+	// from the /token endpoint. The default is false, so ID tokens will be included
+	OmitIDTokens bool
+
+	// OmitAccessTokens turn on/off the omitting of access_tokens from the /token
+	// endpoint.  If set to true, the test provider will not omit (issue)
+	// access_tokens from the /token endpoint. The default is false, so Access
+	// tokens will be included
+	OmitAccessTokens bool
+
+	// DisableTokenEndpoint makes the /token endpoint return 401. It is false by
+	// default, so the endpoint is on
 	DisableTokenEndpoint bool
-	DisableImplicitFlow  bool
-	InvalidJWKS          bool // InvalidJWKS makes the JWKs endpoint return an invalid response
+
+	// DisableImplicitFlow disables implicit flow responses, causing them to
+	// return a 401 http status. The implicit flow is allowed by default
+	DisableImplicitFlow bool
+
+	// InvalidJWKS makes the JWKs endpoint return an invalid response. Valid
+	// JWKs are returned by default.
+	InvalidJWKS bool
+
+	// SubjectPasswords configures a subject/password dictionary. If configured,
+	// then an interactive Login form is presented by the /authorize endpoint
+	// and the TestProvider becomes an interactive test provider using the
+	// provided subject/password dictionary.
+	SubjectPasswords map[string]string
 }
 
 // WithTestDefaults provides an option to provide a set of defaults to
