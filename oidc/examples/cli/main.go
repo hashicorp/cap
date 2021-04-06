@@ -17,8 +17,8 @@ import (
 
 	"github.com/hashicorp/cap/oidc"
 	"github.com/hashicorp/cap/oidc/callback"
-	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/cap/util"
+	"github.com/hashicorp/go-hclog"
 	"golang.org/x/oauth2"
 )
 
@@ -112,20 +112,8 @@ func main() {
 		}
 
 		id, secret := "test-rp", "fido"
-		expectedCode, err := oidc.NewID()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "unable to generate code: %s", err.Error())
-			return
-		}
-		expectedNonce, err := oidc.NewID()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "unable to generate nonce: %s", err.Error())
-			return
-		}
 		tp = oidc.StartTestProvider(l, oidc.WithNoTLS(), oidc.WithTestDefaults(&oidc.TestProviderDefaults{
-			ExpectedCode:  &expectedCode,
-			ExpectedNonce: &expectedNonce,
-			CustomClaims:  map[string]interface{}{},
+			CustomClaims: map[string]interface{}{},
 			SubjectInfo: map[string]*oidc.TestSubject{
 				"alice": {
 					Password: "fido",
@@ -228,10 +216,6 @@ func main() {
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		return
-	}
-
-	if *useTestProvider {
-		tp.SetExpectedAuthNonce(oidcRequest.Nonce())
 	}
 
 	successFn, successCh := success()

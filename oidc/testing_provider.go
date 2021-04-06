@@ -280,6 +280,7 @@ type testProviderOptions struct {
 	withCHashOf  string
 	withNoTLS    bool
 	withSubject  string
+	withNonce    string
 	withDefaults *TestProviderDefaults
 }
 
@@ -349,6 +350,16 @@ func withTestSubject(s string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*testProviderOptions); ok {
 			o.withSubject = s
+		}
+	}
+}
+
+// withTestNonce provides the option to provide a nonce
+//
+func withTestNonce(n string) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*testProviderOptions); ok {
+			o.withNonce = n
 		}
 	}
 }
@@ -981,6 +992,14 @@ func (p *TestProvider) issueSignedJWT(opt ...Option) string {
 	default:
 		sub = p.replySubject
 	}
+
+	switch {
+	case opts.withNonce != "":
+		p.customClaims["nonce"] = opts.withNonce
+	case p.expectedAuthNonce != "":
+		p.customClaims["nonce"] = p.expectedAuthNonce
+	}
+
 	claims := map[string]interface{}{
 		"sub":       sub,
 		"iss":       p.Addr(),
@@ -993,9 +1012,6 @@ func (p *TestProvider) issueSignedJWT(opt ...Option) string {
 	}
 	if len(p.customAudiences) != 0 {
 		claims["aud"] = append(claims["aud"].([]string), p.customAudiences...)
-	}
-	if p.expectedAuthNonce != "" {
-		p.customClaims["nonce"] = p.expectedAuthNonce
 	}
 	for k, v := range p.customClaims {
 		claims[k] = v
@@ -1157,6 +1173,7 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		uname := req.FormValue("uname")
 		psw := req.FormValue("psw")
 		state := req.FormValue("state")
+		code := req.FormValue("code")
 		redirectURI := req.FormValue("redirect_uri")
 
 		// p.mu.Lock() called at top of func... so this map access if okay.
@@ -1171,21 +1188,15 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 
 		// p.mu.Lock() called at top of func... so this map access if okay.
-		p.codes[p.expectedAuthCode] = &codeState{
-			sub: uname,
-			exp: time.Now().Add(codeTimeout),
+		c, ok := p.codes[code]
+		if !ok {
+			p.writeAuthErrorResponse(w, req, redirectURI, state, "invalid_request", "missing code")
+			return
 		}
+		c.sub = uname
 
-		var s string
-		switch {
-		case p.expectedState != "":
-			s = p.expectedState
-		default:
-			s = state
-		}
-
-		redirectURI += "?state=" + url.QueryEscape(s) +
-			"&code=" + url.QueryEscape(p.expectedAuthCode)
+		redirectURI += "?state=" + url.QueryEscape(state) +
+			"&code=" + url.QueryEscape(code)
 
 		http.Redirect(w, req, redirectURI, http.StatusFound)
 		return
@@ -1209,7 +1220,18 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		// if subjectInfo are configured, then we're doing interactive
 		// testing and we need to create a login form.
 		if len(p.subjectInfo) > 0 {
-			_ = p.writeLoginPage(w, state, redirectURI)
+			code, err := NewID()
+			require.NoError(err)
+			cs := &codeState{
+				exp: time.Now().Add(codeTimeout),
+			}
+			nonce := req.FormValue("nonce")
+			if nonce != "" {
+				cs.nonce = nonce
+			}
+			// p.mu.Lock() called at top of func... so this map access if okay.
+			p.codes[code] = cs
+			_ = p.writeLoginPage(w, state, code, redirectURI)
 			return
 		}
 
@@ -1309,7 +1331,7 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		case !strutils.StrListContains(p.allowedRedirectURIs, req.FormValue("redirect_uri")):
 			_ = p.writeTokenErrorResponse(w, http.StatusBadRequest, "invalid_request", "redirect_uri is not allowed")
 			return
-		case code != p.expectedAuthCode:
+		case len(p.subjectInfo) == 0 && code != p.expectedAuthCode:
 			_ = p.writeTokenErrorResponse(w, http.StatusUnauthorized, "invalid_grant", "unexpected auth code")
 			return
 		case req.FormValue("code_verifier") != "" && req.FormValue("code_verifier") != p.pkceVerifier.Verifier():
@@ -1318,22 +1340,25 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 
 		var sub string
+		var nonce string
 		switch {
 		// p.mu.Lock() called at top of func... so this map access is okay.
 		case len(p.subjectInfo) > 0:
 			s := p.verifyCachedCode(code)
 			if s == nil {
-				_ = p.writeTokenErrorResponse(w, http.StatusUnauthorized, "invalid_request", fmt.Sprintf("invalid code: %s", code))
+				_ = p.writeTokenErrorResponse(w, http.StatusUnauthorized, "invalid_grant", fmt.Sprintf("unexpected auth code: %s", code))
 				return
 			}
 			s.issuedTokens = true
 			p.codes[code] = s
 			sub = s.sub
+			nonce = s.nonce
 		default:
 			sub = p.replySubject
+			nonce = p.expectedAuthNonce
 		}
-		accessToken := p.issueSignedJWT(withTestSubject(sub))
-		idToken := p.issueSignedJWT(withTestSubject(sub), withTestAtHash(accessToken), withTestCHash(p.expectedAuthCode))
+		accessToken := p.issueSignedJWT(withTestSubject(sub), withTestNonce(nonce))
+		idToken := p.issueSignedJWT(withTestSubject(sub), withTestNonce(nonce), withTestAtHash(accessToken), withTestCHash(p.expectedAuthCode))
 		reply := struct {
 			AccessToken string `json:"access_token,omitempty"`
 			IDToken     string `json:"id_token,omitempty"`
@@ -1409,6 +1434,7 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 type codeState struct {
 	exp          time.Time
 	sub          string
+	nonce        string
 	issuedTokens bool
 }
 
@@ -1523,7 +1549,7 @@ func (l *TestingLogger) FailNow() {
 	panic("testing.T failed, see logs for output (if any)")
 }
 
-func (p *TestProvider) writeLoginPage(w http.ResponseWriter, state, redirectURI string) error {
+func (p *TestProvider) writeLoginPage(w http.ResponseWriter, state, code, redirectURI string) error {
 	// this is horrible CSS/HTML. I'd welcome help with a better implementation
 	// for these bits.
 	const loginCss = `<!DOCTYPE html>
@@ -1606,6 +1632,7 @@ span.psw {
   <div class="container" style="background-color:#f1f1f1">
     <button type="button" class="cancelbtn">Cancel</button>
 	<input type="hidden" name="state" id=state" value="%s"/>
+	<input type="hidden" name="code" id=state" value="%s"/>
 	<input type="hidden" name="redirect_uri" value="%s" />
   </div>
 </form>
@@ -1622,7 +1649,7 @@ span.psw {
 	require.NotNilf(w, "%s: http.ResponseWriter is nil")
 
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
-	if _, err := w.Write([]byte(loginCss + fmt.Sprintf(loginForm, state, redirectURI))); err != nil {
+	if _, err := w.Write([]byte(loginCss + fmt.Sprintf(loginForm, state, code, redirectURI))); err != nil {
 		return err
 	}
 
