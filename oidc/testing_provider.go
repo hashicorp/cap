@@ -247,7 +247,7 @@ func StartTestProvider(t TestingT, opt ...Option) *TestProvider {
 			},
 		},
 	}
-	p.httpServer = httptestNewUnstartedServerWithPort(t, p, opts.withPort)
+	p.httpServer = httptestNewUnstartedServerWithOpts(t, p, opt...)
 	p.httpServer.Config.ErrorLog = log.New(ioutil.Discard, "", 0)
 	if opts.withNoTLS {
 		p.httpServer.Start()
@@ -275,6 +275,7 @@ func StartTestProvider(t TestingT, opt ...Option) *TestProvider {
 // testProviderOptions is the set of available options for TestProvider
 // functions
 type testProviderOptions struct {
+	withHost     string
 	withPort     int
 	withAtHashOf string
 	withCHashOf  string
@@ -571,7 +572,20 @@ func WithNoTLS() Option {
 	}
 }
 
-// WithTestPort provides an optional port for the test provider.
+// WithTestHost provides an optional address for the test provider.
+//
+// Valid for: TestProvider.StartTestProvider
+func WithTestHost(host string) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*testProviderOptions); ok {
+			o.withHost = host
+		}
+	}
+}
+
+// WithTestPort provides an optional port for the test provider. -1 causes an
+// unstarted server with a random port. 0 causes a started server with a random
+// port. Any other value returns a started server on that port.
 //
 // Valid for: TestProvider.StartTestProvider
 func WithTestPort(port int) Option {
@@ -1478,19 +1492,26 @@ func (p *TestProvider) startCachedCodesCleanupTicking(cancelCtx context.Context)
 	}()
 }
 
-// httptestNewUnstartedServerWithPort is roughly the same as
-// httptest.NewUnstartedServer() but allows the caller to explicitly choose the
-// port if desired.
-func httptestNewUnstartedServerWithPort(t TestingT, handler http.Handler, port int) *httptest.Server {
+// httptestNewUnstartedServerWithOpts is roughly the same as
+// httptest.NewUnstartedServer() but allows the caller to tweak some options.
+func httptestNewUnstartedServerWithOpts(t TestingT, handler http.Handler, opt ...Option) *httptest.Server {
 	if v, ok := interface{}(t).(HelperT); ok {
 		v.Helper()
 	}
 	require := require.New(t)
 	require.NotNil(handler)
-	if port == 0 {
+
+	opts := getTestProviderOpts(t, opt...)
+	if opts.withPort == -1 {
 		return httptest.NewUnstartedServer(handler)
 	}
-	addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
+
+	host := opts.withHost
+	if host == "" {
+		host = "127.0.0.1"
+	}
+
+	addr := net.JoinHostPort(host, strconv.Itoa(opts.withPort))
 	l, err := net.Listen("tcp", addr)
 	require.NoError(err)
 
