@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/sha512"
+	"crypto/subtle"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -1182,7 +1183,7 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			p.writeAuthErrorResponse(w, req, redirectURI, state, "access_denied", "invalid user name")
 			return
 		}
-		if subInfo.Password != psw {
+		if subtle.ConstantTimeCompare([]byte(subInfo.Password), []byte(psw)) == 0 {
 			p.writeAuthErrorResponse(w, req, redirectURI, state, "access_denied", "invalid password")
 			return
 		}
@@ -1453,7 +1454,7 @@ func (p *TestProvider) verifyCachedCode(code string) *codeState {
 
 func (p *TestProvider) startCachedCodesCleanupTicking(cancelCtx context.Context) {
 	go func() {
-		interval := 1 * time.Minute
+		interval := codeCleanupInterval
 		timer := time.NewTimer(0)
 		for {
 			select {
