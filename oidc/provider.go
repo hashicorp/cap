@@ -710,7 +710,13 @@ type DiscoveryInfo struct {
 
 	// ClaimsParameterSupported (OPTIONAL, omitempty): Boolean value specifying whether
 	// the OP supports use of the claims parameter, with true indicating support.
-	ClaimsParameterSupported bool `json:"claims_supported,omitempty"`
+	ClaimsParameterSupported bool `json:"claims_parameter_supported,omitempty"`
+
+	// ClaimsSupported (RECOMMENDED, omitempty): a list of the Claim Names of
+	// the Claims that the OpenID Provider MAY be able to supply values for.
+	// Note that for privacy or other reasons, this might not be an exhaustive
+	// list.
+	ClaimsSupported []string `json:"claims_supported,omitempty"`
 
 	// AcrValuesSupported (OPTIONAL, omitempty): a list of the Authentication
 	// Context Class References that this OP supports
