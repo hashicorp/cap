@@ -1572,95 +1572,155 @@ func (l *TestingLogger) FailNow() {
 }
 
 func (p *TestProvider) writeLoginPage(w http.ResponseWriter, state, code, redirectURI string) error {
-	// this is horrible CSS/HTML. I'd welcome help with a better implementation
-	// for these bits.
-	const loginCss = `<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-body {font-family: Arial, Helvetica, sans-serif;}
-form {border: 3px solid #f1f1f1;}
-
-input[type=text], input[type=password] {
-  width: 100%;
-  padding: 12px 20px;
-  margin: 8px 0;
-  display: inline-block;
-  border: 1px solid #ccc;
-  box-sizing: border-box;
-}
-
-button {
-  background-color: #4CAF50;
-  color: white;
-  padding: 14px 20px;
-  margin: 8px 0;
-  border: none;
-  cursor: pointer;
-  width: 100%;
-}
-
-button:hover {
-  opacity: 0.8;
-}
-
-.cancelbtn {
-  width: auto;
-  padding: 10px 18px;
-  background-color: #f44336;
-}
-
-
-.container {
-  padding: 16px;
-}
-
-span.psw {
-  float: right;
-  padding-top: 16px;
-}
-
-/* Change styles for span and cancel button on extra small screens */
-@media screen and (max-width: 300px) {
-  span.psw {
-     display: block;
-     float: none;
-  }
-  .cancelbtn {
-     width: 100%;
-  }
-}
-</style>
-</head>
-`
 	const loginForm = `
+<!DOCTYPE html>
 <html>
-<body>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Mockland Login</title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<h2>Login</h2>
+    <!-- Normalize.css -->
+    <style type="text/css">
+      html{line-height:1.15;-webkit-text-size-adjust:100%}body{margin:0}main{display:block}h1{font-size:2em;margin:.67em 0}hr{box-sizing:content-box;height:0;overflow:visible}pre{font-family:monospace,monospace;font-size:1em}a{background-color:transparent}abbr[title]{border-bottom:none;text-decoration:underline;text-decoration:underline dotted}b,strong{font-weight:bolder}code,kbd,samp{font-family:monospace,monospace;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}img{border-style:none}button,input,optgroup,select,textarea{font-family:inherit;font-size:100%;line-height:1.15;margin:0}button,input{overflow:visible}button,select{text-transform:none}[type=button],[type=reset],[type=submit],button{-webkit-appearance:button}[type=button]::-moz-focus-inner,[type=reset]::-moz-focus-inner,[type=submit]::-moz-focus-inner,button::-moz-focus-inner{border-style:none;padding:0}[type=button]:-moz-focusring,[type=reset]:-moz-focusring,[type=submit]:-moz-focusring,button:-moz-focusring{outline:1px dotted ButtonText}fieldset{padding:.35em .75em .625em}legend{box-sizing:border-box;color:inherit;display:table;max-width:100%;padding:0;white-space:normal}progress{vertical-align:baseline}textarea{overflow:auto}[type=checkbox],[type=radio]{box-sizing:border-box;padding:0}[type=number]::-webkit-inner-spin-button,[type=number]::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}[type=search]::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}details{display:block}summary{display:list-item}template{display:none}[hidden]{display:none}
+    </style>
+    <style type="text/css">
+      html {
+        background: #222;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+      }
+      body {
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      section {
+        margin: 1rem;
+        width: 100%;
+        max-width: 25rem;
+        border-radius: 0.25rem;
+        overflow: hidden;
+        background: #FFF;
+        color: #333;
+        animation: outerglow 10s infinite;
+      }
+			@keyframes outerglow {
+        0% {
+          box-shadow:
+            0 0 30px #fffa,
+            20px 0 80px #f0f,
+            -20px 0 80px #0ff,
+            20px 0 300px #f0f,
+            -20px 0 300px #0ff;
+        }
+        33% {
+          box-shadow:
+            0 0 25px #fff9,
+            20px 0 80px #f0f,
+            -20px 0 80px #0ff,
+            20px 0 300px #f0f,
+            -20px 0 300px #f0f;
+        }
+        66% {
+          box-shadow:
+            0 0 10px #fff4,
+            20px 0 80px #f0f9,
+            -20px 0 80px #0ff9,
+            20px 0 300px #0ff9,
+            -20px 0 300px #f0f9;
+        }
+        100% {
+          box-shadow:
+            0 0 30px #fffa,
+            20px 0 80px #f0f,
+            -20px 0 80px #0ff,
+            20px 0 300px #f0f,
+            -20px 0 300px #0ff;
+        }
+      }
+      header {
+        padding: 3rem 2rem 2rem 2rem;
+        text-align: center;
+      }
+      h1 {
+        margin: 0;
+        font-weight: 400;
+        font-size: 2rem;
+      }
+      p {
+        color: #888;
+      }
+      form {
+        padding: 0 2rem 3rem 2rem;
+      }
+      .field {
+        margin-bottom: 1rem;
+      }
+      label {
+        display: block;
+        margin-bottom: 0.5rem;
+      }
+      input {
+        display: block;
+        box-sizing: border-box;
+        width: 100%;
+        padding: 1rem;
+        border: 0;
+        border-radius: 0.5rem;
+        background: #eee;
+      }
+      input:focus {
+        outline: 0;
+        box-shadow: 0 0 10px 2px #60e9, inset 0 0 0 1px #fff;
+        background: #fff;
+      }
+      button {
+        margin-top: 2rem;
+        width: 100%;
+        border: 0;
+        padding: 1rem;
+        background: #c0f;
+        color: #fff;
+        border-radius: 0.5rem;
+      }
+      button:focus {
+        outline: 0;
+        box-shadow: 0 0 10px 3px #60e9, inset 0 0 0 1px #fff;
+      }
+    </style>
+  </head>
+  <body>
 
-<form action="/login" method="post">
-  <div class="container">
-    <label for="uname"><b>Username</b></label>
-    <input type="text" placeholder="Enter Username" name="uname" required>
+    <section>
+      <header>
+        <h1>Sign In</h1>
+        <p>Welcome to the mock OIDC provider.</p>
+      </header>
 
-    <label for="psw"><b>Password</b></label>
-    <input type="password" placeholder="Enter Password" name="psw" required>
-        
-    <button type="submit">Login</button>
-  </div>
+      <form action="/login" method="post">
 
-  <div class="container" style="background-color:#f1f1f1">
-    <button type="button" class="cancelbtn">Cancel</button>
-	<input type="hidden" name="state" id=state" value="%s"/>
-	<input type="hidden" name="code" id=state" value="%s"/>
-	<input type="hidden" name="redirect_uri" value="%s" />
-  </div>
-</form>
+        <div class="field">
+          <label for="username">Username</label>
+          <input id="username" name="username" type="text" autocomplete="off" autofocus required />
+        </div>
 
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="off" required />
+        </div>
 
-</body>
+        <input name="state" type="hidden" value="%s" />
+        <input name="code" type="hidden" value="%s" />
+        <input name="redirect_uri" type="hidden" value="%s" />
+
+        <button type="submit">Login</button>
+      </form>
+    </section>
+
+  </body>
 </html>
 `
 
@@ -1671,7 +1731,7 @@ span.psw {
 	require.NotNilf(w, "%s: http.ResponseWriter is nil")
 
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
-	if _, err := w.Write([]byte(loginCss + fmt.Sprintf(loginForm, state, code, redirectURI))); err != nil {
+	if _, err := w.Write([]byte(fmt.Sprintf(loginForm, state, code, redirectURI))); err != nil {
 		return err
 	}
 
