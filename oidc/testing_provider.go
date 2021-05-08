@@ -1607,38 +1607,38 @@ func (p *TestProvider) writeLoginPage(w http.ResponseWriter, state, code, redire
         color: #333;
         animation: outerglow 10s infinite;
       }
-			@keyframes outerglow {
+      @keyframes outerglow {
         0% {
           box-shadow:
-            0 0 30px #fffa,
-            20px 0 80px #f0f,
-            -20px 0 80px #0ff,
-            20px 0 300px #f0f,
-            -20px 0 300px #0ff;
+            0 0 30px #fff8,
+            10px 0 15px #f0f8,
+            -10px 0 15px #0ff8,
+            10px 0 50px #f0f8,
+            -10px 0 50px #0ff8;
         }
         33% {
           box-shadow:
-            0 0 25px #fff9,
-            20px 0 80px #f0f,
-            -20px 0 80px #0ff,
-            20px 0 300px #f0f,
-            -20px 0 300px #f0f;
+            0 0 25px #fff8,
+            10px 0 15px #f0f8,
+            -10px 0 15px #0ff8,
+            10px 0 50px #f0f8,
+            -10px 0 50px #f0f8;
         }
         66% {
           box-shadow:
             0 0 10px #fff4,
-            20px 0 80px #f0f9,
-            -20px 0 80px #0ff9,
-            20px 0 300px #0ff9,
-            -20px 0 300px #f0f9;
+            10px 0 15px #f0f6,
+            -10px 0 15px #0ff6,
+            10px 0 50px #0ff6,
+            -10px 0 50px #f0f6;
         }
         100% {
           box-shadow:
-            0 0 30px #fffa,
-            20px 0 80px #f0f,
-            -20px 0 80px #0ff,
-            20px 0 300px #f0f,
-            -20px 0 300px #0ff;
+            0 0 30px #fff8,
+            10px 0 15px #f0f8,
+            -10px 0 15px #0ff8,
+            10px 0 50px #f0f8,
+            -10px 0 50px #0ff8;
         }
       }
       header {
@@ -1696,8 +1696,8 @@ func (p *TestProvider) writeLoginPage(w http.ResponseWriter, state, code, redire
 
     <section>
       <header>
-        <h1>Sign In</h1>
-        <p>Welcome to the mock OIDC provider.</p>
+        <h1>Test Sign In</h1>
+        <p>Welcome to the test OIDC provider.</p>
       </header>
 
       <form action="/login" method="post">
