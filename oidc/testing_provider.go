@@ -1605,41 +1605,6 @@ func (p *TestProvider) writeLoginPage(w http.ResponseWriter, state, code, redire
         overflow: hidden;
         background: #FFF;
         color: #333;
-        animation: outerglow 10s infinite;
-      }
-      @keyframes outerglow {
-        0% {
-          box-shadow:
-            0 0 30px #fff8,
-            10px 0 15px #f0f8,
-            -10px 0 15px #0ff8,
-            10px 0 50px #f0f8,
-            -10px 0 50px #0ff8;
-        }
-        33% {
-          box-shadow:
-            0 0 25px #fff8,
-            10px 0 15px #f0f8,
-            -10px 0 15px #0ff8,
-            10px 0 50px #f0f8,
-            -10px 0 50px #f0f8;
-        }
-        66% {
-          box-shadow:
-            0 0 10px #fff4,
-            10px 0 15px #f0f6,
-            -10px 0 15px #0ff6,
-            10px 0 50px #0ff6,
-            -10px 0 50px #f0f6;
-        }
-        100% {
-          box-shadow:
-            0 0 30px #fff8,
-            10px 0 15px #f0f8,
-            -10px 0 15px #0ff8,
-            10px 0 50px #f0f8,
-            -10px 0 50px #0ff8;
-        }
       }
       header {
         padding: 3rem 2rem 2rem 2rem;
