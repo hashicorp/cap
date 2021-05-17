@@ -715,6 +715,31 @@ func TestProvider_UserInfo(t *testing.T) {
 			}(),
 		},
 		{
+			name: "valid-aud-just-a-string",
+			p:    p,
+			args: args{
+				tokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+					AccessToken: "dummy_access_token",
+					Expiry:      time.Now().Add(10 * time.Second),
+				}),
+				claims: &map[string]interface{}{},
+				sub:    defaultSub,
+				opt:    []Option{WithAudiences(clientID)},
+			},
+			providerClaims: func() map[string]interface{} {
+				c := defaultClaims()
+				c["iss"] = tp.Addr()
+				c["aud"] = clientID
+				return c
+			}(),
+			wantClaims: func() *map[string]interface{} {
+				c := defaultClaims()
+				c["iss"] = tp.Addr()
+				c["aud"] = clientID
+				return &c
+			}(),
+		},
+		{
 			name: "invalid-audiences",
 			p:    p,
 			args: args{
@@ -726,6 +751,12 @@ func TestProvider_UserInfo(t *testing.T) {
 				sub:    defaultSub,
 				opt:    []Option{WithAudiences(tp.Addr())},
 			},
+			providerClaims: func() map[string]interface{} {
+				c := defaultClaims()
+				c["iss"] = tp.Addr()
+				c["aud"] = "not-matching"
+				return c
+			}(),
 			wantErr:   true,
 			wantIsErr: ErrInvalidAudience,
 		},

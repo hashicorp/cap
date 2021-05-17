@@ -356,7 +356,7 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource,
 	type verifyClaims struct {
 		Sub string
 		Iss string
-		Aud []string
+		Aud interface{}
 	}
 	var vc verifyClaims
 	err = userinfo.Claims(&vc)
@@ -372,8 +372,21 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource,
 		return fmt.Errorf("%s: %w", op, ErrInvalidIssuer)
 	}
 	// optional audiences check...
-	if len(opts.withAudiences) > 0 {
-		if err := p.verifyAudience(opts.withAudiences, vc.Aud); err != nil {
+	if len(opts.withAudiences) > 0 && vc.Aud != nil {
+		var infoAudiences []string
+		switch v := vc.Aud.(type) {
+		case []interface{}:
+			for _, raw := range v {
+				if s, ok := raw.(string); ok {
+					infoAudiences = append(infoAudiences, s)
+				}
+			}
+		default:
+			if s, ok := v.(string); ok {
+				infoAudiences = append(infoAudiences, s)
+			}
+		}
+		if err := p.verifyAudience(opts.withAudiences, infoAudiences); err != nil {
 			return fmt.Errorf("%s: %w", op, ErrInvalidAudience)
 		}
 	}
