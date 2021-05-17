@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coreos/go-oidc"
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/hashicorp/cap/oidc/internal/strutils"
 	"github.com/hashicorp/go-cleanhttp"
 	"golang.org/x/oauth2"
