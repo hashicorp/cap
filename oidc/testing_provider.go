@@ -1572,7 +1572,7 @@ func (l *TestingLogger) FailNow() {
 }
 
 func (p *TestProvider) writeLoginPage(w http.ResponseWriter, state, code, redirectURI string) error {
-	const loginForm = `
+	const loginFormTop = `
 <!DOCTYPE html>
 <html>
   <head>
@@ -1669,18 +1669,20 @@ func (p *TestProvider) writeLoginPage(w http.ResponseWriter, state, code, redire
 
         <div class="field">
           <label for="username">Username</label>
-          <input id="username" name="username" type="text" autocomplete="off" autofocus required />
+          <input id="username" name="uname" type="text" autocomplete="off" autofocus required />
         </div>
 
         <div class="field">
           <label for="password">Password</label>
-          <input id="password" name="password" type="password" autocomplete="off" required />
+          <input id="password" name="psw" type="password" autocomplete="off" required />
         </div>
-
+`
+	const loginFormInputs = `
         <input name="state" type="hidden" value="%s" />
         <input name="code" type="hidden" value="%s" />
         <input name="redirect_uri" type="hidden" value="%s" />
-
+`
+	const loginFormBottom = `
         <button type="submit">Login</button>
       </form>
     </section>
@@ -1696,7 +1698,8 @@ func (p *TestProvider) writeLoginPage(w http.ResponseWriter, state, code, redire
 	require.NotNilf(w, "%s: http.ResponseWriter is nil")
 
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
-	if _, err := w.Write([]byte(fmt.Sprintf(loginForm, state, code, redirectURI))); err != nil {
+	form := fmt.Sprintf("%s%s%s", loginFormTop, fmt.Sprintf(loginFormInputs, state, code, redirectURI), loginFormBottom)
+	if _, err := w.Write([]byte(form)); err != nil {
 		return err
 	}
 
