@@ -7,7 +7,7 @@ import (
 
 	"github.com/hashicorp/cap/oidc/internal/base62"
 
-	"github.com/coreos/go-oidc"
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/text/language"
