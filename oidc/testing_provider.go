@@ -1474,7 +1474,7 @@ func (p *TestProvider) startCachedCodesCleanupTicking(cancelCtx context.Context)
 			select {
 			case <-cancelCtx.Done():
 				if v, ok := interface{}(p.t).(InfofT); ok {
-					v.Infof("cleanup of cached codes shutting down", nil)
+					v.Infof("cleanup of cached codes shutting down")
 				}
 				return
 			case <-timer.C:
