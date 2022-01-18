@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"mime"
 	"net/http"
 	"net/url"
@@ -298,6 +299,17 @@ func (p *Provider) Exchange(ctx context.Context, oidcRequest Request, authorizat
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to create new id_token: %w", op, err)
 	}
+
+	// Log the JWKS published by the provider
+	jwks, err := p.getJWKS(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("%s: unable to get JWKS: %w", op, err)
+	}
+	log.Printf("DEBUG: jwks=%s", jwks)
+
+	// Log the ID token before verification to see its KID
+	log.Printf("DEBUG: id_token=%s", string(t.IDToken()))
+
 	claims, err := p.VerifyIDToken(ctx, t.IDToken(), oidcRequest)
 	if err != nil {
 		return nil, fmt.Errorf("%s: id_token failed verification: %w", op, err)
@@ -317,6 +329,40 @@ func (p *Provider) Exchange(ctx context.Context, oidcRequest Request, authorizat
 		}
 	}
 	return t, nil
+}
+
+func (p *Provider) getJWKS(ctx context.Context) (string, error) {
+	const op = "Provider.getJWKS"
+
+	di, err := p.DiscoveryInfo(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequest("GET", di.JWKSURL, nil)
+	if err != nil {
+		return "", err
+	}
+	client, err := p.HTTPClient()
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", op, err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", op, err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("%s: unable to read response body: %w", op, err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("%s: %s", resp.Status, body)
+	}
+
+	return string(body), nil
 }
 
 // UserInfo gets the UserInfo claims from the provider using the token produced
