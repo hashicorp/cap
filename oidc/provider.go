@@ -305,18 +305,15 @@ func (p *Provider) Exchange(ctx context.Context, oidcRequest Request, authorizat
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to get JWKS: %w", op, err)
 	}
-	log.Printf("DEBUG stderr: jwks=%s", jwks)
-	fmt.Printf("DEBUG stdout: jwks=%s", jwks)
+	log.Printf("TEMP DEBUG: jwks=%s", jwks)
 
 	// Log the ID token before verification to see its KID
 	idt := string(t.IDToken())
 	parts := strings.Split(idt, ".")
 	if len(parts) == 3 {
-		log.Printf("DEBUG stderr: id_token=%s", fmt.Sprintf("%s.%s.xxxxxxxxxxx", parts[0], parts[1]))
-		fmt.Printf("DEBUG stdout: id_token=%s", fmt.Sprintf("%s.%s.xxxxxxxxxxx", parts[0], parts[1]))
+		log.Printf("TEMP DEBUG: id_token=%s", fmt.Sprintf("%s.%s.xxxxxxxxxxx", parts[0], parts[1]))
 	} else {
-		log.Printf("DEBUG stderr: id_token=%s", idt)
-		fmt.Printf("DEBUG stdout: id_token=%s", idt)
+		log.Printf("TEMP DEBUG: id_token=%s", idt)
 	}
 
 	claims, err := p.VerifyIDToken(ctx, t.IDToken(), oidcRequest)
