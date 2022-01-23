@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/cap/ldap"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-secure-stdlib/password"
+	"github.com/jimlambrt/gldap/testdirectory"
 )
 
 func main() {
@@ -79,11 +80,15 @@ func main() {
 	}
 }
 
-func startTestDirectory() *ldap.TestDirectory {
+func startTestDirectory() *testdirectory.Directory {
 	// start a test directory for the example
-	t := &ldap.TestingLogger{Logger: hclog.Default()}
-	td := ldap.StartTestDirectory(t, ldap.WithTestDirectoryDefaults(&ldap.TestDirectoryDefaults{AllowAnonymousBind: true}))
-	td.SetGroups(ldap.TestGroup(t, "admin", []string{"alice"}))
-	td.SetUsers(ldap.TestUsers(t, []string{"alice", "bob"})...)
+	logger := hclog.New(&hclog.LoggerOptions{
+		Name:  "testdirectory-logger",
+		Level: hclog.Error,
+	})
+	t := &testdirectory.Logger{Logger: logger}
+	td := testdirectory.StartDirectory(t, testdirectory.WithLogger(t, logger), testdirectory.WithDefaults(t, &testdirectory.Defaults{AllowAnonymousBind: true}))
+	td.SetGroups(testdirectory.NewGroup(t, "admin", []string{"alice"}))
+	td.SetUsers(testdirectory.NewUsers(t, []string{"alice", "bob"})...)
 	return td
 }

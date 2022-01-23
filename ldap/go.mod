@@ -4,12 +4,11 @@ go 1.17
 
 require (
 	github.com/go-ldap/ldap/v3 v3.4.1
-	github.com/hashicorp/go-hclog v1.0.0
+	github.com/hashicorp/go-hclog v1.1.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-secure-stdlib/tlsutil v0.1.1
-	github.com/lor00x/goldap v0.0.0-20180618054307-a546dffdd1a3
+	github.com/jimlambrt/gldap v0.0.0-20220123225924-e42489d01fc0
 	github.com/stretchr/testify v1.7.0
-	github.com/vjeantet/ldapserver v1.0.1
 )
 
 require (

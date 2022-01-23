@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/hashicorp/cap/ldap v0.0.0-20220107001345-acd3d11d1d1f
-	github.com/hashicorp/go-hclog v1.0.0
+	github.com/hashicorp/go-hclog v1.1.0
 	github.com/hashicorp/go-secure-stdlib/password v0.1.1
 )
 
@@ -20,6 +20,7 @@ require (
 	github.com/hashicorp/go-secure-stdlib/strutil v0.1.1 // indirect
 	github.com/hashicorp/go-secure-stdlib/tlsutil v0.1.1 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.2 // indirect
+	github.com/jimlambrt/gldap v0.0.0-20220123222342-b036b34bfa49 // indirect
 	github.com/lor00x/goldap v0.0.0-20180618054307-a546dffdd1a3 // indirect
 	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/mattn/go-isatty v0.0.10 // indirect

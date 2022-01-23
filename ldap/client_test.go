@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/jimlambrt/gldap/testdirectory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,7 +15,11 @@ import (
 func TestClient_NewClient(t *testing.T) {
 	t.Parallel()
 	testCtx := context.Background()
-	td := StartTestDirectory(t, WithTestMTLS())
+	logger := hclog.New(&hclog.LoggerOptions{
+		Name:  "test-logger",
+		Level: hclog.Error,
+	})
+	td := testdirectory.StartDirectory(t, testdirectory.WithMTLS(t), testdirectory.WithLogger(t, logger))
 	tests := []struct {
 		name            string
 		conf            *ClientConfig
@@ -80,8 +86,12 @@ func TestClient_NewClient(t *testing.T) {
 func TestClient_connect(t *testing.T) {
 	t.Parallel()
 	testCtx := context.Background()
-	tdTLS := StartTestDirectory(t)
-	tdNonTLS := StartTestDirectory(t, WithTestNoTLS())
+	logger := hclog.New(&hclog.LoggerOptions{
+		Name:  "test-logger",
+		Level: hclog.Error,
+	})
+	tdTLS := testdirectory.StartDirectory(t, testdirectory.WithLogger(t, logger))
+	tdNonTLS := testdirectory.StartDirectory(t, testdirectory.WithNoTLS(t), testdirectory.WithLogger(t, logger))
 	startTLSPool := x509.NewCertPool()
 	require.True(t, startTLSPool.AppendCertsFromPEM([]byte(tdNonTLS.Cert())))
 	tests := []struct {

@@ -6,6 +6,9 @@ import (
 	"testing"
 
 	"github.com/hashicorp/cap/ldap"
+	"github.com/hashicorp/go-hclog"
+	"github.com/jimlambrt/gldap"
+	"github.com/jimlambrt/gldap/testdirectory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,29 +16,33 @@ import (
 func TestClient_Authenticate(t *testing.T) {
 	t.Parallel()
 	testCtx := context.Background()
-	td := ldap.StartTestDirectory(t,
-		ldap.WithTestDirectoryDefaults(&ldap.TestDirectoryDefaults{AllowAnonymousBind: true}),
-		// ldap.WithTestLogging(),
+	logger := hclog.New(&hclog.LoggerOptions{
+		Name:  "test-logger",
+		Level: hclog.Error,
+	})
+	td := testdirectory.StartDirectory(t,
+		testdirectory.WithDefaults(t, &testdirectory.Defaults{AllowAnonymousBind: true}),
+		testdirectory.WithLogger(t, logger),
 	)
-	groups := []*ldap.TestEntry{
-		ldap.TestGroup(t, "admin", []string{"alice"}),
-		ldap.TestGroup(t, "admin", []string{"eve"}, ldap.WithTestDefaults(t, &ldap.TestDefaults{UPNDomain: "example.com"})),
+	groups := []*gldap.Entry{
+		testdirectory.NewGroup(t, "admin", []string{"alice"}),
+		testdirectory.NewGroup(t, "admin", []string{"eve"}, testdirectory.WithDefaults(t, &testdirectory.Defaults{UPNDomain: "example.com"})),
 	}
-	tokenGroups := map[string][]*ldap.TestEntry{
+	tokenGroups := map[string][]*gldap.Entry{
 		"S-1-1": {
-			ldap.TestGroup(t, "admin", []string{"alice"}),
+			testdirectory.NewGroup(t, "admin", []string{"alice"}),
 		},
 	}
 	sidBytes, err := ldap.SIDBytes(1, 1)
 	require.NoError(t, err)
-	users := ldap.TestUsers(t, []string{"alice", "bob"}, ldap.WithTestMembersOf(t, "admin"), ldap.WithTestTokenGroups(t, sidBytes))
+	users := testdirectory.NewUsers(t, []string{"alice", "bob"}, testdirectory.WithMembersOf(t, "admin"), testdirectory.WithTokenGroups(t, sidBytes))
 	users = append(
 		users,
-		ldap.TestUsers(
+		testdirectory.NewUsers(
 			t,
 			[]string{"eve"},
-			ldap.WithTestDefaults(t, &ldap.TestDefaults{UPNDomain: "example.com"}),
-			ldap.WithTestMembersOf(t, "admin"))...,
+			testdirectory.WithDefaults(t, &testdirectory.Defaults{UPNDomain: "example.com"}),
+			testdirectory.WithMembersOf(t, "admin"))...,
 	)
 	td.SetUsers(users...)
 	td.SetGroups(groups...)
@@ -57,8 +64,8 @@ func TestClient_Authenticate(t *testing.T) {
 				URLs:        []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
 				Certificate: td.Cert(),
 				DiscoverDN:  true,
-				UserDN:      ldap.TestDefaultUserDN,
-				GroupDN:     ldap.TestDefaultGroupDN,
+				UserDN:      testdirectory.DefaultUserDN,
+				GroupDN:     testdirectory.DefaultGroupDN,
 			},
 			opts:       []ldap.Option{ldap.WithGroups()},
 			wantGroups: []string{groups[0].DN},
@@ -71,8 +78,8 @@ func TestClient_Authenticate(t *testing.T) {
 				URLs:           []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
 				Certificate:    td.Cert(),
 				DiscoverDN:     true,
-				UserDN:         ldap.TestDefaultUserDN,
-				GroupDN:        ldap.TestDefaultGroupDN,
+				UserDN:         testdirectory.DefaultUserDN,
+				GroupDN:        testdirectory.DefaultGroupDN,
 				UseTokenGroups: true,
 			},
 			opts:       []ldap.Option{ldap.WithGroups()},
@@ -86,8 +93,8 @@ func TestClient_Authenticate(t *testing.T) {
 				URLs:        []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
 				Certificate: td.Cert(),
 				DiscoverDN:  true,
-				UserDN:      ldap.TestDefaultUserDN,
-				GroupDN:     ldap.TestDefaultGroupDN,
+				UserDN:      testdirectory.DefaultUserDN,
+				GroupDN:     testdirectory.DefaultGroupDN,
 				UPNDomain:   "example.com",
 			},
 			opts:       []ldap.Option{ldap.WithGroups()},
