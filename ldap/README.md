@@ -70,7 +70,7 @@ information on UPN can be found
 
 **Binding - Authenticated Search**
 * `BindDN` (string, optional) - Distinguished name of object to bind when
-  performing user and group search. Example: `cn=vault,ou=Users,dc=example,dc=com`
+  performing user and group search. Example: `cn=application-acct,ou=Users,dc=example,dc=com`
 * `BindPassword` (string, optional) - Password to use along with binddn when
   performing user search. 
 * `UserDN` (string, optional) - Base DN under which to perform user search.
@@ -99,8 +99,7 @@ information on UPN can be found
 **Binding - User Principal Name (AD)**
 * `UPNDomain` (string, optional) - userPrincipalDomain used to construct the UPN
   string for the authenticating user. The constructed UPN will appear as
-  `[username]@UPNDomain`.  Example: `example.com`, which will cause vault to
-  bind as `username@example.com`.
+  `[username]@UPNDomain`.  Example: `example.com`, which will result in binding as `username@example.com`.
 
 
 ## Group Membership Resolution
