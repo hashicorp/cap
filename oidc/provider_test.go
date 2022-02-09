@@ -938,6 +938,36 @@ func TestProvider_VerifyIDToken(t *testing.T) {
 			wantIsErr: ErrInvalidNonce,
 		},
 		{
+			name: "missing-subject",
+			p:    defaultProvider,
+			args: args{
+				keys: defaultKeys,
+				claims: func() map[string]interface{} {
+					c := defaultClaims()
+					c["sub"] = ""
+					return c
+				}(),
+				request: defaultRequest,
+			},
+			wantErr:   true,
+			wantIsErr: ErrMissingClaim,
+		},
+		{
+			name: "empty-aud",
+			p:    defaultProvider,
+			args: args{
+				keys: defaultKeys,
+				claims: func() map[string]interface{} {
+					c := defaultClaims()
+					c["aud"] = []string{}
+					return c
+				}(),
+				request: defaultRequest,
+			},
+			wantErr:   true,
+			wantIsErr: ErrMissingClaim,
+		},
+		{
 			name: "valid-with-req-audiences",
 			p:    defaultProvider,
 			args: args{

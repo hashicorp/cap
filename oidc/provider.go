@@ -480,6 +480,14 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, oidcRequest Req
 		)
 	}
 
+	if oidcIDToken.Subject == "" {
+		return nil, fmt.Errorf("%s: invalid id_token: sub: %w", op, ErrMissingClaim)
+	}
+
+	if len(oidcIDToken.Audience) == 0 {
+		return nil, fmt.Errorf("%s: invalid id_token: aud: %w", op, ErrMissingClaim)
+	}
+
 	var audiences []string
 	switch {
 	case len(oidcRequest.Audiences()) > 0:
