@@ -70,6 +70,17 @@ type ClientConfig struct {
 	// userPrincipalDomain login with [username]@UPNDomain (optional)
 	UPNDomain string `json:"upndomain"`
 
+	// UserFilter (optional) is a Go template used to construct a ldap user
+	// search filter. The template can access the following context variables:
+	// [UserAttr, Username]. The default userfilter is
+	// ({{.UserAttr}}={{.Username}}) or
+	// (userPrincipalName={{.Username}}@UPNDomain) if the upndomain parameter
+	// is set. The user search filter can be used to  restrict what user can
+	// attempt to log in. For example, to limit login to users that are not
+	// contractors, you could write
+	// (&(objectClass=user)({{.UserAttr}}={{.Username}})(!(employeeType=Contractor)))
+	UserFilter string `json:"userfilter"`
+
 	// UserAttr is the "username" attribute of the entry's DN and is typically
 	// either the cn in ActiveDirectory or uid in openLDAP  (default: cn)
 	UserAttr string `json:"userattr"`

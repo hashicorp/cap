@@ -1,15 +1,10 @@
 package ldap
 
-import (
-	"crypto/tls"
-)
-
 // Option defines a common functional options type which can be used in a
 // variadic parameter pattern.
 type Option func(interface{})
 
 type configOptions struct {
-	withTLSConfig     *tls.Config
 	withURLs          []string
 	withInsecureTLS   bool
 	withTLSMinVersion string
@@ -49,16 +44,6 @@ func WithURLs(urls ...string) Option {
 		switch v := o.(type) {
 		case *configOptions:
 			v.withURLs = urls
-		}
-	}
-}
-
-// WithTLSConfig provides an optional tls.Config
-func WithTLSConfig(tc *tls.Config) Option {
-	return func(o interface{}) {
-		switch v := o.(type) {
-		case *configOptions:
-			v.withTLSConfig = tc
 		}
 	}
 }

@@ -188,9 +188,6 @@ type AuthResult struct {
 // Supported options: WithGroups, WithDialer, WithURLs
 func (c *Client) Authenticate(ctx context.Context, username, password string, opt ...Option) (*AuthResult, error) {
 	const op = "ldap.(Client).Authenticate"
-	if c.conf == nil {
-		return nil, fmt.Errorf("%s: missing configuration: %w", op, ErrInternal)
-	}
 	if username == "" {
 		return nil, fmt.Errorf("%s: missing username: %w", op, ErrInvalidParameter)
 	}
@@ -227,6 +224,8 @@ func (c *Client) Authenticate(ctx context.Context, username, password string, op
 	// should be the one to search, not the user authenticating.
 	if c.conf.BindDN != "" && c.conf.BindPassword != "" {
 		if err := c.conn.Bind(c.conf.BindDN, c.conf.BindPassword); err != nil {
+			// unless the binddn was changed during this inflight authentication
+			// flow, it should be very difficult to encounter this error
 			return nil, fmt.Errorf("%s: unable to re-bind with the configuration BindDN user: %w", op, err)
 		}
 	}
@@ -261,14 +260,6 @@ func (c *Client) Close(ctx context.Context) {
 	}
 }
 
-// StartTLS sends the command to start a TLS session for an existing connection
-func (c *Client) StartTLS(config *tls.Config) error {
-	if c.conn != nil {
-		return c.conn.StartTLS(config)
-	}
-	return nil
-}
-
 // getGroups queries LDAP and returns a slice describing the set of groups the
 // authenticated user is a member of.
 //
@@ -293,11 +284,11 @@ func (c *Client) StartTLS(config *tls.Config) error {
 func (c *Client) getGroups(userDN string, username string) ([]string, []Warning, error) {
 	const op = "ldap.(Client).getLDAPGroups"
 	var warnings []Warning
-	if c.conf == nil {
-		return nil, warnings, fmt.Errorf("%s: missing configuration: %w", op, ErrInternal)
+	if userDN == "" {
+		return nil, warnings, fmt.Errorf("%s: missing user dn: %w", op, ErrInvalidParameter)
 	}
-	if c.conn == nil {
-		return nil, warnings, fmt.Errorf("%s: no connection: %w", op, ErrInternal)
+	if username == "" {
+		return nil, warnings, fmt.Errorf("%s: missing username: %w", op, ErrInvalidParameter)
 	}
 	var entries []*ldap.Entry
 	var err error
@@ -307,7 +298,7 @@ func (c *Client) getGroups(userDN string, username string) ([]string, []Warning,
 		entries, warnings, err = c.filterGroupsSearch(userDN, username)
 	}
 	if err != nil {
-		return nil, warnings, err
+		return nil, warnings, fmt.Errorf("%s: %w", op, err)
 	}
 
 	// retrieve the groups in a string/bool map as a structure to avoid duplicates
@@ -344,11 +335,8 @@ func (c *Client) getGroups(userDN string, username string) ([]string, []Warning,
 func (c *Client) tokenGroupsSearch(userDN string) ([]*ldap.Entry, []Warning, error) {
 	const op = "ldap.(Client).tokenGroupsSearch"
 	var warnings []Warning
-	if c.conf == nil {
-		return nil, warnings, fmt.Errorf("%s: missing configuration: %w", op, ErrInternal)
-	}
-	if c.conn == nil {
-		return nil, warnings, fmt.Errorf("%s: no connection: %w", op, ErrInternal)
+	if userDN == "" {
+		return nil, warnings, fmt.Errorf("%s: missing user dn: %w", op, ErrInvalidParameter)
 	}
 	result, err := c.conn.Search(&ldap.SearchRequest{
 		BaseDN: userDN,
@@ -405,13 +393,11 @@ func (c *Client) tokenGroupsSearch(userDN string) ([]*ldap.Entry, []Warning, err
 func (c *Client) filterGroupsSearch(userDN string, username string) ([]*ldap.Entry, []Warning, error) {
 	const op = "ldap.(Client).filterGroupsSearch"
 	var warnings []Warning
-	if c.conf == nil {
-		warnings = append(warnings, fmtWarning("%s: groupfilter is empty, will not query server", op))
-		return nil, warnings, fmt.Errorf("%s: missing configuration: %w", op, ErrInternal)
+	if userDN == "" {
+		return nil, warnings, fmt.Errorf("%s: missing user dn: %w", op, ErrInvalidParameter)
 	}
-	if c.conn == nil {
-		warnings = append(warnings, fmtWarning("%s: groupdn is empty, will not query server", op))
-		return nil, warnings, fmt.Errorf("%s: no connection: %w", op, ErrInternal)
+	if username == "" {
+		return nil, warnings, fmt.Errorf("%s: missing username: %w", op, ErrInvalidParameter)
 	}
 	if c.conf.GroupFilter == "" {
 		return make([]*ldap.Entry, 0), warnings, nil
@@ -458,6 +444,9 @@ func (c *Client) filterGroupsSearch(userDN string, username string) ([]*ldap.Ent
 
 func sidBytesToString(b []byte) (string, error) {
 	const op = "ldap.sidBytesToString"
+	if b == nil {
+		return "", fmt.Errorf("%s: missing bytes: %w", op, ErrInvalidParameter)
+	}
 	reader := bytes.NewReader(b)
 
 	var revision, subAuthorityCount uint8
@@ -492,7 +481,6 @@ func sidBytesToString(b []byte) (string, error) {
 // SIDBytes creates a SID from the provided revision and identifierAuthority
 func SIDBytes(revision uint8, identifierAuthority uint16) ([]byte, error) {
 	const op = "ldap.SidBytes"
-	// identifierAuthorityParts := [3]uint16{identifierAuthority}
 	var identifierAuthorityParts [3]uint16
 	identifierAuthorityParts[2] = identifierAuthority
 
@@ -512,11 +500,8 @@ func SIDBytes(revision uint8, identifierAuthority uint16) ([]byte, error) {
 
 func (c *Client) getUserBindDN(username string) (string, error) {
 	const op = "ldap.(Client).getUserBindDN"
-	if c.conf == nil {
-		return "", fmt.Errorf("%s: missing configuration: %w", op, ErrInternal)
-	}
-	if c.conn == nil {
-		return "", fmt.Errorf("%s: no connection: %w", op, ErrInternal)
+	if username == "" {
+		return "", fmt.Errorf("%s: missing username: %w", op, ErrInvalidParameter)
 	}
 	// this validation check and the logic right below it are dependent, so if
 	// you update one of them, be sure to update the other one as well.
@@ -535,9 +520,9 @@ func (c *Client) getUserBindDN(username string) (string, error) {
 			return "", fmt.Errorf("%s: bind (service) failed: %w", op, err)
 		}
 
-		filter := fmt.Sprintf("(%s=%s)", c.conf.UserAttr, EscapeFilter(username))
-		if c.conf.UPNDomain != "" {
-			filter = fmt.Sprintf("(userPrincipalName=%s@%s)", EscapeValue(username), c.conf.UPNDomain)
+		filter, err := c.renderUserSearchFilter(username)
+		if err != nil {
+			return "", fmt.Errorf("%s: %w", op, err)
 		}
 
 		result, err := c.conn.Search(&ldap.SearchRequest{
@@ -568,11 +553,11 @@ func (c *Client) getUserBindDN(username string) (string, error) {
  */
 func (c *Client) getUserDN(bindDN, username string) (string, error) {
 	const op = "ldap.(Client).getUserDN"
-	if c.conf == nil {
-		return "", fmt.Errorf("%s: missing configuration: %w", op, ErrInternal)
+	if bindDN == "" {
+		return "", fmt.Errorf("%s: missing bind dn: %w", op, ErrInvalidParameter)
 	}
-	if c.conn == nil {
-		return "", fmt.Errorf("%s: no connection: %w", op, ErrInternal)
+	if username == "" {
+		return "", fmt.Errorf("%s: missing username: %w", op, ErrInvalidParameter)
 	}
 	var userDN string
 	if c.conf.UPNDomain != "" {
@@ -625,8 +610,61 @@ func (c *Client) getCN(dn string) string {
 	return dn
 }
 
+func (c *Client) renderUserSearchFilter(username string) (string, error) {
+	const (
+		op = "ldap.(Client).renderUserSearchFilter"
+
+		emptyUserFilter   = ""
+		defaultUserFilter = "({{.UserAttr}}={{.Username}})"
+		queryTemplate     = "queryTemplate"
+	)
+	if username == "" {
+		return "", fmt.Errorf("%s: missing username: %w", op, ErrInvalidParameter)
+	}
+
+	var userFilter string
+	// The UserFilter can be blank if not set, or running this version of the code
+	// on an existing ldap configuration
+	switch {
+	case c.conf.UserFilter != emptyUserFilter:
+		userFilter = c.conf.UserFilter
+	default:
+		userFilter = defaultUserFilter
+	}
+
+	// Parse the configuration as a template.
+	// Example template "({{.UserAttr}}={{.Username}})"
+	t, err := template.New(queryTemplate).Parse(userFilter)
+	if err != nil {
+		return "", fmt.Errorf("%s: search failed due to template compilation error: %w", op, err)
+	}
+
+	// Build context to pass to template - we will be exposing UserDn and Username.
+	context := struct {
+		UserAttr string
+		Username string
+	}{
+		EscapeFilter(c.conf.UserAttr),
+		EscapeFilter(username),
+	}
+	if c.conf.UPNDomain != "" {
+		context.UserAttr = "userPrincipalName"
+		context.Username = fmt.Sprintf("%s@%s", EscapeValue(username), c.conf.UPNDomain)
+	}
+
+	var renderedFilter bytes.Buffer
+	if err := t.Execute(&renderedFilter, context); err != nil {
+		return "", fmt.Errorf("%s: search failed due to template parsing error: %w", op, err)
+	}
+
+	return renderedFilter.String(), nil
+}
+
 func getTLSConfig(host string, opt ...Option) (*tls.Config, error) {
 	const op = "ldap.getTLSConfig"
+	if host == "" {
+		return nil, fmt.Errorf("%s: missing host: %w", op, ErrInvalidParameter)
+	}
 	opts := getConfigOpts(opt...)
 	tlsConfig := &tls.Config{
 		ServerName: host,

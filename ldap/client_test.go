@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
+	"net"
 	"testing"
 
 	"github.com/hashicorp/go-hclog"
@@ -50,6 +51,63 @@ func TestClient_NewClient(t *testing.T) {
 			wantErr:         true,
 			wantErrIs:       ErrInvalidParameter,
 			wantErrContains: "both client_tls_cert and client_tls_key must be set in configuration",
+		},
+		{
+			name: "invalid-tls-min",
+			conf: &ClientConfig{
+				TLSMinVersion: "invalid-tls-version",
+			},
+			wantErr:         true,
+			wantErrIs:       ErrInvalidParameter,
+			wantErrContains: "invalid 'tls_min_version' in config",
+		},
+		{
+			name: "invalid-tls-max",
+			conf: &ClientConfig{
+				TLSMaxVersion: "invalid-tls-version",
+			},
+			wantErr:         true,
+			wantErrIs:       ErrInvalidParameter,
+			wantErrContains: "invalid 'tls_max_version' in config",
+		},
+		{
+			name: "tls-max-less-than-min",
+			conf: &ClientConfig{
+				TLSMinVersion: "tls12",
+				TLSMaxVersion: "tls10",
+			},
+			wantErr:         true,
+			wantErrIs:       ErrInvalidParameter,
+			wantErrContains: "'tls_max_version' must be greater than or equal to 'tls_min_version'",
+		},
+		{
+			name: "invalid-cert",
+			conf: &ClientConfig{
+				Certificate: "invalid-cert",
+			},
+			wantErr:         true,
+			wantErrIs:       ErrInvalidParameter,
+			wantErrContains: "failed to parse server tls cert",
+		},
+		{
+			name: "invalid-key-pair",
+			conf: &ClientConfig{
+				ClientTLSKey:  "invalid-key",
+				ClientTLSCert: "invalid-cert",
+			},
+			wantErr:         true,
+			wantErrContains: "failed to parse client X509 key pair",
+		},
+		{
+			name: "valid-key-pair",
+			conf: &ClientConfig{
+				URLs:          []string{"localhost"},
+				TLSMinVersion: "tls12",
+				TLSMaxVersion: "tls13",
+				Certificate:   td.Cert(),
+				ClientTLSKey:  td.ClientKey(),
+				ClientTLSCert: td.ClientCert(),
+			},
 		},
 	}
 
@@ -124,12 +182,30 @@ func TestClient_connect(t *testing.T) {
 			wantErrIs:       ErrInvalidParameter,
 		},
 		{
+			name: "failed-to-parse-urls",
+			conf: &ClientConfig{
+				// leading space
+				URLs: []string{" ldap://127.0.0.1:"},
+			},
+			wantErr:         true,
+			wantErrContains: "error parsing url",
+		},
+		{
 			name: "invalid-urls",
 			conf: &ClientConfig{
 				URLs: []string{"badscheme://127.0.0.1:"},
 			},
 			wantErr:         true,
 			wantErrContains: "invalid LDAP scheme in url",
+		},
+		{
+			name: "error-connecting",
+			conf: &ClientConfig{
+				// leading space
+				URLs: []string{"ldap://127.0.0.1:"},
+			},
+			wantErr:         true,
+			wantErrContains: "error connecting to host",
 		},
 		{
 			name: "tls",
@@ -189,6 +265,30 @@ func TestClient_connect(t *testing.T) {
 			assert.NotNil(c.conn)
 		})
 	}
+
+	// this test won't run if there's already a service listening on port 389,
+	// but on most systems and in CI it will run and it allows us to test
+	// connecting to a URL without a port
+	t.Run("389", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		testCtx := context.Background()
+		logger := hclog.New(&hclog.LoggerOptions{
+			Name:  "test-logger",
+			Level: hclog.Error,
+		})
+		ln, err := net.Listen("tcp", ":"+"389")
+		ln.Close()
+		if err == nil {
+			_ = testdirectory.Start(t, testdirectory.WithNoTLS(t), testdirectory.WithLogger(t, logger), testdirectory.WithPort(t, 389))
+			c, err := NewClient(testCtx, &ClientConfig{
+				URLs: []string{"ldap://127.0.0.1"},
+			})
+			require.NoError(err)
+			err = c.connect(testCtx)
+			defer func() { c.Close(testCtx) }()
+			assert.NoError(err)
+		}
+	})
 }
 
 func Test_sidBytesToString(t *testing.T) {
@@ -207,5 +307,58 @@ func Test_sidBytesToString(t *testing.T) {
 		} else if answer != res {
 			t.Errorf("Failed to convert %#v: %s != %s", test, res, answer)
 		}
+	}
+}
+
+func Test_validateCertificate(t *testing.T) {
+	logger := hclog.New(&hclog.LoggerOptions{
+		Name:  "test-logger",
+		Level: hclog.Error,
+	})
+	td := testdirectory.Start(t, testdirectory.WithMTLS(t), testdirectory.WithLogger(t, logger))
+
+	tests := []struct {
+		name            string
+		pemBlock        []byte
+		wantErr         bool
+		wantErrIs       error
+		wantErrContains string
+	}{
+		{
+			name:            "missing-pem-block",
+			wantErr:         true,
+			wantErrIs:       ErrInvalidParameter,
+			wantErrContains: "missing certificate pem block",
+		},
+		{
+			name: "invalid-pem-block",
+			pemBlock: []byte(
+				`-----BEGIN CERTIFICATE-----
+MIICUTCCAfugAwIBAgIBADANBgkqhkiG9w0BAQQFADBXMQswCQYDVQQGEwJDTjEL
+-----END CERTIFICATE-----`),
+			wantErr:         true,
+			wantErrContains: "failed to parse certificate",
+		},
+		{
+			name:     "success",
+			pemBlock: []byte(td.Cert()),
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert, require := assert.New(t), require.New(t)
+			err := validateCertificate(tc.pemBlock)
+			if tc.wantErr {
+				require.Error(err)
+				if tc.wantErrIs != nil {
+					assert.ErrorIs(err, tc.wantErrIs)
+				}
+				if tc.wantErrContains != "" {
+					assert.Contains(err.Error(), tc.wantErrContains)
+				}
+				return
+			}
+			require.NoError(err)
+		})
 	}
 }
