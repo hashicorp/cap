@@ -595,7 +595,7 @@ func (c *Client) getCN(dn string) string {
 
 	for _, rdn := range parsedDN.RDNs {
 		for _, rdnAttr := range rdn.Attributes {
-			if c.conf.UsePre111GroupCNBehavior == nil || *c.conf.UsePre111GroupCNBehavior {
+			if c.conf.DeprecatedVaultPre111GroupCNBehavior == nil || *c.conf.DeprecatedVaultPre111GroupCNBehavior {
 				if rdnAttr.Type == "CN" {
 					return rdnAttr.Value
 				}

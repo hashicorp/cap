@@ -141,10 +141,10 @@ type ClientConfig struct {
 	// against the server before returning back an error.
 	RequestTimeout int `json:"request_timeout"`
 
-	// UsePre111GroupCNBehavior: if true, group searching reverts to the pre
-	// 1.1.1 Vault behavior.
+	// DeprecatedVaultPre111GroupCNBehavior: if true, group searching reverts to
+	// the pre 1.1.1 Vault behavior.
 	// see: https://www.vaultproject.io/docs/upgrading/upgrade-to-1.1.1
-	UsePre111GroupCNBehavior *bool `json:"use_pre111_group_cn_behavior"`
+	DeprecatedVaultPre111GroupCNBehavior *bool `json:"use_pre111_group_cn_behavior"`
 }
 
 func (c *ClientConfig) clone() (*ClientConfig, error) {
