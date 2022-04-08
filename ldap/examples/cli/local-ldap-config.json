@@ -1,0 +1,12 @@
+{
+    "_comment": [
+        "this is just part of an example way to use your own directory with the cli.",
+        "See the ldap.ClientConfig for the available configuration settings."
+    ],
+    "urls": [
+        "ldap://localhost:10389"
+    ],
+    "insecure_tls": true,
+    "discoverdn": true,
+    "userdn": "ou=people,dc=planetexpress,dc=com"
+}

@@ -132,18 +132,18 @@ JWT signature verification is supported by providing keys from the following sou
 JWT signature verification supports the following asymmetric algorithms defined in
 [rfc7518.html#section-3.1](https://www.rfc-editor.org/rfc/rfc7518.html#section-3.1):
  
-| Identifier     | Signing Algorithm |
-| -------------- | :---------------- |
-| RS256          | RSASSA-PKCS1-v1_5 using SHA-256 |
-| RS384          | RSASSA-PKCS1-v1_5 using SHA-384 |
-| RS512          | RSASSA-PKCS1-v1_5 using SHA-512 |
-| ES256          | ECDSA using P-256 and SHA-256 |
-| ES384          | ECDSA using P-384 and SHA-384 |
-| ES512          | ECDSA using P-521 and SHA-512 |
-| PS256          | RSASSA-PSS using SHA-256 and MGF1 with SHA-256 |
-| PS384          | RSASSA-PSS using SHA-384 and MGF1 with SHA-384 |
-| PS512          | RSASSA-PSS using SHA-512 and MGF1 with SHA-512 |
-| EdDSA          | Ed25519 using SHA-512 |
+| Identifier | Signing Algorithm                              |
+| ---------- | :--------------------------------------------- |
+| RS256      | RSASSA-PKCS1-v1_5 using SHA-256                |
+| RS384      | RSASSA-PKCS1-v1_5 using SHA-384                |
+| RS512      | RSASSA-PKCS1-v1_5 using SHA-512                |
+| ES256      | ECDSA using P-256 and SHA-256                  |
+| ES384      | ECDSA using P-384 and SHA-384                  |
+| ES512      | ECDSA using P-521 and SHA-512                  |
+| PS256      | RSASSA-PSS using SHA-256 and MGF1 with SHA-256 |
+| PS384      | RSASSA-PSS using SHA-384 and MGF1 with SHA-384 |
+| PS512      | RSASSA-PSS using SHA-512 and MGF1 with SHA-512 |
+| EdDSA      | Ed25519 using SHA-512                          |
 
 <hr>
 
@@ -178,3 +178,44 @@ if err != nil {
 ```
 
 For additional documentation and usage examples, see [jwt/README.md](./jwt).
+
+
+<hr>
+
+### [`ldap package`](./ldap) 
+[![Go
+Reference](https://pkg.go.dev/badge/github.com/hashicorp/cap/ldap.svg)](https://pkg.go.dev/github.com/hashicorp/cap/ldap)
+
+ldap is a package for writing clients that authenticate using Active Directory
+or LDAP.
+
+Primary types provided by the package:
+
+* `ldap.Client`
+* `ldap.ClientConfig`
+
+<hr>
+
+### Example usage
+
+An abbreviated example of authenticating a user:
+
+```go
+client, err := ldap.NewClient(ctx, &clientConfig)
+if err != nil { 
+  // handle error appropriately
+}
+
+// authenticate and get the user's groups as well.
+result, err := client.Authenticate(ctx, username, passwd, ldap.WithGroups())
+if err != nil { 
+  // handle error appropriately
+}
+
+if result.Success {
+  // user successfully authenticated...
+  if len(result.Groups) > 0 {
+    // we found some groups associated with the authenticated user...
+  } 
+}
+```
