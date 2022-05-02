@@ -162,9 +162,8 @@ func (v *Validator) validateAll(ctx context.Context, token string, expected Expe
 	if *claims.IssuedAt == 0 && *claims.Expiry == 0 && *claims.NotBefore == 0 {
 		if allowMissingIatExpNbf {
 			return allClaims, nil
-		} else {
-			return nil, errors.New("no issued at (iat), not before (nbf), or expiration time (exp) claims in token")
 		}
+		return nil, errors.New("no issued at (iat), not before (nbf), or expiration time (exp) claims in token")
 	}
 
 	// If "exp" (Expiration Time) is not set, then set it to the latest of
