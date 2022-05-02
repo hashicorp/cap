@@ -93,6 +93,26 @@ type Expected struct {
 //     (Issued At) claim, with configurable leeway. See Expected.Now() for details
 //     on how the current time is provided for validation.
 func (v *Validator) Validate(ctx context.Context, token string, expected Expected) (map[string]interface{}, error) {
+	return v.validateAll(ctx, token, expected, false)
+}
+
+// ValidateAllowMissingIatNbfExp validates JWTs of the JWS compact serialization form.
+//
+// The given JWT is considered valid if:
+//  1. Its signature is successfully verified.
+//  2. Its claims set and header parameter values match what's given by Expected.
+//  3. It's valid with respect to the current time. This means that the current
+//     time must be within the times (inclusive) given by the "nbf" (Not Before)
+//     and "exp" (Expiration Time) claims and after the time given by the "iat"
+//     (Issued At) claim, with configurable leeway, if they are present. If all
+//     of "nbf", "exp", and "iat" are missing, then this check is skipped. See
+//     Expected.Now() for details on how the current time is provided for
+//     validation.
+func (v *Validator) ValidateAllowMissingIatNbfExp(ctx context.Context, token string, expected Expected) (map[string]interface{}, error) {
+	return v.validateAll(ctx, token, expected, true)
+}
+
+func (v *Validator) validateAll(ctx context.Context, token string, expected Expected, allowMissingIatExpNbf bool) (map[string]interface{}, error) {
 	// First, verify the signature to ensure subsequent validation is against verified claims
 	allClaims, err := v.keySet.VerifySignature(ctx, token)
 	if err != nil {
@@ -114,8 +134,20 @@ func (v *Validator) Validate(ctx context.Context, token string, expected Expecte
 		return nil, err
 	}
 
-	// At least one of the "nbf" (Not Before), "exp" (Expiration Time), or "iat" (Issued At)
-	// claims are required to be set.
+	// Validate claims by asserting that they're as expected
+	if expected.Issuer != "" && expected.Issuer != claims.Issuer {
+		return nil, fmt.Errorf("invalid issuer (iss) claim")
+	}
+	if expected.Subject != "" && expected.Subject != claims.Subject {
+		return nil, fmt.Errorf("invalid subject (sub) claim")
+	}
+	if expected.ID != "" && expected.ID != claims.ID {
+		return nil, fmt.Errorf("invalid ID (jti) claim")
+	}
+	if err := validateAudience(expected.Audiences, claims.Audience); err != nil {
+		return nil, fmt.Errorf("invalid audience (aud) claim: %w", err)
+	}
+
 	if claims.IssuedAt == nil {
 		claims.IssuedAt = new(jwt.NumericDate)
 	}
@@ -125,8 +157,14 @@ func (v *Validator) Validate(ctx context.Context, token string, expected Expecte
 	if claims.NotBefore == nil {
 		claims.NotBefore = new(jwt.NumericDate)
 	}
+	// At least one of the "nbf" (Not Before), "exp" (Expiration Time), or "iat" (Issued At)
+	// claims are required to be set unless allowMissingIatExpNbf is set.
 	if *claims.IssuedAt == 0 && *claims.Expiry == 0 && *claims.NotBefore == 0 {
-		return nil, errors.New("no issued at (iat), not before (nbf), or expiration time (exp) claims in token")
+		if allowMissingIatExpNbf {
+			return allClaims, nil
+		} else {
+			return nil, errors.New("no issued at (iat), not before (nbf), or expiration time (exp) claims in token")
+		}
 	}
 
 	// If "exp" (Expiration Time) is not set, then set it to the latest of
@@ -167,20 +205,6 @@ func (v *Validator) Validate(ctx context.Context, token string, expected Expecte
 		cksLeeway = 0
 	} else if expected.ClockSkewLeeway.Seconds() == 0 {
 		cksLeeway = jwt.DefaultLeeway
-	}
-
-	// Validate claims by asserting they're as expected
-	if expected.Issuer != "" && expected.Issuer != claims.Issuer {
-		return nil, fmt.Errorf("invalid issuer (iss) claim")
-	}
-	if expected.Subject != "" && expected.Subject != claims.Subject {
-		return nil, fmt.Errorf("invalid subject (sub) claim")
-	}
-	if expected.ID != "" && expected.ID != claims.ID {
-		return nil, fmt.Errorf("invalid ID (jti) claim")
-	}
-	if err := validateAudience(expected.Audiences, claims.Audience); err != nil {
-		return nil, fmt.Errorf("invalid audience (aud) claim: %w", err)
 	}
 
 	// Validate that the token is not expired with respect to the current time

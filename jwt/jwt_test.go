@@ -13,6 +13,18 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
+var priv *rsa.PrivateKey
+
+func init() {
+	// Generate a key to sign JWTs with throughout most test cases.
+	// It can be slow sometimes to generate a 4096-bit RSA key, so we only do it once.
+	var err error
+	priv, err = rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		panic(err)
+	}
+}
+
 // TestValidator_Validate_Valid_JWT tests cases where a JWT is expected to be valid.
 func TestValidator_Validate_Valid_JWT(t *testing.T) {
 	tp := oidc.StartTestProvider(t)
@@ -21,9 +33,6 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 	keySet, err := NewOIDCDiscoveryKeySet(context.Background(), tp.Addr(), tp.CACert())
 	require.NoError(t, err)
 
-	// Generate a key to sign JWTs with throughout most test cases
-	priv, err := rsa.GenerateKey(rand.Reader, 4096)
-	require.NoError(t, err)
 	tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 
 	// Establish past, now, and future for validation of time related claims
@@ -281,6 +290,61 @@ func TestValidator_Validate_Valid_JWT(t *testing.T) {
 	}
 }
 
+func TestValidator_NoExpIatNbf(t *testing.T) {
+	tp := oidc.StartTestProvider(t)
+
+	// Create the KeySet to be used to verify JWT signatures
+	keySet, err := NewOIDCDiscoveryKeySet(context.Background(), tp.Addr(), tp.CACert())
+	require.NoError(t, err)
+
+	tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
+
+	type args struct {
+		claims   map[string]interface{}
+		token    func(map[string]interface{}) string
+		expected Expected
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "valid jwt with assertion on issuer claim",
+			args: args{
+				claims: map[string]interface{}{
+					"iss": "https://example.com/",
+				},
+				token: func(claims map[string]interface{}) string {
+					return oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
+				},
+				expected: Expected{
+					Issuer: "https://example.com/",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			// Create the signed JWT with the given claims
+			token := tt.args.token(tt.args.claims)
+
+			// Create the validator with the KeySet
+			validator, err := NewValidator(keySet)
+			require.NoError(t, err)
+
+			// Validate the JWT claims against expected values
+			got, err := validator.ValidateAllowMissingIatNbfExp(ctx, token, tt.args.expected)
+
+			// Expect to get back the same claims that were serialized in the JWT
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			require.Equal(t, tt.args.claims, got)
+		})
+	}
+}
+
 // TestValidator_Validate_Valid_JWT tests cases where a JWT is expected to be invalid.
 func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 	tp := oidc.StartTestProvider(t)
@@ -289,9 +353,6 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 	keySet, err := NewOIDCDiscoveryKeySet(context.Background(), tp.Addr(), tp.CACert())
 	require.NoError(t, err)
 
-	// Generate a key to sign JWTs with throughout most test cases
-	priv, err := rsa.GenerateKey(rand.Reader, 4096)
-	require.NoError(t, err)
 	tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
 
 	// Establish past, now, and future for validation of time related claims
@@ -585,9 +646,6 @@ func Test_validateAudience(t *testing.T) {
 }
 
 func Test_validateSigningAlgorithm(t *testing.T) {
-	priv, err := rsa.GenerateKey(rand.Reader, 4096)
-	require.NoError(t, err)
-
 	type args struct {
 		token              func() string
 		expectedAlgorithms []Alg
