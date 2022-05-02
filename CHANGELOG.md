@@ -4,6 +4,8 @@ Canonical reference for changes, improvements, and bugfixes for cap.
 
 ## Next
 
+* Add Validator `ValidateAllowMissingIatNbfExp` method to allow all of iat/nbf/exp to be missing.
+
 ## 0.1.1 (2021/06/24)
 
 ### Bug Fixes
