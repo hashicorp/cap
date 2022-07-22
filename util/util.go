@@ -15,11 +15,21 @@ func IsWSL() (bool, error) {
 	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
 		return false, nil
 	}
-	data, err := ioutil.ReadFile("/proc/version")
+	procData, err := ioutil.ReadFile("/proc/version")
 	if err != nil {
 		return false, fmt.Errorf("Unable to read /proc/version: %w", err)
 	}
-	return strings.Contains(strings.ToLower(string(data)), "microsoft"), nil
+
+	cgroupData, err := ioutil.ReadFile("/proc/1/cgroup")
+	if err != nil {
+		return false, fmt.Errorf("Unable to read /proc/1/cgroup: %w", err)
+	}
+
+	isDocker := strings.Contains(strings.ToLower(string(cgroupData)), "/docker/")
+	isLxc := strings.Contains(strings.ToLower(string(cgroupData)), "/lxc/")
+	isMsLinux := strings.Contains(strings.ToLower(string(procData)), "microsoft")
+	
+	return isMsLinux && !(isDocker || isLxc), nil
 }
 
 // OpenURL opens the specified URL in the default browser of the user. Source:
