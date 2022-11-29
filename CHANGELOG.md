@@ -4,9 +4,9 @@ Canonical reference for changes, improvements, and bugfixes for cap.
 
 ## Next
 
-* Add `ProviderConfig` which supports creating a provider that doesn't support
+* Add `ProviderConfig` which creates a provider that doesn't support
   OIDC discovery. It's probably better to use NewProvider(...) with discovery
-  whenever possible.
+  whenever possible ([PR](https://github.com/hashicorp/cap/pull/57) and [issue](https://github.com/hashicorp/cap/issues/55)).
 * Add Validator `ValidateAllowMissingIatNbfExp` method to allow all of
   iat/nbf/exp to be missing. 
 
