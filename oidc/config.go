@@ -90,7 +90,12 @@ type Config struct {
 	ProviderCA string
 
 	// NowFunc is a time func that returns the current time.
-	NowFunc func() time.Time
+	NowFunc func() time.Time `json:"-"`
+
+	// ProviderConfig is an optional ProviderConfig that supports creating a
+	// provider that doesn't support OIDC discovery. It's probably better to use
+	// NewProvider(...) with discovery whenever possible.
+	ProviderConfig *ProviderConfig
 }
 
 // NewConfig composes a new config for a provider.
@@ -99,7 +104,7 @@ type Config struct {
 // regardless of what additional scopes are requested via the WithScopes option
 // and duplicate scopes are allowed.
 //
-// Supported options: WithProviderCA, WithScopes, WithAudiences, WithNow
+// Supported options: WithProviderCA, WithScopes, WithAudiences, WithNow, WithProviderConfig
 func NewConfig(issuer string, clientID string, clientSecret ClientSecret, supported []Alg, allowedRedirectURLs []string, opt ...Option) (*Config, error) {
 	const op = "NewConfig"
 	opts := getConfigOpts(opt...)
@@ -113,6 +118,7 @@ func NewConfig(issuer string, clientID string, clientSecret ClientSecret, suppor
 		Audiences:            opts.withAudiences,
 		NowFunc:              opts.withNowFunc,
 		AllowedRedirectURLs:  allowedRedirectURLs,
+		ProviderConfig:       opts.withProviderConfig,
 	}
 	if err := c.Validate(); err != nil {
 		return nil, fmt.Errorf("%s: invalid provider config: %w", op, err)
@@ -158,6 +164,16 @@ func (c *Config) Hash() (uint64, error) {
 	args = append(args, scopes...)
 	args = append(args, audiences...)
 	args = append(args, redirects...)
+
+	if c.ProviderConfig != nil {
+		args = append(
+			args,
+			c.ProviderConfig.AuthURL,
+			c.ProviderConfig.JWKSURL,
+			c.ProviderConfig.TokenURL,
+			c.ProviderConfig.UserInfoURL,
+		)
+	}
 	if h, err = hashStrings(args...); err != nil {
 		return 0, fmt.Errorf("hashing error: %w", err)
 	}
@@ -250,6 +266,19 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("%s: %w", op, ErrInvalidCACert)
 		}
 	}
+
+	if c.ProviderConfig != nil {
+		switch {
+		case c.ProviderConfig.AuthURL == "":
+			return fmt.Errorf("%s: missing AuthURL: %w", op, ErrInvalidParameter)
+		case c.ProviderConfig.JWKSURL == "":
+			return fmt.Errorf("%s: missing JWKSURL: %w", op, ErrInvalidParameter)
+		case c.ProviderConfig.TokenURL == "":
+			return fmt.Errorf("%s: missing TokenURL: %w", op, ErrInvalidParameter)
+		case c.ProviderConfig.UserInfoURL == "":
+			return fmt.Errorf("%s: missing UserInfoURL: %w", op, ErrInvalidParameter)
+		}
+	}
 	return nil
 }
 
@@ -263,10 +292,11 @@ func (c *Config) Now() time.Time {
 
 // configOptions is the set of available options
 type configOptions struct {
-	withScopes     []string
-	withAudiences  []string
-	withProviderCA string
-	withNowFunc    func() time.Time
+	withScopes         []string
+	withAudiences      []string
+	withProviderCA     string
+	withNowFunc        func() time.Time
+	withProviderConfig *ProviderConfig
 }
 
 // configDefaults is a handy way to get the defaults at runtime and
@@ -320,4 +350,34 @@ func EncodeCertificates(certs ...*x509.Certificate) (string, error) {
 		}
 	}
 	return buffer.String(), nil
+}
+
+// ProviderConfig supports creating a provider that doesn't support OIDC
+// discovery. It's probably better to use NewProvider(...) with discovery
+// whenever possible.
+type ProviderConfig struct {
+	// AuthURL is the provider's OAuth 2.0 authorization endpoint.
+	AuthURL string
+
+	// TokenURL is the provider's OAuth2.0 token endpoint.
+	TokenURL string
+	// UserInfoURL is the provider's OpenID UserInfo endpoint.
+	//
+	// See: https://openid.net/specs/openid-connect-core-1_0.html#UserInfo
+	UserInfoURL string
+
+	// JWKSURL is the provider's OpenID JWKS endpoint (where it publishes the
+	// pub keys.
+	JWKSURL string
+}
+
+// WithProviderConfig provides an optional ProviderConfig which supports
+// creating a provider that doesn't support OIDC discovery. It's probably better
+// to use NewProvider(...) with discovery whenever possible.
+func WithProviderConfig(cfg *ProviderConfig) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*configOptions); ok {
+			o.withProviderConfig = cfg
+		}
+	}
 }
