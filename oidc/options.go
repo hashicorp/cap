@@ -66,7 +66,7 @@ func WithScopes(scopes ...string) Option {
 
 // WithAudiences provides an optional list of audiences.
 //
-//Valid for: Config and Request
+// Valid for: Config and Request
 func WithAudiences(auds ...string) Option {
 	return func(o interface{}) {
 		if len(auds) == 0 {
