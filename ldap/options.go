@@ -5,14 +5,15 @@ package ldap
 type Option func(interface{})
 
 type configOptions struct {
-	withURLs          []string
-	withInsecureTLS   bool
-	withTLSMinVersion string
-	withTLSMaxVersion string
-	withCertificate   string
-	withClientTLSCert string
-	withClientTLSKey  string
-	withGroups        bool
+	withURLs           []string
+	withInsecureTLS    bool
+	withTLSMinVersion  string
+	withTLSMaxVersion  string
+	withCertificate    string
+	withClientTLSCert  string
+	withClientTLSKey   string
+	withGroups         bool
+	withUserAttributes bool
 }
 
 func configDefaults() configOptions {
@@ -54,6 +55,16 @@ func WithGroups() Option {
 		switch v := o.(type) {
 		case *configOptions:
 			v.withGroups = true
+		}
+	}
+}
+
+// WithUserAttributes requests that user attributes be included in the response.
+func WithUserAttributes() Option {
+	return func(o interface{}) {
+		switch v := o.(type) {
+		case *configOptions:
+			v.withUserAttributes = true
 		}
 	}
 }

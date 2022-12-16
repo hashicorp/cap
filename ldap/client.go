@@ -39,12 +39,12 @@ func fmtWarning(format string, a ...interface{}) Warning {
 
 // NewClient will create a new client from the configuration.  The following
 // defaults will be used if no config value is provided for them:
-// 	* URLs:			see constant DefaultURL
-//	* UserAttr: 		see constant DefaultUserAttr
-//	* GroupAttr: 		see constant DefaultGroupAttr
-//	* GroupFilter: 		see constant DefaultGroupFilter
-//	* TLSMinVersion: 	see constant DefaultTLSMinVersion
-// 	* TLSMaxVersion: 	see constant DefaultTLSMaxVersion
+//   - URLs:			see constant DefaultURL
+//   - UserAttr: 		see constant DefaultUserAttr
+//   - GroupAttr: 		see constant DefaultGroupAttr
+//   - GroupFilter: 		see constant DefaultGroupFilter
+//   - TLSMinVersion: 	see constant DefaultTLSMinVersion
+//   - TLSMaxVersion: 	see constant DefaultTLSMaxVersion
 func NewClient(ctx context.Context, conf *ClientConfig) (*Client, error) {
 	const op = "ldap.NewClient"
 	if conf == nil {
@@ -175,17 +175,28 @@ type AuthResult struct {
 	// user (optional, see WithGroups() option)
 	Groups []string
 
+	// UserAttributes that are associated with the authenticated user (optional,
+	// see WithUserAttributes() option)
+	UserAttributes []Attribute
+
 	// Warnings are warnings that happen during either authentication or when
 	// attempting to find the groups associated with the authenticated user (see
 	// the WithGroups option)
 	Warnings []Warning
 }
 
+type Attribute struct {
+	// Name is the name of the LDAP attribute
+	Name string
+	// Vals are the LDAP attribute values
+	Vals []string
+}
+
 // Authenticate the user using the client's configured directory service.  If
 // the WithGroups option is specified, it will also return the user's groups
 // from the directory.
 //
-// Supported options: WithGroups, WithDialer, WithURLs
+// Supported options: WithUserAttributes, WithGroups, WithDialer, WithURLs
 func (c *Client) Authenticate(ctx context.Context, username, password string, opt ...Option) (*AuthResult, error) {
 	const op = "ldap.(Client).Authenticate"
 	if username == "" {
@@ -214,7 +225,7 @@ func (c *Client) Authenticate(ctx context.Context, username, password string, op
 		return nil, fmt.Errorf("%s: unable to bind user: %w", op, err)
 	}
 	opts := getConfigOpts(opt...)
-	if !opts.withGroups {
+	if !opts.withGroups && !opts.withUserAttributes {
 		return &AuthResult{
 			Success: true,
 		}, nil
@@ -235,6 +246,20 @@ func (c *Client) Authenticate(ctx context.Context, username, password string, op
 		return nil, fmt.Errorf("%s: failed to get the DN for the authenticated user: %w", op, err)
 	}
 
+	var userAttrs []Attribute
+	if opts.withUserAttributes {
+		userAttrs, err = c.getUserAttributes(userDN)
+		if err != nil {
+			return nil, fmt.Errorf("%s: failed to get user attributes: %w", op, err)
+		}
+	}
+	if !opts.withGroups {
+		return &AuthResult{
+			Success:        true,
+			UserAttributes: userAttrs,
+		}, nil
+	}
+
 	if c.conf.AnonymousGroupSearch {
 		if err := c.conn.UnauthenticatedBind(userDN); err != nil {
 			return nil, fmt.Errorf("%s: group search anonymous bind failed: %w", op, err)
@@ -247,9 +272,10 @@ func (c *Client) Authenticate(ctx context.Context, username, password string, op
 	}
 
 	return &AuthResult{
-		Success:  true,
-		Groups:   ldapGroups,
-		Warnings: warnings,
+		Success:        true,
+		UserAttributes: userAttrs,
+		Groups:         ldapGroups,
+		Warnings:       warnings,
 	}, nil
 }
 
@@ -258,6 +284,35 @@ func (c *Client) Close(ctx context.Context) {
 	if c.conn != nil {
 		c.conn.Close()
 	}
+}
+
+func (c *Client) getUserAttributes(userDN string) ([]Attribute, error) {
+	const op = "ldap.(Client).getUserAttributes"
+	switch {
+	case userDN == "":
+		return nil, fmt.Errorf("%s: missing user dn: %w", op, ErrInvalidParameter)
+	}
+
+	result, err := c.conn.Search(&ldap.SearchRequest{
+		BaseDN: userDN,
+		Scope:  ldap.ScopeBaseObject,
+		Filter: "(objectClass=*)",
+	})
+	switch {
+	case err != nil:
+		return nil, fmt.Errorf("%s: LDAP search for user attributes failed: %w", op, err)
+	case len(result.Entries) != 1:
+		return nil, fmt.Errorf("%s: LDAP search for user attributes was 0 or not unique", op)
+	}
+	userEntry := result.Entries[0]
+	attributes := make([]Attribute, 0, len(userEntry.Attributes))
+	for _, a := range userEntry.Attributes {
+		attributes = append(attributes, Attribute{
+			Name: a.Name,
+			Vals: a.Values,
+		})
+	}
+	return attributes, nil
 }
 
 // getGroups queries LDAP and returns a slice describing the set of groups the
@@ -271,16 +326,18 @@ func (c *Client) Close(ctx context.Context) {
 // defined in c.conf.GroupAttr.
 //
 // c.conf.GroupFilter is a go template and is compiled with the following context: [UserDN, Username]
-//   UserDN - The DN of the authenticated user
-//   Username - The Username of the authenticated user
+//
+//	UserDN - The DN of the authenticated user
+//	Username - The Username of the authenticated user
 //
 // Example:
-//   c.conf.GroupFilter = "(&(objectClass=group)(member:1.2.840.113556.1.4.1941:={{.UserDN}}))"
-//   c.conf.GroupDN     = "OU=Groups,DC=myorg,DC=com"
-//   c.conf.GroupAttr   = "cn"
 //
-//  NOTE - If the config GroupFilter is empty, no query is performed and an
-//  empty result slice is returned.
+//	 c.conf.GroupFilter = "(&(objectClass=group)(member:1.2.840.113556.1.4.1941:={{.UserDN}}))"
+//	 c.conf.GroupDN     = "OU=Groups,DC=myorg,DC=com"
+//	 c.conf.GroupAttr   = "cn"
+//
+//	NOTE - If the config GroupFilter is empty, no query is performed and an
+//	empty result slice is returned.
 func (c *Client) getGroups(userDN string, username string) ([]string, []Warning, error) {
 	const op = "ldap.(Client).getLDAPGroups"
 	var warnings []Warning
