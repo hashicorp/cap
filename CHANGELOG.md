@@ -4,6 +4,8 @@ Canonical reference for changes, improvements, and bugfixes for cap.
 
 ## Next
 
+* Add `WithUserAttributes(...)` option to the ldap package that allows callers
+  to request that attributes be returned for the authenticating user ([PR](https://github.com/hashicorp/cap/pull/58))
 * Add `ProviderConfig` which creates a provider that doesn't support
   OIDC discovery. It's probably better to use NewProvider(...) with discovery
   whenever possible ([PR](https://github.com/hashicorp/cap/pull/57) and [issue](https://github.com/hashicorp/cap/issues/55)).
