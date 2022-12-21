@@ -44,6 +44,15 @@ func TestClient_Authenticate(t *testing.T) {
 			testdirectory.WithDefaults(t, &testdirectory.Defaults{UPNDomain: "example.com"}),
 			testdirectory.WithMembersOf(t, "admin"))...,
 	)
+	// add some attributes that we always want to filter out of an AuthResult,
+	// so if we ever start seeing tests fail because of them; we know that we've
+	// messed up the default filtering
+	for _, u := range users {
+		u.Attributes = append(u.Attributes,
+			gldap.NewEntryAttribute(ldap.DefaultADUserPasswordAttribute, []string{"password"}),
+			gldap.NewEntryAttribute(ldap.DefaultOpenLDAPUserPasswordAttribute, []string{"password"}),
+		)
+	}
 	td.SetUsers(users...)
 	td.SetGroups(groups...)
 	td.SetTokenGroups(tokenGroups)
@@ -54,7 +63,8 @@ func TestClient_Authenticate(t *testing.T) {
 		clientConfig       *ldap.ClientConfig
 		opts               []ldap.Option
 		wantGroups         []string
-		wantUserAttributes []ldap.Attribute
+		wantUserAttributes map[string][]string
+		wantUserDN         string
 		wantErr            bool
 		wantErrIs          error
 		wantErrContains    string
@@ -134,20 +144,54 @@ func TestClient_Authenticate(t *testing.T) {
 			username: "alice",
 			password: "password",
 			clientConfig: &ldap.ClientConfig{
-				URLs:        []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
-				Certificate: td.Cert(),
-				DiscoverDN:  true,
-				UserDN:      testdirectory.DefaultUserDN,
-				GroupDN:     testdirectory.DefaultGroupDN,
+				URLs:                   []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificate:            td.Cert(),
+				DiscoverDN:             true,
+				UserDN:                 testdirectory.DefaultUserDN,
+				GroupDN:                testdirectory.DefaultGroupDN,
+				ExcludedUserAttributes: []string{"password", "memberof"},
 			},
 			opts: []ldap.Option{ldap.WithUserAttributes()},
-			wantUserAttributes: []ldap.Attribute{
-				{Name: "email", Vals: []string{"alice@example.com"}},
-				{Name: "memberOf", Vals: []string{"admin"}},
-				{Name: "name", Vals: []string{"alice"}},
-				{Name: "password", Vals: []string{"password"}},
-				{Name: "tokenGroups", Vals: []string{"\x01\x00\x00\x00\x00\x00\x00\x01"}},
+			wantUserAttributes: map[string][]string{
+				"email":       {"alice@example.com"},
+				"name":        {"alice"},
+				"tokenGroups": {"\x01\x00\x00\x00\x00\x00\x00\x01"},
 			},
+			wantUserDN: "cn=alice,ou=people,dc=example,dc=org",
+		},
+		{
+			name:     "success-include-user-attributes",
+			username: "alice",
+			password: "password",
+			clientConfig: &ldap.ClientConfig{
+				URLs:                   []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificate:            td.Cert(),
+				DiscoverDN:             true,
+				UserDN:                 testdirectory.DefaultUserDN,
+				GroupDN:                testdirectory.DefaultGroupDN,
+				ExcludedUserAttributes: []string{"password", "memberof"},
+				IncludeUserAttributes:  true,
+			},
+			wantUserAttributes: map[string][]string{
+				"email":       {"alice@example.com"},
+				"name":        {"alice"},
+				"tokenGroups": {"\x01\x00\x00\x00\x00\x00\x00\x01"},
+			},
+			wantUserDN: "cn=alice,ou=people,dc=example,dc=org",
+		},
+		{
+			name:     "success-include-user-groups",
+			username: "alice",
+			password: "password",
+			clientConfig: &ldap.ClientConfig{
+				URLs:              []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificate:       td.Cert(),
+				DiscoverDN:        true,
+				UserDN:            testdirectory.DefaultUserDN,
+				GroupDN:           testdirectory.DefaultGroupDN,
+				IncludeUserGroups: true,
+			},
+			wantGroups: []string{groups[0].DN},
 		},
 		{
 			name:     "success-with-groups-and-user-attributes",
@@ -161,13 +205,14 @@ func TestClient_Authenticate(t *testing.T) {
 				GroupDN:     testdirectory.DefaultGroupDN,
 			},
 			opts: []ldap.Option{ldap.WithGroups(), ldap.WithUserAttributes()},
-			wantUserAttributes: []ldap.Attribute{
-				{Name: "email", Vals: []string{"alice@example.com"}},
-				{Name: "memberOf", Vals: []string{"admin"}},
-				{Name: "name", Vals: []string{"alice"}},
-				{Name: "password", Vals: []string{"password"}},
-				{Name: "tokenGroups", Vals: []string{"\x01\x00\x00\x00\x00\x00\x00\x01"}},
+			wantUserAttributes: map[string][]string{
+				"email":       {"alice@example.com"},
+				"memberOf":    {"admin"},
+				"name":        {"alice"},
+				"password":    {"password"},
+				"tokenGroups": {"\x01\x00\x00\x00\x00\x00\x00\x01"},
 			},
+			wantUserDN: "cn=alice,ou=people,dc=example,dc=org",
 			wantGroups: []string{groups[0].DN},
 		},
 		{
@@ -247,13 +292,14 @@ func TestClient_Authenticate(t *testing.T) {
 			},
 			opts:       []ldap.Option{ldap.WithGroups(), ldap.WithUserAttributes()},
 			wantGroups: []string{groups[0].DN},
-			wantUserAttributes: []ldap.Attribute{
-				{Name: "email", Vals: []string{"alice@example.com"}},
-				{Name: "memberOf", Vals: []string{"admin"}},
-				{Name: "name", Vals: []string{"alice"}},
-				{Name: "password", Vals: []string{"password"}},
-				{Name: "tokenGroups", Vals: []string{"\x01\x00\x00\x00\x00\x00\x00\x01"}},
+			wantUserAttributes: map[string][]string{
+				"email":       {"alice@example.com"},
+				"memberOf":    {"admin"},
+				"name":        {"alice"},
+				"password":    {"password"},
+				"tokenGroups": {"\x01\x00\x00\x00\x00\x00\x00\x01"},
 			},
+			wantUserDN: "cn=alice,ou=people,dc=example,dc=org",
 		},
 		{
 			name:     "failed-bind-aka-authentication",
@@ -311,6 +357,7 @@ func TestClient_Authenticate(t *testing.T) {
 			require.NoError(err)
 			require.NotNil(authResult)
 			assert.Equal(tc.wantUserAttributes, authResult.UserAttributes)
+			assert.Equal(tc.wantUserDN, authResult.UserDN)
 			assert.Equal(tc.wantGroups, authResult.Groups)
 		})
 	}

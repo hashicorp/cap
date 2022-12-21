@@ -59,7 +59,10 @@ func WithGroups() Option {
 	}
 }
 
-// WithUserAttributes requests that user attributes be included in the response.
+// WithUserAttributes requests that authenticating user's DN and attributes be
+// included in the response. Note: the default password attribute for both
+// openLDAP (userPassword) and AD (unicodePwd) will always be excluded.  To
+// exclude additional attributes see: Config.ExcludedUserAttributes.
 func WithUserAttributes() Option {
 	return func(o interface{}) {
 		switch v := o.(type) {

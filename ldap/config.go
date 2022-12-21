@@ -29,6 +29,14 @@ const (
 
 	// DefaultTLSMaxVersion for the ClientConfig.TLSMaxVersion
 	DefaultTLSMaxVersion = "tls12"
+
+	// DefaultOpenLDAPUserPasswordAttribute defines the attribute name for the
+	// openLDAP default password attribute which will always be excluded f
+	DefaultOpenLDAPUserPasswordAttribute = "userPassword"
+
+	// DefaultADUserPasswordAttribute defines the attribute name for the
+	// AD default password attribute
+	DefaultADUserPasswordAttribute = "unicodePwd"
 )
 
 type ClientConfig struct {
@@ -60,7 +68,7 @@ type ClientConfig struct {
 	GroupFilter string `json:"groupfilter"`
 
 	// GroupAttr is the attribute which identifies group members in entries
-	// returned from GroupFilter queries.  Examples: for groupfilter queries
+	// returned from GroupFilter queries.  Examples: for groupattr queries
 	// returning group objects, use: cn. For queries returning user objects,
 	// use: memberOf.
 	// Default: cn
@@ -140,6 +148,26 @@ type ClientConfig struct {
 	// RequestTimeout in seconds, for the connection when making requests
 	// against the server before returning back an error.
 	RequestTimeout int `json:"request_timeout"`
+
+	// IncludeUserAttributes optionally specifies that the authenticating user's
+	// DN and attributes be included an authentication AuthResult.
+	//
+	// Note: the default password attribute for both openLDAP (userPassword) and
+	// AD (unicodePwd) will always be excluded.
+	IncludeUserAttributes bool
+
+	// ExcludedUserAttributes optionally defines a set of user attributes to be
+	// excluded when an authenticating user's attributes are included in an
+	// AuthResult (see: Config.IncludeUserAttributes or the WithUserAttributes()
+	// option).
+	//
+	// Note: the default password attribute for both openLDAP (userPassword) and
+	// AD (unicodePwd) will always be excluded.
+	ExcludedUserAttributes []string
+
+	// IncludeUserGroups optionally specifies that the authenticating user's
+	// group membership be included an authentication AuthResult.
+	IncludeUserGroups bool
 
 	// DeprecatedVaultPre111GroupCNBehavior: if true, group searching reverts to
 	// the pre 1.1.1 Vault behavior.

@@ -102,10 +102,26 @@ information on UPN can be found
   `[username]@UPNDomain`.  Example: `example.com`, which will result in binding as `username@example.com`.
 
 
-## Group Membership Resolution
+### Group Membership Resolution
 Once a user has been authenticated, the LDAP auth method must know how to resolve which groups the user is a member of. The configuration for this can vary depending on your LDAP server and your directory schema. There are two main strategies when resolving group membership - the first is searching for the authenticated user object and following an attribute to groups it is a member of. The second is to search for group objects of which the authenticated user is a member of. Both methods are supported.
 
 * `GroupFilter` (string, optional) - Go template used when constructing the group membership query. The template can access the following context variables: [UserDN, Username]. The default is `(|(memberUid={{.Username}})(member={{.UserDN}})(uniqueMember={{.UserDN}}))`, which is compatible with several common directory schemas. To support nested group resolution for Active Directory, instead use the following query: `(&(objectClass=group)(member:1.2.840.113556.1.4.1941:={{.UserDN}}))`.
 * `GroupDN` (string, required) - LDAP search base to use for group membership search. This can be the root containing either groups or users. Example: `ou=Groups,dc=example,dc=com`
 * `GroupAttr` (string, optional) - LDAP attribute to follow on objects returned by GroupFilter in order to enumerate user group membership. Examples: for GroupFilter queries returning group objects, use: `cn`. For queries returning user objects, use: `memberOf`. The default is `cn`.
-Note: When using Authenticated Search for binding parameters (see above) the distinguished name defined for `BindDN` is used for the group search. Otherwise, the authenticating user is used to perform the group search.
+Note: When using Authenticated Search for binding parameters (see above) the
+distinguished name defined for `BindDN` is used for the group search. Otherwise,
+the authenticating user is used to perform the group search.
+
+### User Attributes
+Using configuration you can choose to optionally include an authenticated
+user's DN and entry attributes in the results of an authentication request.  
+
+* `IncludeUserAttributes` (bool, optional) - If true, specifies that the
+  authenticating user's DN and attributes be included an authentication
+  AuthResult. Note: the default  password attribute for both openLDAP
+  (userPassword) and AD (unicodePwd) will always be excluded.
+
+* `ExcludeUserAttributes` ([]string, optional) - If specified, optionally
+  defines a set of user attributes to be excluded when an authenticating user's
+  attributes are included in an AuthResult.Note: the default password attribute
+  for both openLDAP (userPassword) and AD (unicodePwd) will always be excluded.

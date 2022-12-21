@@ -16,6 +16,7 @@ import (
 
 	"github.com/go-ldap/ldap/v3"
 	"github.com/hashicorp/go-multierror"
+	"github.com/hashicorp/go-secure-stdlib/strutil"
 	"github.com/hashicorp/go-secure-stdlib/tlsutil"
 )
 
@@ -42,7 +43,7 @@ func fmtWarning(format string, a ...interface{}) Warning {
 //   - URLs:			see constant DefaultURL
 //   - UserAttr: 		see constant DefaultUserAttr
 //   - GroupAttr: 		see constant DefaultGroupAttr
-//   - GroupFilter: 		see constant DefaultGroupFilter
+//   - GroupFilter: 	see constant DefaultGroupFilter
 //   - TLSMinVersion: 	see constant DefaultTLSMinVersion
 //   - TLSMaxVersion: 	see constant DefaultTLSMaxVersion
 func NewClient(ctx context.Context, conf *ClientConfig) (*Client, error) {
@@ -175,9 +176,15 @@ type AuthResult struct {
 	// user (optional, see WithGroups() option)
 	Groups []string
 
-	// UserAttributes that are associated with the authenticated user (optional,
-	// see WithUserAttributes() option)
-	UserAttributes []Attribute
+	// UserDN of the authenticated user (optional see WithUserAttributes()
+	// option along with IncludeUserAttributes and ExcludedUserAttributes config
+	// fields).
+	UserDN string
+
+	// UserAttributes that are associated with the authenticated user (optional
+	// see WithUserAttributes() option along with IncludeUserAttributes and
+	// ExcludedUserAttributes config fields)
+	UserAttributes map[string][]string
 
 	// Warnings are warnings that happen during either authentication or when
 	// attempting to find the groups associated with the authenticated user (see
@@ -225,7 +232,8 @@ func (c *Client) Authenticate(ctx context.Context, username, password string, op
 		return nil, fmt.Errorf("%s: unable to bind user: %w", op, err)
 	}
 	opts := getConfigOpts(opt...)
-	if !opts.withGroups && !opts.withUserAttributes {
+	if !opts.withGroups && !c.conf.IncludeUserGroups &&
+		!opts.withUserAttributes && !c.conf.IncludeUserAttributes {
 		return &AuthResult{
 			Success: true,
 		}, nil
@@ -246,16 +254,20 @@ func (c *Client) Authenticate(ctx context.Context, username, password string, op
 		return nil, fmt.Errorf("%s: failed to get the DN for the authenticated user: %w", op, err)
 	}
 
-	var userAttrs []Attribute
-	if opts.withUserAttributes {
-		userAttrs, err = c.getUserAttributes(userDN)
+	userAttrs := map[string][]string{}
+	if c.conf.IncludeUserAttributes || opts.withUserAttributes {
+		attrs, err := c.getUserAttributes(userDN)
 		if err != nil {
 			return nil, fmt.Errorf("%s: failed to get user attributes: %w", op, err)
 		}
+		for _, a := range attrs {
+			userAttrs[a.Name] = a.Vals
+		}
 	}
-	if !opts.withGroups {
+	if !opts.withGroups && !c.conf.IncludeUserGroups {
 		return &AuthResult{
 			Success:        true,
+			UserDN:         userDN,
 			UserAttributes: userAttrs,
 		}, nil
 	}
@@ -271,12 +283,22 @@ func (c *Client) Authenticate(ctx context.Context, username, password string, op
 		return nil, fmt.Errorf("%s: unable to get user groups: %w", op, err)
 	}
 
-	return &AuthResult{
-		Success:        true,
-		UserAttributes: userAttrs,
-		Groups:         ldapGroups,
-		Warnings:       warnings,
-	}, nil
+	switch {
+	case c.conf.IncludeUserAttributes || opts.withUserAttributes:
+		return &AuthResult{
+			Success:        true,
+			UserDN:         userDN,
+			UserAttributes: userAttrs,
+			Groups:         ldapGroups,
+			Warnings:       warnings,
+		}, nil
+	default:
+		return &AuthResult{
+			Success:  true,
+			Groups:   ldapGroups,
+			Warnings: warnings,
+		}, nil
+	}
 }
 
 // Close will close the client's connection to the directory service.
@@ -307,10 +329,19 @@ func (c *Client) getUserAttributes(userDN string) ([]Attribute, error) {
 	userEntry := result.Entries[0]
 	attributes := make([]Attribute, 0, len(userEntry.Attributes))
 	for _, a := range userEntry.Attributes {
-		attributes = append(attributes, Attribute{
-			Name: a.Name,
-			Vals: a.Values,
-		})
+		switch {
+		// exclude the default openLDAP password attribute
+		case strings.EqualFold(a.Name, DefaultOpenLDAPUserPasswordAttribute):
+		// exclude the default AD password attribute
+		case strings.EqualFold(a.Name, DefaultADUserPasswordAttribute):
+		// filter out excluded attributes
+		case strutil.StrListContainsCaseInsensitive(c.conf.ExcludedUserAttributes, a.Name):
+		default:
+			attributes = append(attributes, Attribute{
+				Name: a.Name,
+				Vals: a.Values,
+			})
+		}
 	}
 	return attributes, nil
 }
