@@ -9,7 +9,7 @@ type configOptions struct {
 	withInsecureTLS    bool
 	withTLSMinVersion  string
 	withTLSMaxVersion  string
-	withCertificate    string
+	withCertificates   []string
 	withClientTLSCert  string
 	withClientTLSKey   string
 	withGroups         bool
@@ -99,11 +99,11 @@ func withInsecureTLS(withInsecure bool) Option {
 	}
 }
 
-func withCertificate(cert string) Option {
+func withCertificates(cert ...string) Option {
 	return func(o interface{}) {
 		switch v := o.(type) {
 		case *configOptions:
-			v.withCertificate = cert
+			v.withCertificates = cert
 		}
 	}
 }

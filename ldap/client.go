@@ -124,7 +124,7 @@ func (c *Client) connect(ctx context.Context, opt ...Option) error {
 					withInsecureTLS(c.conf.InsecureTLS),
 					withTLSMinVersion(c.conf.TLSMinVersion),
 					withTLSMaxVersion(c.conf.TLSMaxVersion),
-					withCertificate(c.conf.Certificate),
+					withCertificates(c.conf.Certificates...),
 					withClientTLSCert(c.conf.ClientTLSCert),
 					withClientTLSKey(c.conf.ClientTLSKey),
 				)
@@ -139,7 +139,7 @@ func (c *Client) connect(ctx context.Context, opt ...Option) error {
 				withInsecureTLS(c.conf.InsecureTLS),
 				withTLSMinVersion(c.conf.TLSMinVersion),
 				withTLSMaxVersion(c.conf.TLSMaxVersion),
-				withCertificate(c.conf.Certificate),
+				withCertificates(c.conf.Certificates...),
 				withClientTLSCert(c.conf.ClientTLSCert),
 				withClientTLSKey(c.conf.ClientTLSKey),
 			)
@@ -777,11 +777,13 @@ func getTLSConfig(host string, opt ...Option) (*tls.Config, error) {
 	if opts.withInsecureTLS {
 		tlsConfig.InsecureSkipVerify = true
 	}
-	if opts.withCertificate != "" {
+	if opts.withCertificates != nil {
 		caPool := x509.NewCertPool()
-		ok := caPool.AppendCertsFromPEM([]byte(opts.withCertificate))
-		if !ok {
-			return nil, fmt.Errorf("%s: could not append CA certificate: %w", op, ErrUnknown)
+		for _, c := range opts.withCertificates {
+			ok := caPool.AppendCertsFromPEM([]byte(c))
+			if !ok {
+				return nil, fmt.Errorf("%s: could not append CA certificate: %w", op, ErrUnknown)
+			}
 		}
 		tlsConfig.RootCAs = caPool
 	}
