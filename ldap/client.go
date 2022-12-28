@@ -370,7 +370,7 @@ func (c *Client) getUserAttributes(userDN string) ([]Attribute, error) {
 //	NOTE - If the config GroupFilter is empty, no query is performed and an
 //	empty result slice is returned.
 func (c *Client) getGroups(userDN string, username string) ([]string, []Warning, error) {
-	const op = "ldap.(Client).getLDAPGroups"
+	const op = "ldap.(Client).getGroups"
 	var warnings []Warning
 	if userDN == "" {
 		return nil, warnings, fmt.Errorf("%s: missing user dn: %w", op, ErrInvalidParameter)
@@ -524,7 +524,13 @@ func (c *Client) filterGroupsSearch(userDN string, username string) ([]*ldap.Ent
 		SizeLimit: math.MaxInt32,
 	})
 	if err != nil {
-		return nil, warnings, fmt.Errorf("%s: LDAP search failed: %w", op, err)
+		switch {
+		case ldap.IsErrorWithCode(err, ldap.LDAPResultNoSuchObject):
+			warnings = append(warnings, Warning(err.Error()))
+			return []*ldap.Entry{}, warnings, nil
+		default:
+			return nil, warnings, fmt.Errorf("%s: LDAP search failed: %w", op, err)
+		}
 	}
 
 	return result.Entries, warnings, nil

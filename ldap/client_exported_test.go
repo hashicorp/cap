@@ -194,6 +194,20 @@ func TestClient_Authenticate(t *testing.T) {
 			wantGroups: []string{groups[0].DN},
 		},
 		{
+			name:     "success-include-user-groups-but-no-groups",
+			username: "bob",
+			password: "password",
+			clientConfig: &ldap.ClientConfig{
+				URLs:              []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates:      []string{td.Cert()},
+				DiscoverDN:        true,
+				UserDN:            testdirectory.DefaultUserDN,
+				GroupDN:           testdirectory.DefaultGroupDN,
+				IncludeUserGroups: true,
+			},
+			wantGroups: []string{},
+		},
+		{
 			name:     "success-with-groups-and-user-attributes",
 			username: "alice",
 			password: "password",
