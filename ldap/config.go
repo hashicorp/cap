@@ -31,11 +31,11 @@ const (
 	DefaultTLSMaxVersion = "tls12"
 
 	// DefaultOpenLDAPUserPasswordAttribute defines the attribute name for the
-	// openLDAP default password attribute which will always be excluded f
+	// openLDAP default password attribute which will always be excluded
 	DefaultOpenLDAPUserPasswordAttribute = "userPassword"
 
 	// DefaultADUserPasswordAttribute defines the attribute name for the
-	// AD default password attribute
+	// AD default password attribute which will always be excluded
 	DefaultADUserPasswordAttribute = "unicodePwd"
 )
 

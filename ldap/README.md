@@ -118,7 +118,7 @@ user's DN and entry attributes in the results of an authentication request.
 
 * `IncludeUserAttributes` (bool, optional) - If true, specifies that the
   authenticating user's DN and attributes be included an authentication
-  AuthResult. Note: the default  password attribute for both openLDAP
+  AuthResult. Note: the default password attribute for both openLDAP
   (userPassword) and AD (unicodePwd) will always be excluded.
 
 * `ExcludeUserAttributes` ([]string, optional) - If specified, optionally
