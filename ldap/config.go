@@ -29,6 +29,14 @@ const (
 
 	// DefaultTLSMaxVersion for the ClientConfig.TLSMaxVersion
 	DefaultTLSMaxVersion = "tls12"
+
+	// DefaultOpenLDAPUserPasswordAttribute defines the attribute name for the
+	// openLDAP default password attribute which will always be excluded
+	DefaultOpenLDAPUserPasswordAttribute = "userPassword"
+
+	// DefaultADUserPasswordAttribute defines the attribute name for the
+	// AD default password attribute which will always be excluded
+	DefaultADUserPasswordAttribute = "unicodePwd"
 )
 
 type ClientConfig struct {
@@ -60,7 +68,7 @@ type ClientConfig struct {
 	GroupFilter string `json:"groupfilter"`
 
 	// GroupAttr is the attribute which identifies group members in entries
-	// returned from GroupFilter queries.  Examples: for groupfilter queries
+	// returned from GroupFilter queries.  Examples: for groupattr queries
 	// returning group objects, use: cn. For queries returning user objects,
 	// use: memberOf.
 	// Default: cn
@@ -85,9 +93,9 @@ type ClientConfig struct {
 	// either the cn in ActiveDirectory or uid in openLDAP  (default: cn)
 	UserAttr string `json:"userattr"`
 
-	// Certificate to use verify the identity of the directory service and is a
-	// PEM encoded x509 (optional)
-	Certificate string `json:"certificate"`
+	// Certificates to use verify the identity of the directory service and is a
+	// set of PEM encoded x509 (optional)
+	Certificates []string `json:"certificates"`
 
 	// ClientTLSCert is the client certificate used with the ClientTLSKey to
 	// authenticate the client to the directory service.  It must be PEM encoded
@@ -141,6 +149,26 @@ type ClientConfig struct {
 	// against the server before returning back an error.
 	RequestTimeout int `json:"request_timeout"`
 
+	// IncludeUserAttributes optionally specifies that the authenticating user's
+	// DN and attributes be included an authentication AuthResult.
+	//
+	// Note: the default password attribute for both openLDAP (userPassword) and
+	// AD (unicodePwd) will always be excluded.
+	IncludeUserAttributes bool
+
+	// ExcludedUserAttributes optionally defines a set of user attributes to be
+	// excluded when an authenticating user's attributes are included in an
+	// AuthResult (see: Config.IncludeUserAttributes or the WithUserAttributes()
+	// option).
+	//
+	// Note: the default password attribute for both openLDAP (userPassword) and
+	// AD (unicodePwd) will always be excluded.
+	ExcludedUserAttributes []string
+
+	// IncludeUserGroups optionally specifies that the authenticating user's
+	// group membership be included an authentication AuthResult.
+	IncludeUserGroups bool
+
 	// DeprecatedVaultPre111GroupCNBehavior: if true, group searching reverts to
 	// the pre 1.1.1 Vault behavior.
 	// see: https://www.vaultproject.io/docs/upgrading/upgrade-to-1.1.1
@@ -168,9 +196,11 @@ func (c *ClientConfig) validate() error {
 	if tlsMaxVersion < tlsMinVersion {
 		return fmt.Errorf("%s: 'tls_max_version' must be greater than or equal to 'tls_min_version': %w", op, ErrInvalidParameter)
 	}
-	if c.Certificate != "" {
-		if err := validateCertificate([]byte(c.Certificate)); err != nil {
-			return fmt.Errorf("%s: failed to parse server tls cert: %w", op, err)
+	if c.Certificates != nil {
+		for _, cert := range c.Certificates {
+			if err := validateCertificate([]byte(cert)); err != nil {
+				return fmt.Errorf("%s: failed to parse server tls cert: %w", op, err)
+			}
 		}
 	}
 	if (c.ClientTLSCert != "" && c.ClientTLSKey == "") ||

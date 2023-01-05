@@ -83,7 +83,7 @@ func TestClient_NewClient(t *testing.T) {
 		{
 			name: "invalid-cert",
 			conf: &ClientConfig{
-				Certificate: "invalid-cert",
+				Certificates: []string{"invalid-cert"},
 			},
 			wantErr:         true,
 			wantErrIs:       ErrInvalidParameter,
@@ -104,7 +104,7 @@ func TestClient_NewClient(t *testing.T) {
 				URLs:          []string{"localhost"},
 				TLSMinVersion: "tls12",
 				TLSMaxVersion: "tls13",
-				Certificate:   td.Cert(),
+				Certificates:  []string{td.Cert()},
 				ClientTLSKey:  td.ClientKey(),
 				ClientTLSCert: td.ClientCert(),
 			},
@@ -210,14 +210,14 @@ func TestClient_connect(t *testing.T) {
 		{
 			name: "tls",
 			conf: &ClientConfig{
-				Certificate: tdTLS.Cert(),
-				URLs:        []string{fmt.Sprintf("ldaps://localhost:%d", tdTLS.Port())},
+				Certificates: []string{tdTLS.Cert()},
+				URLs:         []string{fmt.Sprintf("ldaps://localhost:%d", tdTLS.Port())},
 			},
 		},
 		{
 			name: "tls-with-all-opts",
 			conf: &ClientConfig{
-				Certificate:    tdTLS.Cert(),
+				Certificates:   []string{tdTLS.Cert()},
 				URLs:           []string{fmt.Sprintf("ldaps://localhost:%d", tdTLS.Port())},
 				RequestTimeout: 2,
 			},
@@ -228,16 +228,16 @@ func TestClient_connect(t *testing.T) {
 		{
 			name: "non-tls",
 			conf: &ClientConfig{
-				Certificate: tdTLS.Cert(),
-				URLs:        []string{fmt.Sprintf("ldap://localhost:%d", tdNonTLS.Port())},
+				Certificates: []string{tdTLS.Cert()},
+				URLs:         []string{fmt.Sprintf("ldap://localhost:%d", tdNonTLS.Port())},
 			},
 		},
 		{
 			name: "start-tls",
 			conf: &ClientConfig{
-				Certificate: tdNonTLS.Cert(),
-				URLs:        []string{fmt.Sprintf("ldap://localhost:%d", tdNonTLS.Port())},
-				StartTLS:    true,
+				Certificates: []string{tdNonTLS.Cert()},
+				URLs:         []string{fmt.Sprintf("ldap://localhost:%d", tdNonTLS.Port())},
+				StartTLS:     true,
 			},
 		},
 	}

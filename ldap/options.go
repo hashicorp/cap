@@ -9,7 +9,7 @@ type configOptions struct {
 	withInsecureTLS    bool
 	withTLSMinVersion  string
 	withTLSMaxVersion  string
-	withCertificate    string
+	withCertificates   []string
 	withClientTLSCert  string
 	withClientTLSKey   string
 	withGroups         bool
@@ -59,7 +59,10 @@ func WithGroups() Option {
 	}
 }
 
-// WithUserAttributes requests that user attributes be included in the response.
+// WithUserAttributes requests that authenticating user's DN and attributes be
+// included in the response. Note: the default password attribute for both
+// openLDAP (userPassword) and AD (unicodePwd) will always be excluded.  To
+// exclude additional attributes see: Config.ExcludedUserAttributes.
 func WithUserAttributes() Option {
 	return func(o interface{}) {
 		switch v := o.(type) {
@@ -96,11 +99,11 @@ func withInsecureTLS(withInsecure bool) Option {
 	}
 }
 
-func withCertificate(cert string) Option {
+func withCertificates(cert ...string) Option {
 	return func(o interface{}) {
 		switch v := o.(type) {
 		case *configOptions:
-			v.withCertificate = cert
+			v.withCertificates = cert
 		}
 	}
 }
