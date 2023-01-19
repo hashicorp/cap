@@ -322,7 +322,7 @@ func (c *Client) getUserAttributes(userDN string) ([]Attribute, error) {
 	})
 	switch {
 	case err != nil:
-		return nil, fmt.Errorf("%s: LDAP search for user attributes failed: %w", op, err)
+		return nil, fmt.Errorf("%s: LDAP search for user attributes failed (baseDN: %q / filter: %q): %w", op, userDN, "(objectClass=*)", err)
 	case len(result.Entries) != 1:
 		return nil, fmt.Errorf("%s: LDAP search for user attributes was 0 or not unique", op)
 	}
@@ -436,7 +436,7 @@ func (c *Client) tokenGroupsSearch(userDN string) ([]*ldap.Entry, []Warning, err
 		SizeLimit: 1,
 	})
 	if err != nil {
-		return nil, warnings, fmt.Errorf("%s: search failed: %w", op, err)
+		return nil, warnings, fmt.Errorf("%s: search failed (baseDN: %q / filter: %q): %w", op, userDN, "(objectClass=*)", err)
 	}
 	if len(result.Entries) == 0 {
 		warnings = append(warnings, fmtWarning("%s: unable to read object for group attributes: userdn %s and groupattr %s", op, userDN, c.conf.GroupAttr))
@@ -464,11 +464,11 @@ func (c *Client) tokenGroupsSearch(userDN string) ([]*ldap.Entry, []Warning, err
 			SizeLimit: 1,
 		})
 		if err != nil {
-			warnings = append(warnings, fmtWarning("%s: unable to read the group sid: %s", op, sidString))
+			warnings = append(warnings, fmtWarning("%s: unable to read the group sid (baseDN: %q / filter: %q): %s", op, fmt.Sprintf("<SID=%s>", sidString), "(objectClass=*)", sidString))
 			continue
 		}
 		if len(groupResult.Entries) == 0 {
-			warnings = append(warnings, fmtWarning("%s: unable to find the group sid: %s", op, sidString))
+			warnings = append(warnings, fmtWarning("%s: unable to find the group sid (baseDN: %q / filter: %q): %s", op, fmt.Sprintf("<SID=%s>", sidString), "(objectClass=*)", sidString))
 			continue
 		}
 
@@ -529,7 +529,7 @@ func (c *Client) filterGroupsSearch(userDN string, username string) ([]*ldap.Ent
 			warnings = append(warnings, Warning(err.Error()))
 			return []*ldap.Entry{}, warnings, nil
 		default:
-			return nil, warnings, fmt.Errorf("%s: LDAP search failed: %w", op, err)
+			return nil, warnings, fmt.Errorf("%s: LDAP search failed (baseDN: %q / filter: %q): %w", op, c.conf.GroupDN, renderedQuery.String(), err)
 		}
 	}
 
@@ -626,7 +626,7 @@ func (c *Client) getUserBindDN(username string) (string, error) {
 			SizeLimit: math.MaxInt32,
 		})
 		if err != nil {
-			return "", fmt.Errorf("%s: LDAP search for binddn failed: %w", op, err)
+			return "", fmt.Errorf("%s: LDAP search for binddn failed using (baseDN: %q / filter: %q): %w", op, c.conf.UserDN, filter, err)
 		}
 		if len(result.Entries) != 1 {
 			return "", fmt.Errorf("LDAP search for binddn 0 or not unique")
@@ -664,7 +664,7 @@ func (c *Client) getUserDN(bindDN, username string) (string, error) {
 			SizeLimit: math.MaxInt32,
 		})
 		if err != nil {
-			return userDN, fmt.Errorf("%s: LDAP search failed for detecting user: %w", op, err)
+			return userDN, fmt.Errorf("%s: LDAP search failed for detecting user (baseDN: %q / filter: %q): %w", op, c.conf.UserDN, filter, err)
 		}
 		for _, e := range result.Entries {
 			userDN = e.DN
