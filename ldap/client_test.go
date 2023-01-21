@@ -199,6 +199,26 @@ func TestClient_connect(t *testing.T) {
 			wantErrContains: "invalid LDAP scheme in url",
 		},
 		{
+			name: "error-ldap-timeout",
+			conf: &ClientConfig{
+				RequestTimeout: 1,
+				// invalid-port on ldap (non-tls) scheme
+				URLs: []string{fmt.Sprintf("ldap://ldap.forumsys.com:%d", freePort(t))},
+			},
+			wantErr:         true,
+			wantErrContains: "i/o timeout",
+		},
+		{
+			name: "error-ldaps-timeout",
+			conf: &ClientConfig{
+				// invalid-port on ldaps (tls) scheme
+				RequestTimeout: 1,
+				URLs:           []string{fmt.Sprintf("ldaps://ldap.forumsys.com:%d", freePort(t))},
+			},
+			wantErr:         true,
+			wantErrContains: "i/o timeout",
+		},
+		{
 			name: "error-connecting",
 			conf: &ClientConfig{
 				// leading space
@@ -361,4 +381,16 @@ MIICUTCCAfugAwIBAgIBADANBgkqhkiG9w0BAQQFADBXMQswCQYDVQQGEwJDTjEL
 			require.NoError(err)
 		})
 	}
+}
+
+func freePort(t *testing.T) int {
+	t.Helper()
+	require := require.New(t)
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	require.NoError(err)
+
+	l, err := net.ListenTCP("tcp", addr)
+	require.NoError(err)
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port
 }

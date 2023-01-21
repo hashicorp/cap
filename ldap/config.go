@@ -10,6 +10,10 @@ import (
 )
 
 const (
+	// DefaultTimeout is the timeout value used for both dialing and requests to
+	// the LDAP server
+	DefaultTimeout = 60
+
 	// DefaultURL for the ClientConfig.URLs
 	DefaultURL = "ldaps://127.0.0.1:686"
 
@@ -145,8 +149,10 @@ type ClientConfig struct {
 	// security groups including nested ones.",
 	UseTokenGroups bool `json:"use_token_groups"`
 
-	// RequestTimeout in seconds, for the connection when making requests
-	// against the server before returning back an error.
+	// RequestTimeout in seconds is used when dialing to establish the
+	// connection and when making requests against the server via a connection
+	// before returning back an error. If not set, then the DefaultTimeout is
+	// used.
 	RequestTimeout int `json:"request_timeout"`
 
 	// IncludeUserAttributes optionally specifies that the authenticating user's
