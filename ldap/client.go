@@ -110,7 +110,7 @@ func (c *Client) connect(ctx context.Context, opt ...Option) error {
 		var tlsConfig *tls.Config
 		switch u.Scheme {
 		case schemeLDAP:
-			conn, err = ldap.DialURL(uut)
+			conn, err = ldap.DialURL(uut, ldap.DialWithDialer(&net.Dialer{Timeout: c.getTimeout()}))
 			if err != nil {
 				break
 			}
@@ -146,7 +146,7 @@ func (c *Client) connect(ctx context.Context, opt ...Option) error {
 			if err != nil {
 				break
 			}
-			conn, err = ldap.DialURL(uut, ldap.DialWithTLSConfig(tlsConfig))
+			conn, err = ldap.DialURL(uut, ldap.DialWithTLSDialer(tlsConfig, &net.Dialer{Timeout: c.getTimeout()}))
 		default:
 			retErr = multierror.Append(retErr, fmt.Errorf("%s: invalid LDAP scheme in url %q: %w", op, uut, ErrInvalidParameter))
 			continue
@@ -160,11 +160,18 @@ func (c *Client) connect(ctx context.Context, opt ...Option) error {
 	if retErr != nil {
 		return retErr
 	}
-	if timeout := c.conf.RequestTimeout; timeout > 0 {
-		conn.SetTimeout(time.Duration(timeout) * time.Second)
-	}
+	conn.SetTimeout(c.getTimeout())
 	c.conn = conn
 	return nil
+}
+
+func (c *Client) getTimeout() time.Duration {
+	switch c.conf.RequestTimeout {
+	case 0:
+		return DefaultTimeout * time.Second
+	default:
+		return time.Duration(c.conf.RequestTimeout) * time.Second
+	}
 }
 
 // AuthResult is the result from a user authentication request via Client.Authenticate(...)
