@@ -296,9 +296,8 @@ func TestClient_connect(t *testing.T) {
 			Name:  "test-logger",
 			Level: hclog.Error,
 		})
-		ln, err := net.Listen("tcp", ":"+"389")
-		ln.Close()
-		if err == nil {
+		if ln, err := net.Listen("tcp", ":"+"389"); err == nil {
+			ln.Close()
 			_ = testdirectory.Start(t, testdirectory.WithNoTLS(t), testdirectory.WithLogger(t, logger), testdirectory.WithPort(t, 389))
 			c, err := NewClient(testCtx, &ClientConfig{
 				URLs: []string{"ldap://127.0.0.1"},
@@ -307,6 +306,8 @@ func TestClient_connect(t *testing.T) {
 			err = c.connect(testCtx)
 			defer func() { c.Close(testCtx) }()
 			assert.NoError(err)
+		} else {
+			t.Logf("warning: failed to listen on port 389, err=%s", err)
 		}
 	})
 }
