@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package oidc
 
 // Prompt is a string values that specifies whether the Authorization Server
