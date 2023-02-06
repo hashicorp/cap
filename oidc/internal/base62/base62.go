@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 // Package base62 provides utilities for working with base62 strings.
 // base62 strings will only contain characters: 0-9, a-z, A-Z
 package base62

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 /*
 oidc is a package for writing clients that integrate with OIDC Providers using
 OIDC flows.
