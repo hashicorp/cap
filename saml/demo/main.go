@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/xml"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -22,24 +21,13 @@ func main() {
 	sp, err := saml.NewServiceProvider(cfg)
 	exitOnError(err)
 
-	http.HandleFunc("/saml/acs", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("SAML Response received")
-	})
-
+	http.HandleFunc("/saml/acs", handler.ACSHandlerFunc(sp))
 	http.HandleFunc("/saml/auth", handler.RequestHandler(sp))
-
-	http.HandleFunc("/metadata", func(w http.ResponseWriter, r *http.Request) {
-		meta := sp.CreateSPMetadata()
-		xml.NewEncoder(w).Encode(meta)
-	})
-
+	http.HandleFunc("/metadata", handler.MetadaHandlerFunc(sp))
 	http.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
-		ts, err := template.New("sso").Parse(
+		ts, _ := template.New("sso").Parse(
 			`<html><form method="GET" action="/saml/auth"><button type="submit">Submit</button></form></html>`,
 		)
-		if err != nil {
-			panic(err)
-		}
 
 		ts.Execute(w, nil)
 	})
