@@ -1,12 +1,17 @@
 package saml
 
 import (
+	"crypto/rsa"
+	"crypto/tls"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/hashicorp/cap/oidc"
 	"github.com/hashicorp/cap/saml/models/core"
 )
+
+var ErrInvalidTLSCert = errors.New("invalid tls certificate")
 
 type ValidUntilFunc func() time.Time
 
@@ -45,6 +50,9 @@ type Config struct {
 	// ValidUntil is a function that defines until the generate service provider metadata
 	// document is valid.
 	ValidUntil ValidUntilFunc
+
+	// Certificate is used to sign SAML Authentication Requests.
+	Certificate *tls.Certificate
 
 	// IDP is an optional field that defines IDP specific configurations that are usually
 	// consumed from the metadata doc. If set, the configuration will not be fetched from
@@ -95,6 +103,26 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("%s: IDP config provided but no SSO service URL not set: %w",
 				op, oidc.ErrInvalidParameter)
 		}
+	}
+
+	if c.Certificate != nil {
+		err := c.ValidateTLSCertificate()
+		return fmt.Errorf("%s: failed to validate tls certificate: %w", op, err)
+	}
+
+	return nil
+}
+
+func (c *Config) ValidateTLSCertificate() error {
+	const op = "saml.Config.ValidateTLSCertificate"
+
+	_, ok := c.Certificate.PrivateKey.(*rsa.PrivateKey)
+	if !ok {
+		return fmt.Errorf("%s: no RSA key: %w", op, ErrInvalidTLSCert)
+	}
+
+	if len(c.Certificate.Certificate) == 0 {
+		return fmt.Errorf("%s: no certificate provided: %w", op, ErrInvalidTLSCert)
 	}
 
 	return nil

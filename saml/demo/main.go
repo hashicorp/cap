@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -11,6 +12,11 @@ import (
 )
 
 func main() {
+	envs := map[string]string{
+		"certFile": os.Getenv("SAML_CERT_FILE"),
+		"keyFile":  os.Getenv("SAML_KEY_FILE"),
+	}
+
 	cfg := saml.NewConfig(
 		"http://saml.julz/example",
 		"http://localhost:8000/saml/acs",
@@ -18,12 +24,20 @@ func main() {
 		"https://samltest.id/saml/idp",
 	)
 
+	if envs["certFile"] != "" && envs["keyFile"] != "" {
+		cert, err := tls.LoadX509KeyPair(envs["certFile"], envs["keyFile"])
+		exitOnError(err)
+
+		cfg.Certificate = &cert
+	}
+
 	sp, err := saml.NewServiceProvider(cfg)
 	exitOnError(err)
 
 	http.HandleFunc("/saml/acs", handler.ACSHandlerFunc(sp))
 	http.HandleFunc("/saml/auth", handler.RequestHandler(sp))
 	http.HandleFunc("/metadata", handler.MetadaHandlerFunc(sp))
+
 	http.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
 		ts, _ := template.New("sso").Parse(
 			`<html><form method="GET" action="/saml/auth"><button type="submit">Submit</button></form></html>`,
