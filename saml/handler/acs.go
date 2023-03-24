@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/base64"
 	"net/http"
 
 	"github.com/hashicorp/cap/saml"
@@ -8,6 +9,15 @@ import (
 
 func ACSHandlerFunc(sp *saml.ServiceProvider) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "SAML Response received, but ACS is not implemented", http.StatusNotImplemented)
+		r.ParseForm()
+		samlResp := r.PostForm.Get("SAMLResponse")
+
+		raw, err := base64.StdEncoding.DecodeString(samlResp)
+		if err != nil {
+			http.Error(w, "failed to decode saml response", http.StatusNotImplemented)
+			return
+		}
+
+		w.Write(raw)
 	}
 }
