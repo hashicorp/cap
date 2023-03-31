@@ -151,6 +151,7 @@ type RequestResponseCommon struct {
 	Issuer       *Issuer     // recommended
 	Singature    string      // recommended
 	Extensions   *Extensions // optional
+	Destination  string      `xml:",attr"`
 }
 
 // See 2.2.1 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf

@@ -6,16 +6,13 @@ type Response struct {
 	XMLName xml.Name `xml:"urn:oasis:names:tc:SAML:2.0:protocol Response"`
 
 	StatusResponseType
-
-	Status *Status
-	Issuer *Issuer
 }
 
 // See 3.2.2 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
 type StatusResponseType struct {
 	RequestResponseCommon
 
-	InResponseTo string  // optional
+	InResponseTo string  `xml:",attr"` // optional
 	Status       *Status // required
 }
 
@@ -32,8 +29,8 @@ type Status struct {
 type StatusCode struct {
 	XMLName xml.Name `xml:"urn:oasis:names:tc:SAML:2.0:protocol StatusCode"`
 
-	StatusCode StatusCodeType // optional
-	Value      string         `xml:",attr"` // required
+	// StatusCode StatusCodeType `xml:",attr,omitempty"` // optional TODO: Required?
+	Value StatusCodeType `xml:",attr"` // required
 }
 
 // See 3.2.2.3 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf

@@ -7,8 +7,6 @@ import (
 // See 3.2.1 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
 type StatusRequestType struct {
 	RequestResponseCommon
-
-	Destination string `xml:",attr"`
 }
 
 // See 3.4.1 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
