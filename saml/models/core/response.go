@@ -1,11 +1,17 @@
 package core
 
-import "encoding/xml"
+import (
+	"encoding/xml"
+	"time"
+)
 
 type Response struct {
 	XMLName xml.Name `xml:"urn:oasis:names:tc:SAML:2.0:protocol Response"`
 
 	StatusResponseType
+
+	Assertion          []*Assertion
+	EncryptedAssertion []*TBD
 }
 
 // See 3.2.2 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
@@ -33,10 +39,34 @@ type StatusCode struct {
 	Value StatusCodeType `xml:",attr"` // required
 }
 
+// TODO
 // See 3.2.2.3 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
 type StatusMessage struct {
 }
 
+// TODO
 // See 3.2.2.4 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
 type StatusDetail struct {
+}
+
+// See 2.3.3 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
+type Assertion struct {
+	XMLName xml.Name `xml:"urn:oasis:names:tc:SAML:2.0:assertion Assertion"`
+
+	// attributes
+	Version      string    `xml:",attr"` // required
+	ID           string    `xml:",attr"` // required
+	IssueInstant time.Time `xml:",attr"` // required
+
+	Issuer *Issuer // required
+
+	// Signature  *TBD     // optional
+	Subject *Subject // optional
+	// Conditions *TBD     // optional
+	// Advice     *TBD     // optional
+
+	// Statement          *TBD
+	// AuthnStatement     *TBD
+	// AuthzStatement     *TBD
+	// AttributeStatement *TBD
 }

@@ -142,6 +142,33 @@ const (
 	StatusCodeUnsupportedBinding StatusCodeType = "urn:oasis:names:tc:SAML:2.0:status:UnsupportedBinding"
 )
 
+// ConfirmationMethod indicates the sepcific method to be used by the relying parte to determine
+// that the request or message came from a system entity that is associated with the subject of
+// the assertion, within the context of a particular profile.
+//
+// See 3. http://docs.oasis-open.org/security/saml/v2.0/saml-profiles-2.0-os.pdf
+type ConfirmationMethod string
+
+const (
+	// ConfirmationMethodHolderOfKey indicates that the key holder itself can confirm
+	// itself as the subject. If this method is given, the SubjectConfirmationData MUST
+	// contain one or more KeyInfo elements, where KeyInfo indentifies a cryptographic key.
+	//
+	// See 3.1 http://docs.oasis-open.org/security/saml/v2.0/saml-profiles-2.0-os.pdf
+	ConfirmationMethodHolderOfKey ConfirmationMethod = "urn:oasis:names:tc:SAML:2.0:cm:holder-of-key"
+
+	// ConfirmationMethodSenderVouches indicates that no other information is available about
+	// the context of use of the assertion.
+	//
+	// See 3.2 http://docs.oasis-open.org/security/saml/v2.0/saml-profiles-2.0-os.pdf
+	ConfirmationMethodSenderVouches ConfirmationMethod = "urn:oasis:names:tc:SAML:2.0:cm:sender-vouches"
+
+	// ConfirmationMethodBearer indicates that the bearer can confirm itself as the subject.
+	//
+	// See 3.3 http://docs.oasis-open.org/security/saml/v2.0/saml-profiles-2.0-os.pdf
+	ConfirmationMethodBearer ConfirmationMethod = "urn:oasis:names:tc:SAML:2.0:cm:bearer"
+)
+
 // See 3.2 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
 type RequestResponseCommon struct {
 	ID           string      `xml:",attr"`           // required
@@ -185,4 +212,9 @@ type Issuer struct {
 	XMLName xml.Name `xml:"urn:oasis:names:tc:SAML:2.0:assertion Issuer"`
 
 	NameIDType
+}
+
+// Indicates that an attribute is yet to be defined.
+// It is only used to for development purposes.
+type TBD struct {
 }

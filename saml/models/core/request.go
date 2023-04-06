@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/xml"
+	"time"
 )
 
 // See 3.2.1 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
@@ -39,6 +40,7 @@ type AuthnRequest struct {
 // Subject specifies the requested subject of the resulting assertion(s).
 // If entirely omitted or if no identifier is included, the presenter of
 // the message is presumed to be the requested subject.
+//
 // See 2.4 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
 type Subject struct {
 	XMLName xml.Name `xml:"urn:oasis:names:tc:SAML:2.0:assertion Subject"`
@@ -49,12 +51,32 @@ type Subject struct {
 	SubjectConfirmation []*SubjectConfirmation
 }
 
+// See 2.4.1.1 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
 type SubjectConfirmation struct {
-	Method      string
-	BaseID      string
-	NameID      string
-	EncryptedID *EncryptedID
+	Method ConfirmationMethod `xml:",attr"` // required
+
+	SubjectConfirmationData *SubjectConfirmationData // optional
+
+	BaseID      *BaseID      // optional
+	NameID      *NameID      // optional
+	EncryptedID *EncryptedID // optional
 }
+
+// See 2.4.1.2 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
+type SubjectConfirmationData struct {
+	NotBefore    time.Time `xml:",attr"` // optional
+	NotOnOrAfter time.Time `xml:",attr"` // optional
+	Recipient    string    `xml:",attr"` // optional
+	InResponseTo string    `xml:",attr"` // optional
+	Address      string    `xml:",attr"` // optional
+}
+
+/* TODO: Create a function to validate this:
+Note that the time period specified by the optional NotBefore and NotOnOrAfter attributes, if present,
+SHOULD fall within the overall assertion validity period as specified by the <Conditions> element's
+NotBefore and NotOnOrAfter attributes. If both attributes are present, the value for NotBefore
+MUST be less than (earlier than) the value for NotOnOrAfter.
+*/
 
 // NameIDPolicy specifies constraints on the name identifier to be used to represent
 // the requested subject.
