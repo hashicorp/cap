@@ -28,7 +28,6 @@ import (
 // KeySet represents a set of keys that can be used to verify the signatures of JWTs.
 // A KeySet is expected to be backed by a set of local or remote keys.
 type KeySet interface {
-
 	// VerifySignature parses the given JWT, verifies its signature, and returns the claims in its payload.
 	// The given JWT must be of the JWS compact serialization form.
 	VerifySignature(ctx context.Context, token string) (claims map[string]interface{}, err error)
@@ -238,7 +237,7 @@ func unmarshalResp(r *http.Response, body []byte, v interface{}) error {
 	ct := r.Header.Get("Content-Type")
 	mediaType, _, parseErr := mime.ParseMediaType(ct)
 	if parseErr == nil && mediaType == "application/json" {
-		return fmt.Errorf("got Content-Type = application/json, but could not unmarshal as JSON: %v", err)
+		return fmt.Errorf("got Content-Type = application/json, but could not unmarshal as JSON")
 	}
-	return fmt.Errorf("expected Content-Type = application/json, got %q: %v", ct, err)
+	return fmt.Errorf("expected Content-Type = application/json, got %q", ct)
 }
