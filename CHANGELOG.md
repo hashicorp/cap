@@ -2,15 +2,28 @@
 
 Canonical reference for changes, improvements, and bugfixes for cap.
 
-## Next
-
-* Add `WithUserAttributes(...)` option to the ldap package that allows callers
-  to request that attributes be returned for the authenticating user ([PR](https://github.com/hashicorp/cap/pull/58))
+## 0.3.0
+#### OIDC
 * Add `ProviderConfig` which creates a provider that doesn't support
   OIDC discovery. It's probably better to use NewProvider(...) with discovery
   whenever possible ([PR](https://github.com/hashicorp/cap/pull/57) and [issue](https://github.com/hashicorp/cap/issues/55)).
-* Add Validator `ValidateAllowMissingIatNbfExp` method to allow all of
-  iat/nbf/exp to be missing. 
+* Improve WSL detection ([**PR**](https://github.com/hashicorp/cap/pull/51))
+* Add option to allow all of IAT, NBF, and EXP to be missing
+  ([**PR**](https://github.com/hashicorp/cap/pull/50))
+* Validate sub and aud are present in an id_token ([**PR**](https://github.com/hashicorp/cap/pull/48))
+
+#### LDAP
+* Add better (more consistent) timeouts ([**PR**](https://github.com/hashicorp/cap/pull/61))
+* Add better error msgs on failed search queries ([**PR**](https://github.com/hashicorp/cap/pull/60))
+* Add new config fields for including/excluding user attrs ([**PR**](https://github.com/hashicorp/cap/pull/59))
+* Add `WithUserAttributes(...)` option to the ldap package that allows callers
+  to request that attributes be returned for the authenticating user ([**PR**](https://github.com/hashicorp/cap/pull/58))
+
+
+
+## 0.2.0 (2022/04/08)
+* Add support for LDAP/AD authentication ([**PR**](https://github.com/hashicorp/cap/pull/47))
+  
 
 ## 0.1.1 (2021/06/24)
 
