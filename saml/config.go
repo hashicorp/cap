@@ -53,11 +53,6 @@ type Config struct {
 
 	// Certificate is used to sign SAML Authentication Requests.
 	Certificate *tls.Certificate
-
-	// IDP is an optional field that defines IDP specific configurations that are usually
-	// consumed from the metadata doc. If set, the configuration will not be fetched from
-	// the metadata URL.
-	IDP *IDPConfig
 }
 
 func NewConfig(entityID, acs, issuer, metadata string) *Config {
@@ -68,15 +63,8 @@ func NewConfig(entityID, acs, issuer, metadata string) *Config {
 		ValidUntil:                  DefaultValidUntil,
 		NameIDFormat:                core.NameIDFormatEmail,
 		MetadataURL:                 metadata,
-		ServiceBinding:              core.ServiceBindingHTTPPost,
+		// ServiceBinding:              core.ServiceBindingHTTPPost,
 	}
-}
-
-func NewConfigWithCustomIDP(entityID, acs, issuer, metadata string, idp *IDPConfig) *Config {
-	cfg := NewConfig(entityID, acs, issuer, metadata)
-	cfg.IDP = idp
-
-	return cfg
 }
 
 func (c *Config) Validate() error {
@@ -90,19 +78,8 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("%s: EntityID is empty: %w", op, oidc.ErrInvalidParameter)
 	}
 
-	if c.MetadataURL == "" && c.IDP == nil {
+	if c.MetadataURL == "" {
 		return fmt.Errorf("%s: no metadata URL or IDP config set: %w", op, oidc.ErrInvalidParameter)
-	}
-
-	if c.ServiceBinding == "" {
-		return fmt.Errorf("%s: no ServiceBinding set: %w", op, oidc.ErrInvalidParameter)
-	}
-
-	if c.IDP != nil {
-		if c.IDP.SSOServiceURL == "" {
-			return fmt.Errorf("%s: IDP config provided but no SSO service URL not set: %w",
-				op, oidc.ErrInvalidParameter)
-		}
 	}
 
 	if c.Certificate != nil {
@@ -129,5 +106,5 @@ func (c *Config) ValidateTLSCertificate() error {
 }
 
 func DefaultValidUntil() time.Time {
-	return time.Now().Add(time.Hour * 24 * 7)
+	return time.Now().Add(time.Hour * 24 * 365)
 }

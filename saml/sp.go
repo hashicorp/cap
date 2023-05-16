@@ -11,11 +11,16 @@ import (
 	"github.com/hashicorp/cap/oidc"
 	"github.com/hashicorp/cap/saml/models/core"
 	"github.com/hashicorp/cap/saml/models/metadata"
+
+	_ "embed"
 )
 
 var (
 	ErrBindingUnsupported = errors.New("Configured binding unsupported by the IDP")
 )
+
+//go:embed post_binding.gohtml
+var PostBindingTempl string
 
 type ServiceProvider struct {
 	cfg *Config
@@ -38,14 +43,14 @@ func NewServiceProvider(cfg *Config) (*ServiceProvider, error) {
 
 // CreateAuthNRequest creates an Authentication Request object. If no service binding defined in the
 // config it defaults to the HTTP POST binding.
-func (sp *ServiceProvider) CreateAuthNRequest(id string) (*core.AuthnRequest, error) {
+func (sp *ServiceProvider) CreateAuthNRequest(id string, binding core.ServiceBinding) (*core.AuthnRequest, error) {
 	const op = "saml.ServiceProvider.CreateAuthNRequest"
 
 	if id == "" {
 		return nil, fmt.Errorf("%s: id is empty: %w", op, oidc.ErrInvalidParameter)
 	}
 
-	destination, err := sp.destination()
+	destination, err := sp.destination(binding)
 	if err != nil {
 		return nil, fmt.Errorf("%s: failed to get destination: %w", op, err)
 	}
@@ -54,7 +59,7 @@ func (sp *ServiceProvider) CreateAuthNRequest(id string) (*core.AuthnRequest, er
 
 	ar.ID = id
 	ar.Version = core.SAMLVersion2
-	ar.ProtocolBinding = sp.cfg.ServiceBinding
+	ar.ProtocolBinding = core.ServiceBindingHTTPPost
 	ar.AssertionConsumerServiceURL = sp.cfg.AssertionConsumerServiceURL
 	ar.IssueInstant = time.Now().UTC() // TODO format this.
 	ar.Destination = destination
@@ -72,9 +77,6 @@ func (sp *ServiceProvider) CreateAuthNRequest(id string) (*core.AuthnRequest, er
 	}
 
 	ar.ForceAuthn = false
-
-	// TODO: RequestedAuthnContext?
-	// TODO: Sign request
 
 	return ar, nil
 }
@@ -133,23 +135,15 @@ func (sp *ServiceProvider) FetchMetadata() (*metadata.EntityDescriptorIDPSSO, er
 	return &ed, nil
 }
 
-func (sp *ServiceProvider) ServiceBinding() core.ServiceBinding {
-	return sp.cfg.ServiceBinding
-}
-
-func (sp *ServiceProvider) destination() (string, error) {
+func (sp *ServiceProvider) destination(binding core.ServiceBinding) (string, error) {
 	const op = "saml.ServiceProvider.destination"
-
-	if sp.cfg.IDP != nil {
-		return sp.cfg.IDP.SSOServiceURL, nil
-	}
 
 	meta, err := sp.FetchMetadata()
 	if err != nil {
 		return "", fmt.Errorf("%s: failed to fetch metadata: %w", op, err)
 	}
 
-	destination, ok := meta.GetLocationForBinding(sp.cfg.ServiceBinding)
+	destination, ok := meta.GetLocationForBinding(binding)
 	if !ok {
 		return "", fmt.Errorf(
 			"%s: no location for provided binding (%s) found: %w",

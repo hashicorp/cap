@@ -35,7 +35,7 @@ func main() {
 	exitOnError(err)
 
 	http.HandleFunc("/saml/acs", handler.ACSHandlerFunc(sp))
-	http.HandleFunc("/saml/auth", handler.RequestHandler(sp))
+	http.HandleFunc("/saml/auth", handler.RedirectBindingHandlerFunc(sp))
 	http.HandleFunc("/metadata", handler.MetadaHandlerFunc(sp))
 
 	http.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
