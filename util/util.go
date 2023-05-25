@@ -6,6 +6,7 @@ package util
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -31,7 +32,7 @@ func IsWSL() (bool, error) {
 	isDocker := strings.Contains(strings.ToLower(string(cgroupData)), "/docker/")
 	isLxc := strings.Contains(strings.ToLower(string(cgroupData)), "/lxc/")
 	isMsLinux := strings.Contains(strings.ToLower(string(procData)), "microsoft")
-	
+
 	return isMsLinux && !(isDocker || isLxc), nil
 }
 
@@ -47,6 +48,8 @@ func OpenURL(url string) error {
 		mErr = multierror.Append(err)
 	}
 	switch {
+	case os.Getenv("DEFAULT_WEB_BROWSER") != "":
+		cmd = os.Getenv("DEFAULT_WEB_BROWSER")
 	case "windows" == runtime.GOOS || wsl:
 		cmd = "cmd.exe"
 		args = []string{"/c", "start"}
