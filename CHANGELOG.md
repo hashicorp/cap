@@ -2,11 +2,17 @@
 
 Canonical reference for changes, improvements, and bugfixes for cap.
 
+## 0.3.1
+
+### Bug Fixes
+* Fixes integer overflow in `auth_time` claim validation when compiled for 32-bit 
+  architecture ([**PR**](https://github.com/hashicorp/cap/pull/76))
+
 ## 0.3.0
 #### OIDC
 * Add `ProviderConfig` which creates a provider that doesn't support
   OIDC discovery. It's probably better to use NewProvider(...) with discovery
-  whenever possible ([PR](https://github.com/hashicorp/cap/pull/57) and [issue](https://github.com/hashicorp/cap/issues/55)).
+  whenever possible ([**PR**](https://github.com/hashicorp/cap/pull/57) and [issue](https://github.com/hashicorp/cap/issues/55)).
 * Improve WSL detection ([**PR**](https://github.com/hashicorp/cap/pull/51))
 * Add option to allow all of IAT, NBF, and EXP to be missing
   ([**PR**](https://github.com/hashicorp/cap/pull/50))
