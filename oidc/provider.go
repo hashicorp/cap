@@ -556,7 +556,7 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, oidcRequest Req
 		}
 		authTime := time.Unix(int64(atClaim), 0)
 		if !authTime.Add(leeway).After(authAfter) {
-			return nil, fmt.Errorf("%s: auth_time (%s) is beyond max age (%d): %w", op, authTime, secs, ErrExpiredAuthTime)
+			return nil, fmt.Errorf("%s: issued at (%s) is beyond max age (%d / %s): %w", op, authTime, secs, authAfter, ErrExpiredAuthTime)
 		}
 	}
 
