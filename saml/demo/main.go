@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/hashicorp/cap/saml"
@@ -17,12 +18,19 @@ func main() {
 		"keyFile":  os.Getenv("SAML_KEY_FILE"),
 	}
 
-	cfg := saml.NewConfig(
-		"http://saml.julz/example",
-		"http://localhost:8000/saml/acs",
-		"https://samltest.id",
-		"https://samltest.id/saml/idp",
-	)
+	entityID, err := url.Parse("http://saml.julz/example")
+	exitOnError(err)
+
+	acs, err := url.Parse("http://localhost:8000/saml/acs")
+	exitOnError(err)
+
+	issuer, err := url.Parse("https://samltest.id")
+	exitOnError(err)
+
+	metadataURL, err := url.Parse("https://samltest.id/saml/idp")
+	exitOnError(err)
+
+	cfg := saml.NewConfig(entityID, acs, issuer, metadataURL)
 
 	if envs["certFile"] != "" && envs["keyFile"] != "" {
 		cert, err := tls.LoadX509KeyPair(envs["certFile"], envs["keyFile"])

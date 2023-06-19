@@ -41,6 +41,10 @@ func NewServiceProvider(cfg *Config) (*ServiceProvider, error) {
 	}, nil
 }
 
+func (sp *ServiceProvider) Config() Config {
+	return *sp.cfg
+}
+
 // CreateAuthNRequest creates an Authentication Request object. If no service binding defined in the
 // config it defaults to the HTTP POST binding.
 func (sp *ServiceProvider) CreateAuthNRequest(id string, binding core.ServiceBinding) (*core.AuthnRequest, error) {
@@ -60,12 +64,12 @@ func (sp *ServiceProvider) CreateAuthNRequest(id string, binding core.ServiceBin
 	ar.ID = id
 	ar.Version = core.SAMLVersion2
 	ar.ProtocolBinding = core.ServiceBindingHTTPPost
-	ar.AssertionConsumerServiceURL = sp.cfg.AssertionConsumerServiceURL
+	ar.AssertionConsumerServiceURL = sp.cfg.AssertionConsumerServiceURL.String()
 	ar.IssueInstant = time.Now().UTC() // TODO format this.
 	ar.Destination = destination
 
 	ar.Issuer = &core.Issuer{}
-	ar.Issuer.Value = sp.cfg.EntityID
+	ar.Issuer.Value = sp.cfg.EntityID.String()
 
 	ar.NameIDPolicy = &core.NameIDPolicy{
 		AllowCreate: true,
@@ -85,7 +89,7 @@ func (sp *ServiceProvider) CreateSPMetadata() *metadata.EntityDescriptorSPSSO {
 	validUntil := sp.cfg.ValidUntil()
 
 	spsso := metadata.EntityDescriptorSPSSO{}
-	spsso.EntityID = sp.cfg.EntityID
+	spsso.EntityID = sp.cfg.EntityID.String()
 	spsso.ValidUntil = validUntil
 
 	spssoDescriptor := &metadata.SPSSODescriptor{}
@@ -98,7 +102,7 @@ func (sp *ServiceProvider) CreateSPMetadata() *metadata.EntityDescriptorSPSSO {
 		{
 			Endpoint: metadata.Endpoint{
 				Binding:  core.ServiceBindingHTTPPost,
-				Location: sp.cfg.AssertionConsumerServiceURL,
+				Location: sp.cfg.AssertionConsumerServiceURL.String(),
 			},
 			Index: 1,
 		},
@@ -112,11 +116,11 @@ func (sp *ServiceProvider) CreateSPMetadata() *metadata.EntityDescriptorSPSSO {
 func (sp *ServiceProvider) FetchMetadata() (*metadata.EntityDescriptorIDPSSO, error) {
 	const op = "saml.ServiceProvider.FetchMetdata"
 
-	if sp.cfg.MetadataURL == "" {
+	if sp.cfg.MetadataURL == nil {
 		return nil, fmt.Errorf("%s: no metadata url set: %w", op, oidc.ErrInvalidParameter)
 	}
 
-	res, err := http.Get(sp.cfg.MetadataURL)
+	res, err := http.Get(sp.cfg.MetadataURL.String())
 	if err != nil {
 		return nil, fmt.Errorf("%s: failed to fetch metadata: %w", op, err)
 	}

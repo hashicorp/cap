@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"encoding/base64"
+	"fmt"
 	"net/http"
 
 	"github.com/hashicorp/cap/saml"
@@ -12,12 +12,12 @@ func ACSHandlerFunc(sp *saml.ServiceProvider) http.HandlerFunc {
 		r.ParseForm()
 		samlResp := r.PostForm.Get("SAMLResponse")
 
-		raw, err := base64.StdEncoding.DecodeString(samlResp)
+		res, err := sp.ParseResponse(samlResp)
 		if err != nil {
-			http.Error(w, "failed to decode saml response", http.StatusNotImplemented)
+			http.Error(w, "failed to handle SAML response", http.StatusUnauthorized)
 			return
 		}
 
-		w.Write(raw)
+		fmt.Fprintf(w, "Authenticated! %s", res.GetAssertion().GetSubject())
 	}
 }

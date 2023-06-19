@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/hashicorp/cap/oidc"
@@ -36,16 +37,16 @@ type Config struct {
 
 	// AssertionConsumerServiceURL defines the endpoint at the SP where the IDP
 	// will redirect to with its authentication response.
-	AssertionConsumerServiceURL string
+	AssertionConsumerServiceURL *url.URL
 
 	// EntityID is a globaly unique identifier of the service provider.
-	EntityID string
+	EntityID *url.URL
 
 	// Issuer is a globaly unique identifier of the identity provider.
-	Issuer string
+	Issuer *url.URL
 
 	// MetadataURL is the endpoint an IDP serves its metadata XML document.
-	MetadataURL string
+	MetadataURL *url.URL
 
 	// ValidUntil is a function that defines until the generate service provider metadata
 	// document is valid.
@@ -55,7 +56,7 @@ type Config struct {
 	Certificate *tls.Certificate
 }
 
-func NewConfig(entityID, acs, issuer, metadata string) *Config {
+func NewConfig(entityID, acs, issuer, metadata *url.URL) *Config {
 	return &Config{
 		EntityID:                    entityID,
 		Issuer:                      issuer,
@@ -63,22 +64,21 @@ func NewConfig(entityID, acs, issuer, metadata string) *Config {
 		ValidUntil:                  DefaultValidUntil,
 		NameIDFormat:                core.NameIDFormatEmail,
 		MetadataURL:                 metadata,
-		// ServiceBinding:              core.ServiceBindingHTTPPost,
 	}
 }
 
 func (c *Config) Validate() error {
 	const op = "saml.Config.Validate"
 
-	if c.AssertionConsumerServiceURL == "" {
+	if c.AssertionConsumerServiceURL == nil {
 		return fmt.Errorf("%s: ACS URL is empty: %w", op, oidc.ErrInvalidParameter)
 	}
 
-	if c.EntityID == "" {
+	if c.EntityID == nil {
 		return fmt.Errorf("%s: EntityID is empty: %w", op, oidc.ErrInvalidParameter)
 	}
 
-	if c.MetadataURL == "" {
+	if c.MetadataURL == nil {
 		return fmt.Errorf("%s: no metadata URL or IDP config set: %w", op, oidc.ErrInvalidParameter)
 	}
 

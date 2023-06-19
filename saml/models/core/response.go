@@ -17,9 +17,6 @@ type Response struct {
 // See 3.2.2 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
 type StatusResponseType struct {
 	RequestResponseCommon
-
-	InResponseTo string  `xml:",attr"` // optional
-	Status       *Status // required
 }
 
 // See 3.2.2.1 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
@@ -69,4 +66,39 @@ type Assertion struct {
 	// AuthnStatement     *TBD
 	// AuthzStatement     *TBD
 	// AttributeStatement *TBD
+}
+
+func (r *Response) GetAssertion() *Assertion {
+	if len(r.Assertion) == 0 {
+		return nil
+	}
+
+	return r.Assertion[0]
+}
+
+func (r *Response) GetAssertionForIndex(index int) *Assertion {
+	if (len(r.Assertion) - 1) < index {
+		return nil
+	}
+
+	return r.Assertion[index]
+}
+
+// Issuer will return the issuer value from the Assertion.Issuer complext type.
+func (a *Assertion) GetIssuer() string {
+	return a.Issuer.Value
+}
+
+func (a *Assertion) GetIssuerFormat() string {
+	return string(a.Issuer.Format)
+}
+
+// Subject will return the subject value from the Assertion.Subject complex type.
+func (a *Assertion) GetSubject() string {
+	return a.Subject.NameID.Value
+}
+
+// Subject will return the subject format value.
+func (a *Assertion) GetSubjectFormat() string {
+	return string(a.Subject.NameID.Format)
 }

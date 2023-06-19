@@ -17,6 +17,7 @@ const (
 )
 
 func (sp *ServiceProvider) AuthNRequestPost(relayState string) ([]byte, *core.AuthnRequest, error) {
+	// TODO change this
 	requestID, err := uuid.GenerateUUID()
 	if err != nil {
 		return nil, nil, err
