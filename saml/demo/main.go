@@ -54,6 +54,8 @@ func main() {
 		ts.Execute(w, nil)
 	})
 
+	fmt.Println("Visit http://localhost:8000/login")
+
 	err = http.ListenAndServe(":8000", nil)
 	exitOnError(err)
 }

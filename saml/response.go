@@ -55,8 +55,7 @@ func (sp *ServiceProvider) ParseResponse(samlResp string) (*core.Response, error
 		}
 	}
 
-	// Now that Response has been validated we can safely parse the response
-	// into the cap SAML response model.
+	// TODO: transform gosaml2 response to core.Response
 	var result core.Response
 	xml.Unmarshal([]byte(samlResp), &result)
 

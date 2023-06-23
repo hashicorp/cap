@@ -14,10 +14,11 @@ func ACSHandlerFunc(sp *saml.ServiceProvider) http.HandlerFunc {
 
 		res, err := sp.ParseResponse(samlResp)
 		if err != nil {
+			fmt.Println("failed ot handle SAML response:", err.Error())
 			http.Error(w, "failed to handle SAML response", http.StatusUnauthorized)
 			return
 		}
 
-		fmt.Fprintf(w, "Authenticated! %s", res.GetAssertion().GetSubject())
+		fmt.Fprintf(w, "Authenticated! %s", res)
 	}
 }
