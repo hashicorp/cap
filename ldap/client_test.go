@@ -16,6 +16,72 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestClient_renderUserSearchFilter(t *testing.T) {
+	t.Parallel()
+	// just ensure that rendered filters are properly escaped
+	testCtx := context.Background()
+	tests := []struct {
+		name        string
+		conf        *ClientConfig
+		userName    string
+		want        string
+		errContains string
+	}{
+		{
+			name:     "valid-default",
+			userName: "alice",
+			conf: &ClientConfig{
+				URLs: []string{"localhost"},
+			},
+			want: "(cn=alice)",
+		},
+		{
+			name:     "escaped-malicious-filter",
+			userName: "foo@example.com)((((((((((((((((((((((((((((((((((((((userPrincipalName=foo",
+			conf: &ClientConfig{
+				URLs:       []string{"localhost"},
+				UPNDomain:  "example.com",
+				UserFilter: "(&({{.UserAttr}}={{.Username}})({{.UserAttr}}=admin@example.com))",
+			},
+			want: "(&(userPrincipalName=foo@example.com\\29\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28userPrincipalName=foo@example.com)(userPrincipalName=admin@example.com))",
+		},
+		{
+			name:     "bad-filter-unclosed-action",
+			userName: "alice",
+			conf: &ClientConfig{
+				URLs:       []string{"localhost"},
+				UserFilter: "hello{{range",
+			},
+			errContains: "search failed due to template compilation error",
+		},
+		{
+			name: "missing-username",
+			conf: &ClientConfig{
+				URLs: []string{"localhost"},
+			},
+			errContains: "missing username",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert, require := assert.New(t), require.New(t)
+			c, err := NewClient(testCtx, tc.conf)
+			require.NoError(err)
+
+			f, err := c.renderUserSearchFilter(tc.userName)
+			if tc.errContains != "" {
+				require.Error(err)
+				assert.ErrorContains(err, tc.errContains)
+				return
+			}
+			require.NoError(err)
+			assert.NotEmpty(f)
+			assert.Equal(tc.want, f)
+		})
+	}
+
+}
+
 func TestClient_NewClient(t *testing.T) {
 	t.Parallel()
 	testCtx := context.Background()

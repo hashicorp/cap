@@ -753,7 +753,11 @@ func (c *Client) renderUserSearchFilter(username string) (string, error) {
 	}
 	if c.conf.UPNDomain != "" {
 		context.UserAttr = "userPrincipalName"
-		context.Username = fmt.Sprintf("%s@%s", EscapeValue(username), c.conf.UPNDomain)
+		// Intentionally, calling EscapeFilter(...) (vs EscapeValue) since the
+		// username is being injected into a search filter.
+		// As an untrusted string, the username must be escaped according to RFC
+		// 4515, in order to prevent attackers from injecting characters that could modify the filter
+		context.Username = fmt.Sprintf("%s@%s", EscapeFilter(username), c.conf.UPNDomain)
 	}
 
 	var renderedFilter bytes.Buffer
