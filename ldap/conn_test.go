@@ -13,12 +13,16 @@ func Test_EscapeValue(t *testing.T) {
 		"test\\hello": "test\\\\hello",
 		"  test  ":    "\\  test \\ ",
 		"":            "",
+		`\`:           `\`,
+		"golang\000":  `golang\00`,
+		"go\000lang":  `go\00lang`,
+		"\000":        `\00`,
 	}
 
 	for test, answer := range testcases {
 		res := EscapeValue(test)
 		if res != answer {
-			t.Errorf("Failed to escape %s: %s != %s\n", test, res, answer)
+			t.Errorf("Failed to escape %q: %q != %q\n", test, res, answer)
 		}
 	}
 }

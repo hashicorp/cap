@@ -830,10 +830,14 @@ func EscapeValue(input string) string {
 	// - trailing space
 	// - special characters '"', '+', ',', ';', '<', '>', '\\'
 	// - null
-	for i := 0; i < len(input); i++ {
+	inputLen := len(input)
+	for i := 0; i < inputLen; i++ {
 		escaped := false
 		if input[i] == '\\' {
 			i++
+			if i > inputLen-1 {
+				break
+			}
 			escaped = true
 		}
 		switch input[i] {
@@ -842,6 +846,9 @@ func EscapeValue(input string) string {
 				input = input[0:i] + "\\" + input[i:]
 				i++
 			}
+			continue
+		case '\000':
+			input = input[0:i] + `\00` + input[i+1:]
 			continue
 		}
 		if escaped {
