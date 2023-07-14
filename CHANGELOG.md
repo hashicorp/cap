@@ -1,6 +1,14 @@
 # cap CHANGELOG
 
 Canonical reference for changes, improvements, and bugfixes for cap.
+## 0.3.2
+
+### Bug fixes:
+* Address a set of LDAP issues ([**PR**](https://github.com/hashicorp/cap/pull/77)):
+  * Properly escape user filters when using UPN domains
+  * Increase max tls to 1.3
+  * Improve `EscapeValue(...)`
+  * Use text template for rendering filters
 
 ## 0.3.1
 
