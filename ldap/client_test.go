@@ -131,6 +131,12 @@ func TestClient_NewClient(t *testing.T) {
 			wantErrContains: "invalid 'tls_min_version' in config",
 		},
 		{
+			name: "valid-tls-max",
+			conf: &ClientConfig{
+				TLSMaxVersion: "tls13",
+			},
+		},
+		{
 			name: "invalid-tls-max",
 			conf: &ClientConfig{
 				TLSMaxVersion: "invalid-tls-version",

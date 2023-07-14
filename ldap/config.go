@@ -35,7 +35,7 @@ const (
 	DefaultTLSMinVersion = "tls12"
 
 	// DefaultTLSMaxVersion for the ClientConfig.TLSMaxVersion
-	DefaultTLSMaxVersion = "tls12"
+	DefaultTLSMaxVersion = "tls13"
 
 	// DefaultOpenLDAPUserPasswordAttribute defines the attribute name for the
 	// openLDAP default password attribute which will always be excluded
