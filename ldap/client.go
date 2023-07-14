@@ -10,11 +10,11 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"fmt"
-	"html/template"
 	"math"
 	"net"
 	"net/url"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/go-ldap/ldap/v3"
