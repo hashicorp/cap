@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"net"
@@ -644,9 +645,9 @@ func (c *Client) getUserBindDN(username string) (string, error) {
 		bindDN = result.Entries[0].DN
 	} else {
 		if c.conf.UPNDomain != "" {
-			bindDN = fmt.Sprintf("%s@%s", EscapeValue(username), c.conf.UPNDomain)
+			bindDN = fmt.Sprintf("%s@%s", escapeValue(username), c.conf.UPNDomain)
 		} else {
-			bindDN = fmt.Sprintf("%s=%s,%s", c.conf.UserAttr, EscapeValue(username), c.conf.UserDN)
+			bindDN = fmt.Sprintf("%s=%s,%s", c.conf.UserAttr, escapeValue(username), c.conf.UserDN)
 		}
 	}
 	return bindDN, nil
@@ -666,7 +667,7 @@ func (c *Client) getUserDN(bindDN, username string) (string, error) {
 	var userDN string
 	if c.conf.UPNDomain != "" {
 		// Find the distinguished name for the user if userPrincipalName used for login
-		filter := fmt.Sprintf("(userPrincipalName=%s@%s)", EscapeValue(username), c.conf.UPNDomain)
+		filter := fmt.Sprintf("(userPrincipalName=%s@%s)", escapeValue(username), c.conf.UPNDomain)
 		result, err := c.conn.Search(&ldap.SearchRequest{
 			BaseDN:    c.conf.UserDN,
 			Scope:     ldap.ScopeWholeSubtree,
@@ -819,50 +820,61 @@ func getTLSConfig(host string, opt ...Option) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-// EscapeValue will properly escape the input string as an ldap value
-func EscapeValue(input string) string {
+// escapeValue will properly escape the input string as an ldap value
+// rfc4514 states the following must be escaped:
+// - leading space or hash
+// - trailing space
+// - special characters '"', '+', ',', ';', '<', '>', '\\'
+// - hex
+func escapeValue(input string) string {
+	const op = "ldap.EscapeValue"
 	if input == "" {
 		return ""
 	}
 
-	// RFC4514 forbids un-escaped:
-	// - leading space or hash
-	// - trailing space
-	// - special characters '"', '+', ',', ';', '<', '>', '\\'
-	// - null
+	buf := bytes.Buffer{}
+
+	escFn := func(c byte) {
+		buf.WriteByte('\\')
+		buf.WriteByte(c)
+	}
+
 	inputLen := len(input)
 	for i := 0; i < inputLen; i++ {
-		escaped := false
-		if input[i] == '\\' {
-			i++
-			if i > inputLen-1 {
-				break
-			}
-			escaped = true
-		}
-		switch input[i] {
-		case '"', '+', ',', ';', '<', '>', '\\':
-			if !escaped {
-				input = input[0:i] + "\\" + input[i:]
-				i++
-			}
+		char := input[i]
+		switch {
+		case i == 0 && char == ' ' || char == '#':
+			// leading space or hash.
+			escFn(char)
 			continue
-		case '\000':
-			input = input[0:i] + `\00` + input[i+1:]
+		case i == inputLen-1 && char == ' ':
+			// trailing space.
+			escFn(char)
 			continue
+		case specialChar(char):
+			// special characters '"', '+', ',', ';', '<', '>', '\\'
+			escFn(char)
+			continue
+		case char < ' ' || char > '~':
+			// anything that's not between the ascii space and tilde must by hex
+			buf.WriteByte('\\')
+			buf.WriteString(hex.EncodeToString([]byte{char}))
+			continue
+		default:
+			// everything remaining, doesn't need to be escaped
+			buf.WriteByte(char)
 		}
-		if escaped {
-			input = input[0:i] + "\\" + input[i:]
-			i++
-		}
 	}
-	if input[0] == ' ' || input[0] == '#' {
-		input = "\\" + input
+	return buf.String()
+}
+
+func specialChar(char byte) bool {
+	switch char {
+	case '"', '+', ',', ';', '<', '>', '\\':
+		return true
+	default:
+		return false
 	}
-	if input[len(input)-1] == ' ' {
-		input = input[0:len(input)-1] + "\\ "
-	}
-	return input
 }
 
 func EscapeFilter(filter string) string {
