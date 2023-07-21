@@ -856,7 +856,7 @@ func escapeValue(input string) string {
 			escFn(char)
 			continue
 		case char < ' ' || char > '~':
-			// anything that's not between the ascii space and tilde must by hex
+			// anything that's not between the ascii space and tilde must be hex
 			buf.WriteByte('\\')
 			buf.WriteString(hex.EncodeToString([]byte{char}))
 			continue
