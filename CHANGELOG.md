@@ -1,6 +1,10 @@
 # cap CHANGELOG
 
 Canonical reference for changes, improvements, and bugfixes for cap.
+## 0.3.3
+### Bug fixes:
+* LDAP
+  * A more compete fix for `escapeValue(...)` and we've stopped exporting it ([**PR**](https://github.com/hashicorp/cap/pull/78))
 ## 0.3.2
 
 ### Bug fixes:
