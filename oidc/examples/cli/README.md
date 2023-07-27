@@ -29,7 +29,7 @@ the max-age specified in seconds.
 ```
 ./cli -max-age <seconds>
 ```
-### Require environment variables
+### Required environment variables
 (required if not using the built-in Test Provider. see note below on how-to use this option)
 
 * `OIDC_CLIENT_ID`: Your Relying Party client id.
