@@ -1,6 +1,15 @@
 # cap CHANGELOG
 
 Canonical reference for changes, improvements, and bugfixes for cap.
+
+## 0.3.4
+
+### Bug fixes
+
+* OIDC/examples/cli
+  * Use free port if OIDC_PORT is not set for the example ([**PR**](https://github.com/hashicorp/cap/pull/79))
+
+
 ## 0.3.3
 ### Bug fixes:
 * LDAP
