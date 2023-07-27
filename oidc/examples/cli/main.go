@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"time"
 
@@ -110,7 +111,22 @@ func main() {
 		}
 		oidcPort := os.Getenv("OIDC_PORT")
 		if oidcPort == "" {
-			fmt.Fprintf(os.Stderr, "env OIDC_PORT is empty")
+			oidcPort, err = func() (string, error) {
+				addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+				if err != nil {
+					return "", err
+				}
+
+				l, err := net.ListenTCP("tcp", addr)
+				if err != nil {
+					return "", err
+				}
+				defer l.Close()
+				return strconv.Itoa(l.Addr().(*net.TCPAddr).Port), nil
+			}()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "env OIDC_PORT is empty and error finding a free port: %s", err.Error())
+			}
 			return
 		}
 
