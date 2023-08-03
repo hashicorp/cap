@@ -73,11 +73,7 @@ func (sp *ServiceProvider) CreateAuthNRequest(id string, binding core.ServiceBin
 
 	ar.NameIDPolicy = &core.NameIDPolicy{
 		AllowCreate: true,
-		Format:      sp.cfg.NameIDFormat,
-	}
-
-	if sp.cfg.NameIDFormat == "" {
-		ar.NameIDPolicy.Format = core.NameIDFormatEmail
+		Format:      core.NameIDFormatEmail,
 	}
 
 	ar.ForceAuthn = false
@@ -95,7 +91,10 @@ func (sp *ServiceProvider) CreateSPMetadata() *metadata.EntityDescriptorSPSSO {
 	spssoDescriptor := &metadata.SPSSODescriptor{}
 	spssoDescriptor.ValidUntil = validUntil
 	spssoDescriptor.ProtocolSupportEnumeration = metadata.ProtocolSupportEnumerationProtocol
-	spssoDescriptor.NameIDFormat = []core.NameIDFormat{core.NameIDFormatEmail, core.NameIDFormatTransient}
+	spssoDescriptor.NameIDFormat = []core.NameIDFormat{
+		core.NameIDFormatEmail,
+		core.NameIDFormatTransient,
+	}
 	spssoDescriptor.AuthnRequestsSigned = false
 	spssoDescriptor.WantAssertionsSigned = false
 	spssoDescriptor.AssertionConsumerService = []metadata.IndexedEndpoint{
@@ -151,7 +150,7 @@ func (sp *ServiceProvider) destination(binding core.ServiceBinding) (string, err
 	if !ok {
 		return "", fmt.Errorf(
 			"%s: no location for provided binding (%s) found: %w",
-			op, sp.cfg.ServiceBinding, ErrBindingUnsupported,
+			op, binding, ErrBindingUnsupported,
 		)
 	}
 
