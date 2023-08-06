@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/cap/saml/models/core"
 )
 
-func (sp *ServiceProvider) AuthNRequestRedirect(
+func (sp *ServiceProvider) AuthnRequestRedirect(
 	relayState string,
 ) (*url.URL, *core.AuthnRequest, error) {
 	requestID, err := uuid.GenerateUUID()
