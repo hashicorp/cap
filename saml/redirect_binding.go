@@ -12,13 +12,15 @@ import (
 	"github.com/hashicorp/cap/saml/models/core"
 )
 
-func (sp *ServiceProvider) AuthNRequestRedirect(relayState string) (*url.URL, *core.AuthnRequest, error) {
+func (sp *ServiceProvider) AuthNRequestRedirect(
+	relayState string,
+) (*url.URL, *core.AuthnRequest, error) {
 	requestID, err := uuid.GenerateUUID()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	authN, err := sp.CreateAuthNRequest(requestID, core.ServiceBindingHTTPRedirect)
+	authN, err := sp.CreateAuthnRequest(requestID, core.ServiceBindingHTTPRedirect)
 	if err != nil {
 		return nil, nil, err
 	}

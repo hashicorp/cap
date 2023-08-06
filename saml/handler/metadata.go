@@ -8,8 +8,11 @@ import (
 )
 
 func MetadaHandlerFunc(sp *saml.ServiceProvider) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		meta := sp.CreateSPMetadata()
-		xml.NewEncoder(w).Encode(meta)
+	return func(w http.ResponseWriter, _ *http.Request) {
+		meta := sp.CreateMetadata()
+		err := xml.NewEncoder(w).Encode(meta)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}
 }
