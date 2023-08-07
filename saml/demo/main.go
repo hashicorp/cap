@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -14,30 +13,26 @@ import (
 
 func main() {
 	envs := map[string]string{
-		"certFile": os.Getenv("SAML_CERT_FILE"),
-		"keyFile":  os.Getenv("SAML_KEY_FILE"),
+		"entityID": os.Getenv("CAP_SAML_ENTITY_ID"),
+		"acs":      os.Getenv("CAP_SAML_ACS"),
+		"issuer":   os.Getenv("CAP_SAML_ISSUER"),
+		"metadata": os.Getenv("CAP_SAML_METADATA"),
 	}
 
-	entityID, err := url.Parse("http://saml.julz/example")
+	entityID, err := url.Parse(envs["entityID"])
 	exitOnError(err)
 
-	acs, err := url.Parse("http://localhost:8000/saml/acs")
+	acs, err := url.Parse(envs["acs"])
 	exitOnError(err)
 
-	issuer, err := url.Parse("https://samltest.id")
+	issuer, err := url.Parse(envs["issuer"])
 	exitOnError(err)
 
-	metadataURL, err := url.Parse("https://samltest.id/saml/idp")
+	metadataURL, err := url.Parse(envs["metadata"])
 	exitOnError(err)
 
-	cfg := saml.NewConfig(entityID, acs, issuer, metadataURL)
-
-	if envs["certFile"] != "" && envs["keyFile"] != "" {
-		cert, err := tls.LoadX509KeyPair(envs["certFile"], envs["keyFile"])
-		exitOnError(err)
-
-		cfg.Certificate = &cert
-	}
+	cfg, err := saml.NewConfig(entityID, acs, issuer, metadataURL)
+	exitOnError(err)
 
 	sp, err := saml.NewServiceProvider(cfg)
 	exitOnError(err)
@@ -46,7 +41,7 @@ func main() {
 	http.HandleFunc("/saml/auth", handler.RedirectBindingHandlerFunc(sp))
 	http.HandleFunc("/metadata", handler.MetadaHandlerFunc(sp))
 
-	http.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/login", func(w http.ResponseWriter, _ *http.Request) {
 		ts, _ := template.New("sso").Parse(
 			`<html><form method="GET" action="/saml/auth"><button type="submit">Submit</button></form></html>`,
 		)

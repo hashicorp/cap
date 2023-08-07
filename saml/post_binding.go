@@ -16,14 +16,14 @@ const (
 	postBindingScriptSha256 = "T8Q9GZiIVtYoNIdF6UW5hDNgJudFDijQM/usO+xUkes="
 )
 
-func (sp *ServiceProvider) AuthNRequestPost(relayState string) ([]byte, *core.AuthnRequest, error) {
+func (sp *ServiceProvider) AuthnRequestPost(relayState string) ([]byte, *core.AuthnRequest, error) {
 	// TODO change this
 	requestID, err := uuid.GenerateUUID()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	authN, err := sp.CreateAuthNRequest(requestID, core.ServiceBindingHTTPPost)
+	authN, err := sp.CreateAuthnRequest(requestID, core.ServiceBindingHTTPPost)
 	if err != nil {
 		return nil, nil, err
 	}

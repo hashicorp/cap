@@ -9,10 +9,14 @@ import (
 
 // PostBindingHandlerFunc creates a handler function that handles a HTTP-POST binding SAML request.
 func PostBindingHandlerFunc(sp *saml.ServiceProvider) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		templ, _, err := sp.AuthNRequestPost("")
+	return func(w http.ResponseWriter, _ *http.Request) {
+		templ, _, err := sp.AuthnRequestPost("")
 		if err != nil {
-			http.Error(w, "Failed to do SAML POST authentication request", http.StatusInternalServerError)
+			http.Error(
+				w,
+				"Failed to do SAML POST authentication request",
+				http.StatusInternalServerError,
+			)
 			return
 		}
 
