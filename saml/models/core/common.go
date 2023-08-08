@@ -171,12 +171,14 @@ const (
 
 // See 3.2 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
 type RequestResponseCommon struct {
-	ID           string      `xml:",attr"`           // required
-	Version      string      `xml:",attr"`           // required
+	ID      string `xml:",attr"` // required
+	Version string `xml:",attr"` // required
+
+	// The time instant of issue of the request.
 	IssueInstant time.Time   `xml:",attr"`           // required
 	Consent      string      `xml:",attr,omitempty"` // optional TODO: define constants
 	Issuer       *Issuer     // recommended
-	Singature    string      // recommended
+	Singature    string      `xml:",omitempty"` // recommended
 	Extensions   *Extensions // optional
 	Destination  string      `xml:",attr"`
 }
@@ -216,5 +218,4 @@ type Issuer struct {
 
 // Indicates that an attribute is yet to be defined.
 // It is only used to for development purposes.
-type TBD struct {
-}
+type TBD struct{}

@@ -18,9 +18,9 @@ type AuthnRequest struct {
 	StatusRequestType
 
 	Subject              *Subject
-	NameIDPolicy         *NameIDPolicy
+	NameIDPolicy         *NameIDPolicy `xml:",omitempty"`
 	Conditions           *Conditions
-	RequestedAuthContext *RequestedAuthContext
+	RequestedAuthContext *RequestedAuthnContext
 	Scoping              *Scoping
 
 	ForceAuthn bool `xml:",attr"`
@@ -80,11 +80,11 @@ MUST be less than (earlier than) the value for NotOnOrAfter.
 
 // NameIDPolicy specifies constraints on the name identifier to be used to represent
 // the requested subject.
-// See 2.4.1.1 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
+// See 3.4.1.1 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
 type NameIDPolicy struct {
-	Format          NameIDFormat
-	SPNameQualifier string `xml:",attr,omitempty"`
-	AllowCreate     bool   `xml:",attr"`
+	Format          NameIDFormat `xml:",omitempty"`
+	SPNameQualifier string       `xml:",attr,omitempty"`
+	AllowCreate     bool         `xml:",attr"`
 }
 
 // Scoping ... (TODO: not important for the first MVP)
@@ -123,14 +123,44 @@ type IDPEntry struct {
 	Loc string
 }
 
-type Conditions struct {
+type Conditions struct{}
+
+// Comparison specifies the comparison method used to evaluate the requested context classes or statements.
+// Possible values: "exact", "minimum", "maximum", "better"
+type Comparison string
+
+const (
+	// ComparisonExact requires that the resulting authentication context in the authentication
+	// statement MUST be the exact match of at least one of the authentication contexts specified.
+	ComparisonExact Comparison = "exact" // default
+
+	// ComparisonMin requires that the resulting authentication context in the authentication
+	// statement MUST be at least as strong (as deemed by the responder) as one of the authentication
+	// contexts specified.
+	ComparsionMin Comparison = "minimum"
+
+	// ComparisonMax requires that the resulting authentication context in the authentication
+	// statement MUST be stronger (as deemed by the responder) than any one of the authentication contexts
+	// specified.
+	ComparsionMax Comparison = "maximum"
+
+	// ComparisonBetter requires that the resulting authentication context in the authentication
+	// statement MUST be as strong as possible (as deemed by the responder) without exceeding the strength
+	// of at least one of the authentication contexts specified.
+	ComparisonBetter Comparison = "better"
+)
+
+// RequestedAuthnContext specifies the authentication context requirements of
+// authentication statements returned in response to a request or query.
+// See 3.3.2.2.1 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
+type RequestedAuthnContext struct {
+	XMLName xml.Name `xml:"urn:oasis:names:tc:SAML:2.0:protocol RequestedAuthnContext"`
+
+	AuthnConextClassRef []string   `xml:"urn:oasis:names:tc:SAML:2.0:assertion AuthnContextClassRef"`
+	Comparison          Comparison `xml:",attr"`
 }
 
-type RequestedAuthContext struct {
-}
-
-type Extensions struct {
-}
+type Extensions struct{}
 
 // CreateDocument creates an AuthnRequest XML document.
 func (a *AuthnRequest) CreateXMLDocument() ([]byte, error) {

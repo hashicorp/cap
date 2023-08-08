@@ -19,6 +19,6 @@ func ACSHandlerFunc(sp *saml.ServiceProvider) http.HandlerFunc {
 			return
 		}
 
-		fmt.Fprintf(w, "Authenticated! %s", res)
+		fmt.Fprintf(w, "Authenticated! %s", res.Issuer)
 	}
 }
