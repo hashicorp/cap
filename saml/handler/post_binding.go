@@ -2,6 +2,7 @@ package handler
 
 import (
 	_ "embed"
+	"fmt"
 	"net/http"
 
 	"github.com/hashicorp/cap/saml"
@@ -14,7 +15,7 @@ func PostBindingHandlerFunc(sp *saml.ServiceProvider) http.HandlerFunc {
 		if err != nil {
 			http.Error(
 				w,
-				"Failed to do SAML POST authentication request",
+				fmt.Sprintf("Failed to do SAML POST authentication request: %s", err.Error()),
 				http.StatusInternalServerError,
 			)
 			return
@@ -22,7 +23,14 @@ func PostBindingHandlerFunc(sp *saml.ServiceProvider) http.HandlerFunc {
 
 		_, err = w.Write(templ)
 		if err != nil {
-			http.Error(w, "failed to serve post binding request", http.StatusInternalServerError)
+			http.Error(
+				w,
+				fmt.Sprintf(
+					"failed to serve post binding request: %s",
+					err.Error(),
+				),
+				http.StatusInternalServerError,
+			)
 			return
 		}
 	}

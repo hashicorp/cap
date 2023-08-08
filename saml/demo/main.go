@@ -40,7 +40,6 @@ func main() {
 	http.HandleFunc("/saml/acs", handler.ACSHandlerFunc(sp))
 	http.HandleFunc("/saml/auth", handler.RedirectBindingHandlerFunc(sp))
 	http.HandleFunc("/metadata", handler.MetadaHandlerFunc(sp))
-
 	http.HandleFunc("/login", func(w http.ResponseWriter, _ *http.Request) {
 		ts, _ := template.New("sso").Parse(
 			`<html><form method="GET" action="/saml/auth"><button type="submit">Submit</button></form></html>`,

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/hashicorp/cap/oidc"
 
@@ -17,7 +16,7 @@ import (
 
 var ErrBindingUnsupported = errors.New("Configured binding unsupported by the IDP")
 
-//go:embed post_binding.gohtml
+//go:embed auth_request.gohtml
 var PostBindingTempl string
 
 type ServiceProvider struct {
@@ -51,54 +50,6 @@ func (sp *ServiceProvider) Config() *Config {
 	return sp.cfg
 }
 
-// CreateAuthNRequest creates an Authentication Request object. If no service binding defined in the
-// config it defaults to the HTTP POST binding.
-func (sp *ServiceProvider) CreateAuthnRequest(
-	id string,
-	binding core.ServiceBinding,
-) (*core.AuthnRequest, error) {
-	const op = "saml.ServiceProvider.CreateAuthnRequest"
-
-	if id == "" {
-		return nil, fmt.Errorf("%s: no ID provided: %w", op, oidc.ErrInvalidParameter)
-	}
-
-	if binding == "" {
-		return nil, fmt.Errorf("%s: no binding provided: %w", op, oidc.ErrInvalidParameter)
-	}
-
-	destination, err := sp.destination(binding)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"%s: failed to get destination for given service binding (%s): %w",
-			op,
-			binding,
-			err,
-		)
-	}
-
-	ar := &core.AuthnRequest{}
-
-	ar.ID = id
-	ar.Version = core.SAMLVersion2
-	ar.ProtocolBinding = core.ServiceBindingHTTPPost
-	ar.AssertionConsumerServiceURL = sp.cfg.AssertionConsumerServiceURL.String()
-	ar.IssueInstant = time.Now().UTC() // TODO format this.
-	ar.Destination = destination
-
-	ar.Issuer = &core.Issuer{}
-	ar.Issuer.Value = sp.cfg.EntityID.String()
-
-	ar.NameIDPolicy = &core.NameIDPolicy{
-		AllowCreate: false,                  // TODO: Create option
-		Format:      core.NameIDFormatEmail, // TODO: Create option
-	}
-
-	ar.ForceAuthn = false // TODO: Create Option
-
-	return ar, nil
-}
-
 func (sp *ServiceProvider) CreateMetadata() *metadata.EntityDescriptorSPSSO {
 	validUntil := sp.cfg.ValidUntil()
 
@@ -113,7 +64,7 @@ func (sp *ServiceProvider) CreateMetadata() *metadata.EntityDescriptorSPSSO {
 		core.NameIDFormatEmail,
 		core.NameIDFormatTransient,
 	}
-	spssoDescriptor.AuthnRequestsSigned = false // TODO: create option for this
+	spssoDescriptor.AuthnRequestsSigned = false // always false for now until request signing is supported.
 	spssoDescriptor.WantAssertionsSigned = true // TODO: create option for this
 	spssoDescriptor.AssertionConsumerService = []metadata.IndexedEndpoint{
 		{

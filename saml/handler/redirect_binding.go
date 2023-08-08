@@ -11,7 +11,11 @@ func RedirectBindingHandlerFunc(sp *saml.ServiceProvider) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		redirectURL, _, err := sp.AuthnRequestRedirect("relayState")
 		if err != nil {
-			http.Error(w, "failed to create SAML Authn Request", http.StatusInternalServerError)
+			http.Error(
+				w,
+				fmt.Sprintf("failed to create SAML Authn Request: %s", err.Error()),
+				http.StatusInternalServerError,
+			)
 			return
 		}
 

@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/cap/saml"
 	"github.com/hashicorp/cap/saml/models/core"
 	"github.com/hashicorp/cap/saml/models/metadata"
-	testprovider "github.com/hashicorp/cap/saml/test"
 )
 
 func Test_NewServiceProvider(t *testing.T) {
@@ -59,104 +58,6 @@ func Test_NewServiceProvider(t *testing.T) {
 				r.NoError(err)
 				r.NotNil(got)
 				r.NotNil(got.Config())
-			}
-		})
-	}
-}
-
-func Test_CreateAuthnRequest(t *testing.T) {
-	r := require.New(t)
-
-	tp := testprovider.StartTestProvider(t)
-	defer tp.Close()
-
-	entityID, err := url.Parse("http://test.me/entity")
-	r.NoError(err)
-
-	acs, err := url.Parse("http://test.me/saml/acs")
-	r.NoError(err)
-
-	issuer, err := url.Parse("http://test.idp")
-	r.NoError(err)
-
-	metaURL := fmt.Sprintf("%s/saml/metadata", tp.ServerURL())
-	metadata, err := url.Parse(metaURL)
-	r.NoError(err)
-
-	cfg, err := saml.NewConfig(
-		entityID,
-		acs,
-		issuer,
-		metadata,
-	)
-
-	provider, err := saml.NewServiceProvider(cfg)
-	r.NoError(err)
-
-	cases := []struct {
-		name    string
-		id      string
-		binding core.ServiceBinding
-		err     string
-	}{
-		{
-			name:    "With service binding post",
-			id:      "abc123",
-			binding: core.ServiceBindingHTTPPost,
-			err:     "",
-		},
-		{
-			name:    "With service binding redirect",
-			id:      "abc123",
-			binding: core.ServiceBindingHTTPRedirect,
-			err:     "",
-		},
-		{
-			name:    "When there is no ID provided",
-			id:      "",
-			binding: core.ServiceBindingHTTPRedirect,
-			err:     "saml.ServiceProvider.CreateAuthnRequest: no ID provided: invalid parameter",
-		},
-		{
-			name:    "When there is no binding provided",
-			id:      "abc123",
-			binding: "",
-			err:     "saml.ServiceProvider.CreateAuthnRequest: no binding provided: invalid parameter",
-		},
-		{
-			name:    "When there there is no destination for the given binding",
-			id:      "abc123",
-			binding: core.ServiceBinding("non-existing"),
-			err:     "saml.ServiceProvider.CreateAuthnRequest: failed to get destination for given service binding (non-existing):",
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(_ *testing.T) {
-			got, err := provider.CreateAuthnRequest(c.id, c.binding)
-			if c.err != "" {
-				r.Error(err)
-				r.ErrorContains(err, c.err)
-			} else {
-				r.NoError(err)
-
-				switch c.binding {
-				case core.ServiceBindingHTTPPost:
-					loc := fmt.Sprintf("%s/saml/login/post", tp.ServerURL())
-					r.Equal(loc, got.Destination)
-				case core.ServiceBindingHTTPRedirect:
-					loc := fmt.Sprintf("%s/saml/login/redirect", tp.ServerURL())
-					r.Equal(loc, got.Destination)
-				}
-
-				r.Equal(c.id, got.ID)
-				r.Equal("2.0", got.Version)
-				r.Equal(core.ServiceBindingHTTPPost, got.ProtocolBinding)
-				r.Equal("http://test.me/saml/acs", got.AssertionConsumerServiceURL)
-				r.Equal("http://test.me/entity", got.Issuer.Value)
-				r.Equal(core.NameIDFormatEmail, got.NameIDPolicy.Format)
-				r.False(got.NameIDPolicy.AllowCreate)
-				r.False(got.ForceAuthn)
 			}
 		})
 	}
