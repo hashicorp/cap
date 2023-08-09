@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/hashicorp/cap/oidc"
 
@@ -16,8 +17,74 @@ import (
 
 var ErrBindingUnsupported = errors.New("Configured binding unsupported by the IDP")
 
-//go:embed auth_request.gohtml
+//go:embed authn_request.gohtml
 var PostBindingTempl string
+
+type metadataOptions struct {
+	wantAssertionsSigned bool
+	nameIDFormats        []core.NameIDFormat
+	acsServiceBinding    core.ServiceBinding
+	addtionalACSs        []metadata.Endpoint
+}
+
+func metadataOptionsDefault() metadataOptions {
+	return metadataOptions{
+		wantAssertionsSigned: true,
+		nameIDFormats: []core.NameIDFormat{
+			core.NameIDFormatEmail,
+		},
+		acsServiceBinding: core.ServiceBindingHTTPPost,
+	}
+}
+
+func getMetadataOptions(opt ...Option) metadataOptions {
+	opts := metadataOptionsDefault()
+	ApplyOpts(&opts, opt...)
+	return opts
+}
+
+func InsecureWantAssertionsUnsigned() Option {
+	return func(o interface{}) {
+		if o, ok := o.(*metadataOptions); ok {
+			o.wantAssertionsSigned = false
+		}
+	}
+}
+
+func WithAdditionalNameIDFormat(format core.NameIDFormat) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*metadataOptions); ok {
+			o.nameIDFormats = append(o.nameIDFormats, format)
+		}
+	}
+}
+
+func WithNameIDFormats(formats []core.NameIDFormat) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*metadataOptions); ok {
+			o.nameIDFormats = formats
+		}
+	}
+}
+
+func WithACSServiceBinding(b core.ServiceBinding) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*metadataOptions); ok {
+			o.acsServiceBinding = b
+		}
+	}
+}
+
+func WithAdditionalACSEndpoint(b core.ServiceBinding, location *url.URL) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*metadataOptions); ok {
+			o.addtionalACSs = append(o.addtionalACSs, metadata.Endpoint{
+				Binding:  b,
+				Location: location.String(),
+			})
+		}
+	}
+}
 
 type ServiceProvider struct {
 	cfg *Config
@@ -50,8 +117,17 @@ func (sp *ServiceProvider) Config() *Config {
 	return sp.cfg
 }
 
-func (sp *ServiceProvider) CreateMetadata() *metadata.EntityDescriptorSPSSO {
+// CreateMetadata creates the metadata XML for the service provider.
+//
+// Options:
+// - InsecureWantAssertionsUnsigned
+// - WithNameIDFormats
+// - WithACSServiceBinding
+// - WithAdditonalACSEndpoint
+func (sp *ServiceProvider) CreateMetadata(opt ...Option) *metadata.EntityDescriptorSPSSO {
 	validUntil := sp.cfg.ValidUntil()
+
+	opts := getMetadataOptions(opt...)
 
 	spsso := metadata.EntityDescriptorSPSSO{}
 	spsso.EntityID = sp.cfg.EntityID.String()
@@ -60,20 +136,27 @@ func (sp *ServiceProvider) CreateMetadata() *metadata.EntityDescriptorSPSSO {
 	spssoDescriptor := &metadata.SPSSODescriptor{}
 	spssoDescriptor.ValidUntil = validUntil
 	spssoDescriptor.ProtocolSupportEnumeration = metadata.ProtocolSupportEnumerationProtocol
-	spssoDescriptor.NameIDFormat = []core.NameIDFormat{
-		core.NameIDFormatEmail,
-		core.NameIDFormatTransient,
-	}
+	spssoDescriptor.NameIDFormat = opts.nameIDFormats
 	spssoDescriptor.AuthnRequestsSigned = false // always false for now until request signing is supported.
-	spssoDescriptor.WantAssertionsSigned = true // TODO: create option for this
+	spssoDescriptor.WantAssertionsSigned = opts.wantAssertionsSigned
 	spssoDescriptor.AssertionConsumerService = []metadata.IndexedEndpoint{
 		{
 			Endpoint: metadata.Endpoint{
-				Binding:  core.ServiceBindingHTTPPost,
+				Binding:  opts.acsServiceBinding,
 				Location: sp.cfg.AssertionConsumerServiceURL.String(),
 			},
 			Index: 1,
 		},
+	}
+
+	for i, a := range opts.addtionalACSs {
+		spssoDescriptor.AssertionConsumerService = append(
+			spssoDescriptor.AssertionConsumerService,
+			metadata.IndexedEndpoint{
+				Endpoint: a,
+				Index:    i + 2, // The first index is already taken.
+			},
+		)
 	}
 
 	spsso.SPSSODescriptor = []*metadata.SPSSODescriptor{spssoDescriptor}
@@ -104,6 +187,11 @@ func (sp *ServiceProvider) FetchMetadata() (*metadata.EntityDescriptorIDPSSO, er
 	if err != nil {
 		return nil, fmt.Errorf("%s: failed to parse metadata XML: %w", op, err)
 	}
+
+	// [SDP-MD03] https://kantarainitiative.github.io/SAMLprofiles/saml2int.html#_metadata_and_trust_management
+	// Metadata without a validUntil attribute on its root element MUST be rejected. Metadata whose root element’s validUntil
+	// attribute extends beyond a deployer- or community-imposed threshold MUST be rejected.
+	// TODO: VALIDATE
 
 	return &ed, nil
 }
