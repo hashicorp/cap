@@ -14,9 +14,73 @@ import (
 	"github.com/hashicorp/cap/saml/models/core"
 )
 
-func (sp *ServiceProvider) ParseResponse(samlResp string) (*core.Response, error) {
+type parseResponseOptions struct {
+	skipRequestIDValidation          bool
+	skipAssertionConditionValidation bool
+	skipSignatureValidation          bool
+}
+
+func parseReponseOptionsDefault() parseResponseOptions {
+	return parseResponseOptions{
+		skipRequestIDValidation:          false,
+		skipAssertionConditionValidation: false,
+		skipSignatureValidation:          false,
+	}
+}
+
+func getParseResponseOptions(opt ...Option) parseResponseOptions {
+	opts := parseReponseOptionsDefault()
+	ApplyOpts(&opts, opt...)
+	return opts
+}
+
+// InsecureSkipRequestIDValidation disables/skips if the given requestID matches
+// the InResponseTo parameter in the SAML response. This options should only
+// be used for testing purposes.
+func InsecureSkipRequestIDValidation() Option {
+	return func(o interface{}) {
+		if o, ok := o.(*parseResponseOptions); ok {
+			o.skipRequestIDValidation = true
+		}
+	}
+}
+
+// InsecureSkipAssertionConditionValidation disables/skips validation of the assertion
+// conditions within the SAML response. This options should only be used for
+// testing purposes.
+func InsecureSkipAssertionConditionValidation() Option {
+	return func(o interface{}) {
+		if o, ok := o.(*parseResponseOptions); ok {
+			o.skipAssertionConditionValidation = true
+		}
+	}
+}
+
+// InsecureSkipSignatureValidation disables/skips validation of the SAML Response and its assertions.
+// This options should only be used for testing purposes.
+func InsecureSkipSignatureValidation() Option {
+	return func(o interface{}) {
+		if o, ok := o.(*parseResponseOptions); ok {
+			o.skipSignatureValidation = true
+		}
+	}
+}
+
+// ParseResponse parses and validates a SAML Reponse.
+//
+// Options:
+// - InsecureSkipRequestIDValidation
+// - InsecureSkipAssertionConditionValidation
+// - InsecureSkipSignatureValidation
+func (sp *ServiceProvider) ParseResponse(
+	samlResp string,
+	requestID string,
+	opt ...Option,
+) (*core.Response, error) {
+	opts := getParseResponseOptions(opt...)
+
 	// We use github.com/russellhaering/gosaml2 for SAMLResponse signiture and condition validation.
-	ip, err := sp.internalParser()
+	ip, err := sp.internalParser(opts.skipSignatureValidation)
 	if err != nil {
 		return nil, err
 	}
@@ -27,31 +91,43 @@ func (sp *ServiceProvider) ParseResponse(samlResp string) (*core.Response, error
 		return nil, err
 	}
 
+	if !opts.skipRequestIDValidation {
+		if response.InResponseTo != requestID {
+			return nil, fmt.Errorf(
+				"InResponseTo (%s) doesn't match the expected requestID (%s)",
+				response.InResponseTo,
+				requestID,
+			)
+		}
+	}
+
 	if len(response.Assertions) == 0 {
 		return nil, errors.New("missing assertions")
 	}
 
 	// Verify conditions for all assertions
-	for _, assert := range response.Assertions {
-		warnings, err := ip.VerifyAssertionConditions(&assert)
-		if err != nil {
-			return nil, err
-		}
+	if !opts.skipAssertionConditionValidation {
+		for _, assert := range response.Assertions {
+			warnings, err := ip.VerifyAssertionConditions(&assert)
+			if err != nil {
+				return nil, err
+			}
 
-		if warnings.InvalidTime {
-			return nil, errors.New("invalid time")
-		}
+			if warnings.InvalidTime {
+				return nil, errors.New("invalid time")
+			}
 
-		if warnings.NotInAudience {
-			return nil, errors.New("invalid audience")
-		}
+			if warnings.NotInAudience {
+				return nil, errors.New("invalid audience")
+			}
 
-		if assert.Subject == nil || assert.Subject.NameID == nil {
-			return nil, errors.New("subject missing")
-		}
+			if assert.Subject == nil || assert.Subject.NameID == nil {
+				return nil, errors.New("subject missing")
+			}
 
-		if assert.AttributeStatement == nil {
-			return nil, errors.New("attribute statement missing")
+			if assert.AttributeStatement == nil {
+				return nil, errors.New("attribute statement missing")
+			}
 		}
 	}
 
@@ -62,8 +138,9 @@ func (sp *ServiceProvider) ParseResponse(samlResp string) (*core.Response, error
 	return &result, nil
 }
 
-func (sp *ServiceProvider) internalParser() (*saml2.SAMLServiceProvider, error) {
-
+func (sp *ServiceProvider) internalParser(
+	skipSignatureValidation bool,
+) (*saml2.SAMLServiceProvider, error) {
 	meta, err := sp.FetchMetadata()
 	if err != nil {
 		return nil, err
@@ -93,6 +170,7 @@ func (sp *ServiceProvider) internalParser() (*saml2.SAMLServiceProvider, error) 
 		AssertionConsumerServiceURL: sp.cfg.AssertionConsumerServiceURL.String(),
 		AudienceURI:                 sp.cfg.EntityID.String(),
 		IDPCertificateStore:         &certStore,
+		SkipSignatureValidation:     skipSignatureValidation,
 	}, nil
 }
 
