@@ -100,6 +100,13 @@ func WithAuthContextClassRefs(cfs []string) Option {
 // CreateAuthNRequest creates an Authentication Request object.
 // The defaults follow the deployment profile for federation interoperability.
 // See: 3.1.1 https://kantarainitiative.github.io/SAMLprofiles/saml2int.html#_service_provider_requirements [INT_SAML]
+//
+// Options:
+// - ForceAuthn
+// - AllowCreate
+// - WithIDFormat
+// - WithProtocolBinding
+// - WithAuthContextClassRefs
 func (sp *ServiceProvider) CreateAuthnRequest(
 	id string,
 	binding core.ServiceBinding,

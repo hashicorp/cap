@@ -181,7 +181,102 @@ func Test_ServiceProvider_CreateMetadata(t *testing.T) {
 				got.SPSSODescriptor[0].AssertionConsumerService[0].Location,
 			)
 			r.Contains(got.SPSSODescriptor[0].NameIDFormat, core.NameIDFormatEmail)
-			r.Contains(got.SPSSODescriptor[0].NameIDFormat, core.NameIDFormatTransient)
 		})
 	}
+}
+
+func Test_CreateMetadata_Options(t *testing.T) {
+	r := require.New(t)
+
+	fakeURL, err := url.Parse("http://fake.test.url")
+	r.NoError(err)
+
+	cfg, err := saml.NewConfig(
+		fakeURL,
+		fakeURL,
+		fakeURL,
+		fakeURL,
+	)
+
+	provider, err := saml.NewServiceProvider(cfg)
+	r.NoError(err)
+
+	t.Run("When option InsecureWantAssertionsUnsigned is set", func(_ *testing.T) {
+		got := provider.CreateMetadata(
+			saml.InsecureWantAssertionsUnsigned(),
+		)
+
+		r.False(got.SPSSODescriptor[0].WantAssertionsSigned)
+	})
+
+	t.Run("When option WithAdditionalNameIDFormat is set", func(_ *testing.T) {
+		got := provider.CreateMetadata(
+			saml.WithAdditionalNameIDFormat(core.NameIDFormatTransient),
+		)
+
+		r.Len(got.SPSSODescriptor[0].NameIDFormat, 2)
+		r.Contains(got.SPSSODescriptor[0].NameIDFormat, core.NameIDFormatTransient)
+	})
+
+	t.Run("When option WithNameIDFormats is set", func(_ *testing.T) {
+		got := provider.CreateMetadata(
+			saml.WithNameIDFormats([]core.NameIDFormat{
+				core.NameIDFormatEntity,
+				core.NameIDFormatUnspecified,
+			}),
+		)
+
+		r.Len(got.SPSSODescriptor[0].NameIDFormat, 2)
+		r.Equal(got.SPSSODescriptor[0].NameIDFormat, []core.NameIDFormat{
+			core.NameIDFormatEntity,
+			core.NameIDFormatUnspecified,
+		})
+	})
+
+	t.Run("When option WithACSServiceBinding is set", func(_ *testing.T) {
+		got := provider.CreateMetadata(
+			saml.WithACSServiceBinding(core.ServiceBindingHTTPRedirect),
+		)
+
+		r.Len(got.SPSSODescriptor[0].AssertionConsumerService, 1)
+		r.Equal(
+			got.SPSSODescriptor[0].AssertionConsumerService[0].Binding,
+			core.ServiceBindingHTTPRedirect,
+		)
+	})
+
+	t.Run("When option WithAdditionalACSEndpoint is set", func(_ *testing.T) {
+		redirectEndpoint, err := url.Parse("http://cap.saml.test/acs/redirect")
+		r.NoError(err)
+
+		got := provider.CreateMetadata(
+			saml.WithAdditionalACSEndpoint(
+				core.ServiceBindingHTTPRedirect,
+				redirectEndpoint,
+			),
+		)
+
+		r.Len(got.SPSSODescriptor[0].AssertionConsumerService, 2)
+		r.Equal(
+			got.SPSSODescriptor[0].AssertionConsumerService[0],
+			metadata.IndexedEndpoint{
+				Endpoint: metadata.Endpoint{
+					Binding:  core.ServiceBindingHTTPPost,
+					Location: fakeURL.String(),
+				},
+				Index: 1,
+			},
+		)
+
+		r.Equal(
+			got.SPSSODescriptor[0].AssertionConsumerService[1],
+			metadata.IndexedEndpoint{
+				Endpoint: metadata.Endpoint{
+					Binding:  core.ServiceBindingHTTPRedirect,
+					Location: redirectEndpoint.String(),
+				},
+				Index: 2,
+			},
+		)
+	})
 }
