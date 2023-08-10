@@ -7,11 +7,14 @@ import (
 	"time"
 
 	"github.com/hashicorp/cap/oidc"
+	"github.com/hashicorp/go-uuid"
 )
 
 var ErrInvalidTLSCert = errors.New("invalid tls certificate")
 
 type ValidUntilFunc func() time.Time
+
+type GenerateAuthRequestIDFunc func() (string, error)
 
 type Config struct {
 	// AssertionConsumerServiceURL defines the endpoint at the SP where the IDP
@@ -28,10 +31,14 @@ type Config struct {
 	MetadataURL *url.URL
 
 	// ValidUntil is a function that defines until the generated service provider metadata
-	// document is valid. (optional)
+	// document is valid.
 	ValidUntil ValidUntilFunc
+
+	// GenerateAuthRequestID generates a XSD:ID conform ID.
+	GenerateAuthRequestID GenerateAuthRequestIDFunc
 }
 
+// NewConfig creates a new SAML Config.
 func NewConfig(entityID, acs, issuer, metadata *url.URL) (*Config, error) {
 	const op = "saml.NewConfig"
 
@@ -39,8 +46,10 @@ func NewConfig(entityID, acs, issuer, metadata *url.URL) (*Config, error) {
 		EntityID:                    entityID,
 		Issuer:                      issuer,
 		AssertionConsumerServiceURL: acs,
-		ValidUntil:                  DefaultValidUntil,
 		MetadataURL:                 metadata,
+
+		ValidUntil:            DefaultValidUntil,
+		GenerateAuthRequestID: GenerateAuthRequestID,
 	}
 
 	err := cfg.Validate()
@@ -51,6 +60,20 @@ func NewConfig(entityID, acs, issuer, metadata *url.URL) (*Config, error) {
 	return cfg, nil
 }
 
+// GenerateAuthRequestID generates an auth XSD:ID conform ID.
+// A UUID prefixed with an underscore.
+func GenerateAuthRequestID() (string, error) {
+	newID, err := uuid.GenerateUUID()
+	if err != nil {
+		return "", err
+	}
+
+	// Request IDs have to be xsd:ID, which means they need to start with an underscore or letter,
+	// which is not always given for UUIDs.
+	return fmt.Sprintf("_%s", newID), nil
+}
+
+// Validate validates the provided configuration.
 func (c *Config) Validate() error {
 	const op = "saml.Config.Validate"
 
@@ -70,9 +93,22 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("%s: Metadata URL not set: %w", op, oidc.ErrInvalidParameter)
 	}
 
+	if c.ValidUntil == nil {
+		return fmt.Errorf("%s: ValidUntil func not provided: %w", op, oidc.ErrInvalidParameter)
+	}
+
+	if c.GenerateAuthRequestID == nil {
+		return fmt.Errorf(
+			"%s: GenerateAuthRequestID func not provided: %w",
+			op,
+			oidc.ErrInvalidParameter,
+		)
+	}
+
 	return nil
 }
 
+// DefaultValidUntil
 func DefaultValidUntil() time.Time {
 	return time.Now().Add(time.Hour * 24 * 365)
 }

@@ -20,6 +20,13 @@ func Test_NewServiceProvider(t *testing.T) {
 	exampleURL, err := url.Parse("http://test.me")
 	r.NoError(err)
 
+	validConfig, err := saml.NewConfig(
+		exampleURL,
+		exampleURL,
+		exampleURL,
+		exampleURL,
+	)
+
 	cases := []struct {
 		name string
 		cfg  *saml.Config
@@ -27,13 +34,8 @@ func Test_NewServiceProvider(t *testing.T) {
 	}{
 		{
 			name: "When a valid config is provided",
-			cfg: &saml.Config{
-				AssertionConsumerServiceURL: exampleURL,
-				Issuer:                      exampleURL,
-				MetadataURL:                 exampleURL,
-				EntityID:                    exampleURL,
-			},
-			err: "",
+			cfg:  validConfig,
+			err:  "",
 		},
 		{
 			name: "When an invalid config is provided",
