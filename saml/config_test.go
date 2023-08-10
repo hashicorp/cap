@@ -2,8 +2,10 @@ package saml_test
 
 import (
 	"net/url"
+	"strings"
 	"testing"
 
+	"github.com/hashicorp/go-uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/cap/saml"
@@ -30,6 +32,7 @@ func Test_NewConfig(t *testing.T) {
 		acs         *url.URL
 		issuer      *url.URL
 		metadata    *url.URL
+		cfgOverride func(*saml.Config)
 		expectedErr string
 	}{
 		{
@@ -69,6 +72,7 @@ func Test_NewConfig(t *testing.T) {
 			expectedErr: "saml.NewConfig: invalid provider config: saml.Config.Validate: Metadata URL not set: invalid parameter",
 		},
 	}
+
 	for _, c := range cases {
 		t.Run(c.name, func(_ *testing.T) {
 			got, err := saml.NewConfig(
@@ -87,7 +91,24 @@ func Test_NewConfig(t *testing.T) {
 				r.Equal(got.AssertionConsumerServiceURL.String(), "http://test.me/sso/acs")
 				r.Equal(got.Issuer.String(), "http://test.me")
 				r.Equal(got.MetadataURL.String(), "http://test.me/sso/metadata")
+
+				r.NotNil(got.GenerateAuthRequestID)
+				r.NotNil(got.ValidUntil)
 			}
 		})
 	}
+}
+
+func Test_GenerateAuthRequestID(t *testing.T) {
+	r := require.New(t)
+
+	id, err := saml.GenerateAuthRequestID()
+	r.NoError(err)
+
+	r.Contains(id, "_")
+
+	splitted := strings.Split(id, "_")
+
+	_, err = uuid.ParseUUID(splitted[1])
+	r.NoError(err)
 }

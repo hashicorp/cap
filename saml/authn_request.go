@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/cap/oidc"
-	"github.com/hashicorp/go-uuid"
 
 	"github.com/hashicorp/cap/saml/models/core"
 )
@@ -184,8 +183,7 @@ func (sp *ServiceProvider) CreateAuthnRequest(
 
 // AuthnRequestPost creates an AuthRequest with HTTP-Post binding.
 func (sp *ServiceProvider) AuthnRequestPost(relayState string) ([]byte, *core.AuthnRequest, error) {
-	// TODO change this
-	requestID, err := uuid.GenerateUUID()
+	requestID, err := sp.cfg.GenerateAuthRequestID()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -228,7 +226,7 @@ func WritePostBindingRequestHeader(w http.ResponseWriter) {
 func (sp *ServiceProvider) AuthnRequestRedirect(
 	relayState string, opts ...Option,
 ) (*url.URL, *core.AuthnRequest, error) {
-	requestID, err := uuid.GenerateUUID()
+	requestID, err := sp.cfg.GenerateAuthRequestID()
 	if err != nil {
 		return nil, nil, err
 	}
