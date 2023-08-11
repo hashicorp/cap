@@ -67,14 +67,14 @@ func (c *MetadataParameters) Validate() error {
 		return fmt.Errorf("issuer not set")
 	}
 	if _, err := url.Parse(c.Issuer); err != nil {
-		return fmt.Errorf("failed to parse Issuer: %w", err)
+		return fmt.Errorf("provided Issuer is not a valid URL: %w", err)
 	}
 
 	if c.SingleSignOnURL == "" {
 		return fmt.Errorf("SSO URL not set")
 	}
 	if _, err := url.Parse(c.SingleSignOnURL); err != nil {
-		return fmt.Errorf("failed to parse SSO URL: %w", err)
+		return fmt.Errorf("provided SSO URL is not a valid URL: %w", err)
 	}
 
 	if _, err := parsePEMCertificate([]byte(c.IDPCertificate)); err != nil {
@@ -166,14 +166,14 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("%s: ACS URL not set: %w", op, ErrInvalidParameter)
 	}
 	if _, err := url.Parse(c.AssertionConsumerServiceURL); err != nil {
-		return fmt.Errorf("%s: failed to parse ACS URL: %w", op, ErrInvalidParameter)
+		return fmt.Errorf("%s: provided ACS URL is not a valid URL: %w", op, ErrInvalidParameter)
 	}
 
 	if c.EntityID == "" {
 		return fmt.Errorf("%s: EntityID not set: %w", op, ErrInvalidParameter)
 	}
 	if _, err := url.Parse(c.EntityID); err != nil {
-		return fmt.Errorf("%s: failed to parse EntityID: %w", op, ErrInvalidParameter)
+		return fmt.Errorf("%s: provided Entity ID is not a valid URL: %w", op, ErrInvalidParameter)
 	}
 
 	if c.MetadataURL == "" && c.MetadataXML == "" && c.MetadataParameters == nil {
@@ -182,7 +182,7 @@ func (c *Config) Validate() error {
 	}
 	if c.MetadataURL != "" {
 		if _, err := url.Parse(c.MetadataURL); err != nil {
-			return fmt.Errorf("%s: failed to parse MetadataURL: %w", op, ErrInvalidParameter)
+			return fmt.Errorf("%s: provided Metadata URL is not a valid URL: %w", op, ErrInvalidParameter)
 		}
 	}
 	if c.MetadataXML != "" {
