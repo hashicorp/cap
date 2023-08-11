@@ -199,7 +199,7 @@ func (c *Config) Validate() error {
 
 	if c.GenerateAuthRequestID == nil {
 		return fmt.Errorf(
-			"%s: DefaultGenerateAuthRequestID func not provided: %w",
+			"%s: GenerateAuthRequestID func not provided: %w",
 			op,
 			ErrInvalidParameter,
 		)
