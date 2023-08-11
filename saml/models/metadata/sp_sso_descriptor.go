@@ -8,7 +8,7 @@ import "encoding/xml"
 type EntityDescriptorSPSSO struct {
 	XMLName xml.Name `xml:"urn:oasis:names:tc:SAML:2.0:metadata EntityDescriptor"`
 
-	entityDescriptor
+	EntityDescriptor
 
 	SPSSODescriptor []*SPSSODescriptor
 }

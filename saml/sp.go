@@ -2,20 +2,17 @@ package saml
 
 import (
 	_ "embed"
+	"encoding/base64"
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 
-	"github.com/hashicorp/cap/oidc"
-
 	"github.com/hashicorp/cap/saml/models/core"
 	"github.com/hashicorp/cap/saml/models/metadata"
+	dsig "github.com/russellhaering/goxmldsig/types"
 )
-
-var ErrBindingUnsupported = errors.New("Configured binding unsupported by the IDP")
 
 //go:embed authn_request.gohtml
 var PostBindingTempl string
@@ -130,7 +127,7 @@ func (sp *ServiceProvider) CreateMetadata(opt ...Option) *metadata.EntityDescrip
 	opts := getMetadataOptions(opt...)
 
 	spsso := metadata.EntityDescriptorSPSSO{}
-	spsso.EntityID = sp.cfg.EntityID.String()
+	spsso.EntityID = sp.cfg.EntityID
 	spsso.ValidUntil = validUntil
 
 	spssoDescriptor := &metadata.SPSSODescriptor{}
@@ -143,7 +140,7 @@ func (sp *ServiceProvider) CreateMetadata(opt ...Option) *metadata.EntityDescrip
 		{
 			Endpoint: metadata.Endpoint{
 				Binding:  opts.acsServiceBinding,
-				Location: sp.cfg.AssertionConsumerServiceURL.String(),
+				Location: sp.cfg.AssertionConsumerServiceURL,
 			},
 			Index: 1,
 		},
@@ -164,42 +161,45 @@ func (sp *ServiceProvider) CreateMetadata(opt ...Option) *metadata.EntityDescrip
 	return &spsso
 }
 
-// FetchMetadata fetches the metadata XML document from the IDP provider.
-func (sp *ServiceProvider) FetchMetadata() (*metadata.EntityDescriptorIDPSSO, error) {
-	const op = "saml.ServiceProvider.FetchMetdata"
+// IDPMetadata fetches the metadata XML document from the configured identity provider.
+func (sp *ServiceProvider) IDPMetadata() (*metadata.EntityDescriptorIDPSSO, error) {
+	const op = "saml.ServiceProvider.FetchIDPMetadata"
 
-	if sp.cfg.MetadataURL == nil {
-		return nil, fmt.Errorf("%s: no metadata URL set: %w", op, oidc.ErrInvalidParameter)
+	var err error
+	var ed *metadata.EntityDescriptorIDPSSO
+
+	// Order of switch case determines IDP metadata config precedence
+	switch {
+	case sp.cfg.MetadataURL != "":
+		ed, err = fetchIDPMetadata(sp.cfg.MetadataURL)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+		return ed, nil
+
+	case sp.cfg.MetadataXML != "":
+		ed, err = parseIDPMetadata([]byte(sp.cfg.MetadataXML))
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+
+	case sp.cfg.MetadataParameters != nil:
+		ed, err = constructIDPMetadata(sp.cfg.MetadataParameters)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+
+	default:
+		return nil, fmt.Errorf("%s: no IDP metadata configuration set: %w", op, ErrInvalidParameter)
 	}
 
-	res, err := http.Get(sp.cfg.MetadataURL.String())
-	if err != nil {
-		return nil, fmt.Errorf("%s: failed to fetch metadata: %w", op, err)
-	}
-
-	raw, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("%s: failed to read http body: %w", op, err)
-	}
-
-	var ed metadata.EntityDescriptorIDPSSO
-	err = xml.Unmarshal(raw, &ed)
-	if err != nil {
-		return nil, fmt.Errorf("%s: failed to parse metadata XML: %w", op, err)
-	}
-
-	// [SDP-MD03] https://kantarainitiative.github.io/SAMLprofiles/saml2int.html#_metadata_and_trust_management
-	// Metadata without a validUntil attribute on its root element MUST be rejected. Metadata whose root element’s validUntil
-	// attribute extends beyond a deployer- or community-imposed threshold MUST be rejected.
-	// TODO: VALIDATE
-
-	return &ed, nil
+	return ed, err
 }
 
 func (sp *ServiceProvider) destination(binding core.ServiceBinding) (string, error) {
 	const op = "saml.ServiceProvider.destination"
 
-	meta, err := sp.FetchMetadata()
+	meta, err := sp.IDPMetadata()
 	if err != nil {
 		return "", fmt.Errorf("%s: failed to fetch metadata: %w", op, err)
 	}
@@ -213,4 +213,81 @@ func (sp *ServiceProvider) destination(binding core.ServiceBinding) (string, err
 	}
 
 	return destination, nil
+}
+
+func fetchIDPMetadata(metadataURL string) (*metadata.EntityDescriptorIDPSSO, error) {
+	res, err := http.Get(metadataURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch identity provider metadata: %w", err)
+	}
+
+	raw, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read http body: %w", err)
+	}
+
+	meta, err := parseIDPMetadata(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	return meta, err
+}
+
+func parseIDPMetadata(rawXML []byte) (*metadata.EntityDescriptorIDPSSO, error) {
+	var ed metadata.EntityDescriptorIDPSSO
+	if err := xml.Unmarshal(rawXML, &ed); err != nil {
+		return nil, fmt.Errorf("failed to parse identity provider XML metadata: %w", err)
+	}
+
+	// [SDP-MD03] https://kantarainitiative.github.io/SAMLprofiles/saml2int.html#_metadata_and_trust_management
+	// IDPMetadata without a validUntil attribute on its root element MUST be rejected. IDPMetadata whose root element’s validUntil
+	// attribute extends beyond a deployer- or community-imposed threshold MUST be rejected.
+	// TODO: VALIDATE
+
+	return &ed, nil
+}
+
+func constructIDPMetadata(params *MetadataParameters) (*metadata.EntityDescriptorIDPSSO, error) {
+	cert, err := parsePEMCertificate([]byte(params.IDPCertificate))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse certificate: %w", err)
+	}
+
+	keyDescriptor := metadata.KeyDescriptor{
+		Use: metadata.KeyTypeSigning,
+		KeyInfo: metadata.KeyInfo{
+			KeyInfo: dsig.KeyInfo{
+				X509Data: dsig.X509Data{
+					X509Certificates: []dsig.X509Certificate{
+						{
+							Data: base64.StdEncoding.EncodeToString(cert.Raw),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	idpSSODescriptor := &metadata.IDPSSODescriptor{
+		SSODescriptor: metadata.SSODescriptor{
+			RoleDescriptor: metadata.RoleDescriptor{
+				KeyDescriptor: []metadata.KeyDescriptor{keyDescriptor},
+			},
+		},
+		WantAuthnRequestsSigned: false,
+		SingleSignOnService: []metadata.Endpoint{
+			{
+				Binding:  params.Binding,
+				Location: params.SingleSignOnURL,
+			},
+		},
+	}
+
+	return &metadata.EntityDescriptorIDPSSO{
+		EntityDescriptor: metadata.EntityDescriptor{
+			EntityID: params.Issuer,
+		},
+		IDPSSODescriptor: []*metadata.IDPSSODescriptor{idpSSODescriptor},
+	}, nil
 }
