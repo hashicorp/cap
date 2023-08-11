@@ -55,9 +55,9 @@ type EntitiesDescriptor struct {
 	EntityDescriptor   []*EntityDescriptor
 }
 
-// entityDescriptor represents a system entity (IdP or SP) in metadata.
+// EntityDescriptor represents a system entity (IdP or SP) in metadata.
 // See 2.3.2 in http://docs.oasis-open.org/security/saml/v2.0/saml-metadata-2.0-os.pdf
-type entityDescriptor struct {
+type EntityDescriptor struct {
 	DescriptorCommon
 
 	EntityID string `xml:"entityID,attr"`
@@ -66,25 +66,6 @@ type entityDescriptor struct {
 	Organization               *Organization
 	ContactPerson              *ContactPerson
 	AdditionalMetadataLocation []string
-}
-
-// EntityDescriptorComplete represents a system entity (IdP or SP) in metadata.
-// See 2.3.2 in http://docs.oasis-open.org/security/saml/v2.0/saml-metadata-2.0-os.pdf
-type EntityDescriptor struct {
-	DescriptorCommon
-
-	EntityID string
-
-	RoleDescriptor               []*RoleDescriptor
-	IDPSSODescriptor             []*IDPSSODescriptor
-	SPSSODescriptor              []*SPSSODescriptor
-	AuthnAuthorityDescriptor     []*AuthnAuthorityDescriptor
-	AttributeAuthorityDescriptor []*AttributeAuthorityDescriptor
-	PDPDescriptor                []*PDPDescriptor
-	AffiliationDescriptor        *AffiliationDescriptor
-	Organization                 *Organization
-	ContactPerson                *ContactPerson
-	AdditionalMetadataLocation   []string
 }
 
 // Organization specifies basic information about an organization responsible for a SAML
@@ -183,42 +164,6 @@ type AttributeAuthorityDescriptor struct {
 // entitites, such as related service providers that
 // share a persistent NameID.
 type AffiliationDescriptor struct {
-}
-
-func (e *EntityDescriptor) GetSSOBindingLocation(binding core.ServiceBinding) string {
-	for _, idpSSODescriptor := range e.IDPSSODescriptor {
-		for _, ssoSvc := range idpSSODescriptor.SingleSignOnService {
-			if ssoSvc.Binding == binding {
-				return ssoSvc.Location
-			}
-		}
-	}
-
-	return ""
-}
-
-func (e *EntityDescriptor) GetSLOBindingLocation(binding core.ServiceBinding) string {
-	for _, idpSSODescriptor := range e.IDPSSODescriptor {
-		for _, sloSvc := range idpSSODescriptor.SingleLogoutService {
-			if sloSvc.Binding == binding {
-				return sloSvc.Location
-			}
-		}
-	}
-
-	return ""
-}
-
-func (e *EntityDescriptor) GetArtifactBindingLocation(binding core.ServiceBinding) string {
-	for _, idpSSODescriptor := range e.IDPSSODescriptor {
-		for _, arSvc := range idpSSODescriptor.ArtifactResolutionService {
-			if arSvc.Binding == binding {
-				return arSvc.Location
-			}
-		}
-	}
-
-	return ""
 }
 
 // X509Data contains one ore more identifiers of keys or X509 certifactes.

@@ -2,7 +2,6 @@ package saml_test
 
 import (
 	"fmt"
-	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -18,24 +17,10 @@ func Test_CreateAuthnRequest(t *testing.T) {
 	tp := testprovider.StartTestProvider(t)
 	defer tp.Close()
 
-	entityID, err := url.Parse("http://test.me/entity")
-	r.NoError(err)
-
-	acs, err := url.Parse("http://test.me/saml/acs")
-	r.NoError(err)
-
-	issuer, err := url.Parse("http://test.idp")
-	r.NoError(err)
-
-	metaURL := fmt.Sprintf("%s/saml/metadata", tp.ServerURL())
-	metadata, err := url.Parse(metaURL)
-	r.NoError(err)
-
 	cfg, err := saml.NewConfig(
-		entityID,
-		acs,
-		issuer,
-		metadata,
+		"http://test.me/entity",
+		"http://test.me/saml/acs",
+		fmt.Sprintf("%s/saml/metadata", tp.ServerURL()),
 	)
 
 	provider, err := saml.NewServiceProvider(cfg)
@@ -116,24 +101,10 @@ func Test_CreateAuthnRequest_Options(t *testing.T) {
 	tp := testprovider.StartTestProvider(t)
 	defer tp.Close()
 
-	entityID, err := url.Parse("http://test.me/entity")
-	r.NoError(err)
-
-	acs, err := url.Parse("http://test.me/saml/acs")
-	r.NoError(err)
-
-	issuer, err := url.Parse("http://test.idp")
-	r.NoError(err)
-
-	metaURL := fmt.Sprintf("%s/saml/metadata", tp.ServerURL())
-	metadata, err := url.Parse(metaURL)
-	r.NoError(err)
-
 	cfg, err := saml.NewConfig(
-		entityID,
-		acs,
-		issuer,
-		metadata,
+		"http://test.me/entity",
+		"http://test.me/saml/acs",
+		fmt.Sprintf("%s/saml/metadata", tp.ServerURL()),
 	)
 
 	provider, err := saml.NewServiceProvider(cfg)

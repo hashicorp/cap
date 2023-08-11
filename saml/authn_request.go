@@ -143,12 +143,12 @@ func (sp *ServiceProvider) CreateAuthnRequest(
 	// "The message SHOULD contain an AssertionConsumerServiceURL attribute and MUST NOT contain an
 	// AssertionConsumerServiceIndex attribute (i.e., the desired endpoint MUST be the default,
 	// or identified via the AssertionConsumerServiceURL attribute)."
-	ar.AssertionConsumerServiceURL = sp.cfg.AssertionConsumerServiceURL.String()
+	ar.AssertionConsumerServiceURL = sp.cfg.AssertionConsumerServiceURL
 	ar.IssueInstant = time.Now().UTC()
 	ar.Destination = destination
 
 	ar.Issuer = &core.Issuer{}
-	ar.Issuer.Value = sp.cfg.EntityID.String()
+	ar.Issuer.Value = sp.cfg.EntityID
 
 	// [INT_SAML][SDP-SP04]
 	// "The <samlp:AuthnRequest> message MUST either omit the <samlp:NameIDPolicy> element (RECOMMENDED),

@@ -3,6 +3,7 @@ package saml
 import (
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/pem"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -20,7 +21,7 @@ type parseResponseOptions struct {
 	skipSignatureValidation          bool
 }
 
-func parseReponseOptionsDefault() parseResponseOptions {
+func parseResponseOptionsDefault() parseResponseOptions {
 	return parseResponseOptions{
 		skipRequestIDValidation:          false,
 		skipAssertionConditionValidation: false,
@@ -29,7 +30,7 @@ func parseReponseOptionsDefault() parseResponseOptions {
 }
 
 func getParseResponseOptions(opt ...Option) parseResponseOptions {
-	opts := parseReponseOptionsDefault()
+	opts := parseResponseOptionsDefault()
 	ApplyOpts(&opts, opt...)
 	return opts
 }
@@ -79,7 +80,7 @@ func (sp *ServiceProvider) ParseResponse(
 ) (*core.Response, error) {
 	opts := getParseResponseOptions(opt...)
 
-	// We use github.com/russellhaering/gosaml2 for SAMLResponse signiture and condition validation.
+	// We use github.com/russellhaering/gosaml2 for SAMLResponse signature and condition validation.
 	ip, err := sp.internalParser(opts.skipSignatureValidation)
 	if err != nil {
 		return nil, err
@@ -138,10 +139,8 @@ func (sp *ServiceProvider) ParseResponse(
 	return &result, nil
 }
 
-func (sp *ServiceProvider) internalParser(
-	skipSignatureValidation bool,
-) (*saml2.SAMLServiceProvider, error) {
-	meta, err := sp.FetchMetadata()
+func (sp *ServiceProvider) internalParser(skipSignatureValidation bool) (*saml2.SAMLServiceProvider, error) {
+	idpMetadata, err := sp.IDPMetadata()
 	if err != nil {
 		return nil, err
 	}
@@ -150,11 +149,11 @@ func (sp *ServiceProvider) internalParser(
 		Roots: []*x509.Certificate{},
 	}
 
-	for _, kd := range meta.IDPSSODescriptor[0].KeyDescriptor {
+	for _, kd := range idpMetadata.IDPSSODescriptor[0].KeyDescriptor {
 		switch kd.Use {
 		case "", "signing":
 			for _, xcert := range kd.KeyInfo.X509Data.X509Certificates {
-				parsed, err := parseCert(xcert.Data)
+				parsed, err := parseX509Certificate(xcert.Data)
 				if err != nil {
 					return nil, err
 				}
@@ -165,16 +164,18 @@ func (sp *ServiceProvider) internalParser(
 	}
 
 	return &saml2.SAMLServiceProvider{
-		IdentityProviderIssuer:      meta.EntityID,
-		ServiceProviderIssuer:       sp.cfg.Issuer.String(),
-		AssertionConsumerServiceURL: sp.cfg.AssertionConsumerServiceURL.String(),
-		AudienceURI:                 sp.cfg.EntityID.String(),
+		IdentityProviderIssuer:      idpMetadata.EntityID,
 		IDPCertificateStore:         &certStore,
+		ServiceProviderIssuer:       sp.cfg.EntityID,
+		AudienceURI:                 sp.cfg.EntityID,
+		AssertionConsumerServiceURL: sp.cfg.AssertionConsumerServiceURL,
 		SkipSignatureValidation:     skipSignatureValidation,
 	}, nil
 }
 
-func parseCert(cert string) (*x509.Certificate, error) {
+// parseX509Certificate parses the contents of a <ds:X509Certificate> which is a
+// base64-encoded ASN.1 DER certificate. It does not parse PEM-encoded certificates.
+func parseX509Certificate(cert string) (*x509.Certificate, error) {
 	regex := regexp.MustCompile(`\s+`)
 	cert = regex.ReplaceAllString(cert, "")
 	certBytes, err := base64.StdEncoding.DecodeString(cert)
@@ -188,4 +189,20 @@ func parseCert(cert string) (*x509.Certificate, error) {
 	}
 
 	return parsedCert, nil
+}
+
+func parsePEMCertificate(cert []byte) (*x509.Certificate, error) {
+	block, rest := pem.Decode(cert)
+	if block == nil {
+		return nil, fmt.Errorf("no certificate found")
+	}
+	if len(rest) != 0 {
+		return nil, fmt.Errorf("extra data found after certificate: %s", rest)
+	}
+
+	if block.Type != "CERTIFICATE" {
+		return nil, fmt.Errorf("wrong block type found: %q", block.Type)
+	}
+
+	return x509.ParseCertificate(block.Bytes)
 }

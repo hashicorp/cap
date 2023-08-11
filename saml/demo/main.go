@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"net/url"
 	"os"
 
 	"github.com/hashicorp/cap/saml"
@@ -13,36 +12,31 @@ import (
 
 func main() {
 	envs := map[string]string{
-		"entityID": os.Getenv("CAP_SAML_ENTITY_ID"),
-		"acs":      os.Getenv("CAP_SAML_ACS"),
-		"issuer":   os.Getenv("CAP_SAML_ISSUER"),
-		"metadata": os.Getenv("CAP_SAML_METADATA"),
+		"entityID":     os.Getenv("CAP_SAML_ENTITY_ID"),
+		"acs":          os.Getenv("CAP_SAML_ACS"),
+		"metadata":     os.Getenv("CAP_SAML_METADATA"),
+		"metadata_xml": os.Getenv("CAP_SAML_METADATA_XML"),
 	}
 
-	entityID, err := url.Parse(envs["entityID"])
-	exitOnError(err)
+	var options []saml.Option
+	if metaXML, ok := envs["metadata_xml"]; ok {
+		options = append(options, saml.WithMetadataXML(metaXML))
+	}
 
-	acs, err := url.Parse(envs["acs"])
-	exitOnError(err)
-
-	issuer, err := url.Parse(envs["issuer"])
-	exitOnError(err)
-
-	metadataURL, err := url.Parse(envs["metadata"])
-	exitOnError(err)
-
-	cfg, err := saml.NewConfig(entityID, acs, issuer, metadataURL)
+	cfg, err := saml.NewConfig(envs["entityID"], envs["acs"], envs["metadata"], options...)
 	exitOnError(err)
 
 	sp, err := saml.NewServiceProvider(cfg)
 	exitOnError(err)
 
 	http.HandleFunc("/saml/acs", handler.ACSHandlerFunc(sp))
-	http.HandleFunc("/saml/auth", handler.RedirectBindingHandlerFunc(sp))
+	http.HandleFunc("/saml/auth/redirect", handler.RedirectBindingHandlerFunc(sp))
+	http.HandleFunc("/saml/auth/post", handler.PostBindingHandlerFunc(sp))
 	http.HandleFunc("/metadata", handler.MetadaHandlerFunc(sp))
 	http.HandleFunc("/login", func(w http.ResponseWriter, _ *http.Request) {
 		ts, _ := template.New("sso").Parse(
-			`<html><form method="GET" action="/saml/auth"><button type="submit">Submit</button></form></html>`,
+			`<html><form method="GET" action="/saml/auth/redirect"><button type="submit">Submit Redirect</button></form></html>
+			<html><form method="GET" action="/saml/auth/post"><button type="submit">Submit POST</button></form></html>`,
 		)
 
 		ts.Execute(w, nil)

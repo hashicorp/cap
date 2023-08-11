@@ -17,15 +17,14 @@ import (
 
 func Test_NewServiceProvider(t *testing.T) {
 	r := require.New(t)
-	exampleURL, err := url.Parse("http://test.me")
-	r.NoError(err)
+	exampleURL := "http://test.me"
 
 	validConfig, err := saml.NewConfig(
 		exampleURL,
 		exampleURL,
 		exampleURL,
-		exampleURL,
 	)
+	r.NoError(err)
 
 	cases := []struct {
 		name string
@@ -73,15 +72,10 @@ func Test_ServiceProvider_FetchMetadata_ErrorCases(t *testing.T) {
 	}))
 	defer s.Close()
 
-	fakeURL, err := url.Parse("http://cap.saml.fake")
-	r.NoError(err)
-
-	meta := fmt.Sprintf("%s/saml/metadata", s.URL)
-	metaURL, err := url.Parse(meta)
-	r.NoError(err)
+	fakeURL := "http://cap.saml.fake"
+	metaURL := fmt.Sprintf("%s/saml/metadata", s.URL)
 
 	cfg, err := saml.NewConfig(
-		fakeURL,
 		fakeURL,
 		fakeURL,
 		fakeURL,
@@ -90,18 +84,18 @@ func Test_ServiceProvider_FetchMetadata_ErrorCases(t *testing.T) {
 
 	cases := []struct {
 		name     string
-		metadata *url.URL
+		metadata string
 		wantErr  string
 	}{
 		{
 			name:     "When the metadata can't be fetched",
 			metadata: fakeURL,
-			wantErr:  "saml.ServiceProvider.FetchMetdata: failed to fetch metadata:",
+			wantErr:  "saml.ServiceProvider.FetchIDPMetadata: failed to fetch identity provider metadata:",
 		},
 		{
 			name:     "When the metadata XML can't be parsed",
 			metadata: metaURL,
-			wantErr:  "saml.ServiceProvider.FetchMetdata: failed to parse metadata XML:",
+			wantErr:  "saml.ServiceProvider.FetchIDPMetadata: failed to parse identity provider XML metadata:",
 		},
 	}
 
@@ -112,7 +106,7 @@ func Test_ServiceProvider_FetchMetadata_ErrorCases(t *testing.T) {
 		r.NoError(err)
 
 		t.Run(c.name, func(_ *testing.T) {
-			got, err := provider.FetchMetadata()
+			got, err := provider.IDPMetadata()
 			r.Nil(got)
 			r.Error(err)
 			r.ErrorContains(err, c.wantErr)
@@ -123,17 +117,9 @@ func Test_ServiceProvider_FetchMetadata_ErrorCases(t *testing.T) {
 func Test_ServiceProvider_CreateMetadata(t *testing.T) {
 	r := require.New(t)
 
-	entityID, err := url.Parse("http://test.me/entity")
-	r.NoError(err)
-
-	acs, err := url.Parse("http://test.me/saml/acs")
-	r.NoError(err)
-
-	issuer, err := url.Parse("http://test.idp")
-	r.NoError(err)
-
-	meta, err := url.Parse("http://test.idp/metadata")
-	r.NoError(err)
+	entityID := "http://test.me/entity"
+	acs := "http://test.me/saml/acs"
+	meta := "http://test.me/sso/metadata"
 
 	now := time.Now()
 	validUntil := func() time.Time {
@@ -143,7 +129,6 @@ func Test_ServiceProvider_CreateMetadata(t *testing.T) {
 	cfg, err := saml.NewConfig(
 		entityID,
 		acs,
-		issuer,
 		meta,
 	)
 
@@ -190,11 +175,9 @@ func Test_ServiceProvider_CreateMetadata(t *testing.T) {
 func Test_CreateMetadata_Options(t *testing.T) {
 	r := require.New(t)
 
-	fakeURL, err := url.Parse("http://fake.test.url")
-	r.NoError(err)
+	fakeURL := "http://fake.test.url"
 
 	cfg, err := saml.NewConfig(
-		fakeURL,
 		fakeURL,
 		fakeURL,
 		fakeURL,
@@ -264,7 +247,7 @@ func Test_CreateMetadata_Options(t *testing.T) {
 			metadata.IndexedEndpoint{
 				Endpoint: metadata.Endpoint{
 					Binding:  core.ServiceBindingHTTPPost,
-					Location: fakeURL.String(),
+					Location: fakeURL,
 				},
 				Index: 1,
 			},

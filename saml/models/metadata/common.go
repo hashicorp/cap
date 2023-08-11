@@ -8,8 +8,8 @@ import "github.com/hashicorp/cap/saml/models/core"
   See 2.2 Common Types - http://docs.oasis-open.org/security/saml/v2.0/saml-metadata-2.0-os.pdf
 */
 
-//EndpointType describes a SAML protocol binding endpoint at which a SAML entity can
-//be sent protocol messages.
+// EndpointType describes a SAML protocol binding endpoint at which a SAML entity can
+// be sent protocol messages.
 // See 2.2.2 http://docs.oasis-open.org/security/saml/v2.0/saml-metadata-2.0-os.pdf
 type Endpoint struct {
 	Binding          core.ServiceBinding `xml:",attr"`

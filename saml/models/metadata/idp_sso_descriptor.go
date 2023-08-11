@@ -6,7 +6,7 @@ import (
 	"github.com/hashicorp/cap/saml/models/core"
 )
 
-// IDPSSODescriptor contains profiles specfic to identity providers supporting SSO.
+// IDPSSODescriptor contains profiles specific to identity providers supporting SSO.
 // It extends the SSODescriptor type.
 // See 2.4.3 http://docs.oasis-open.org/security/saml/v2.0/saml-metadata-2.0-os.pdf
 type IDPSSODescriptor struct {
@@ -25,7 +25,7 @@ type IDPSSODescriptor struct {
 // EntityDescriptorIDPSSO is an EntityDescriptor that accommodates the IDPSSODescriptor
 // as descriptor field only.
 type EntityDescriptorIDPSSO struct {
-	entityDescriptor
+	EntityDescriptor
 
 	IDPSSODescriptor []*IDPSSODescriptor
 }
