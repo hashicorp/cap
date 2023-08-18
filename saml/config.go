@@ -5,14 +5,21 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/hashicorp/cap/saml/models/core"
 	"github.com/hashicorp/go-uuid"
+
+	"github.com/hashicorp/cap/saml/models/core"
 )
 
+// ValidUntilFunc represents a function that sets a time until a service provider metadata
+// document is valid.
 type ValidUntilFunc func() time.Time
 
+// GenerateAuthRequestIDFunc represents a function that generates the
+// SAML authentication request ID.
 type GenerateAuthRequestIDFunc func() (string, error)
 
+// Config contains configuraiton parameters that are required for a service provider
+// to successfully federate with an identity provider and execute a SAML authentication flow.
 type Config struct {
 	// AssertionConsumerServiceURL defines the endpoint at the service provider where
 	// the identity provider will redirect to with its authentication response. Must be
@@ -44,6 +51,8 @@ type Config struct {
 	GenerateAuthRequestID GenerateAuthRequestIDFunc
 }
 
+// MetadataParameters are parameters that are required for SAML federation.
+// This can be used when the IDP doesn't support a Metadata URL.
 type MetadataParameters struct {
 	// Issuer is a globally unique identifier of the identity provider.
 	// Must be a valid URL. Required.
@@ -62,6 +71,7 @@ type MetadataParameters struct {
 	Binding core.ServiceBinding
 }
 
+// Validate validates the provided metadata parameters.
 func (c *MetadataParameters) Validate() error {
 	if c.Issuer == "" {
 		return fmt.Errorf("issuer not set")
@@ -158,7 +168,7 @@ func NewConfig(entityID, acs, metadataURL string, opt ...Option) (*Config, error
 	return cfg, nil
 }
 
-// Validate validates the provided configuration.
+// Validate validates the Config fields.
 func (c *Config) Validate() error {
 	const op = "saml.Config.Validate"
 
@@ -182,7 +192,11 @@ func (c *Config) Validate() error {
 	}
 	if c.MetadataURL != "" {
 		if _, err := url.Parse(c.MetadataURL); err != nil {
-			return fmt.Errorf("%s: provided Metadata URL is not a valid URL: %w", op, ErrInvalidParameter)
+			return fmt.Errorf(
+				"%s: provided Metadata URL is not a valid URL: %w",
+				op,
+				ErrInvalidParameter,
+			)
 		}
 	}
 	if c.MetadataXML != "" {
@@ -249,6 +263,8 @@ func DefaultGenerateAuthRequestID() (string, error) {
 	return fmt.Sprintf("_%s", newID), nil
 }
 
+// DefaultValidUntil returns a timestamp with one year
+// added to the time when this function is called.
 func DefaultValidUntil() time.Time {
 	return time.Now().Add(time.Hour * 24 * 365)
 }

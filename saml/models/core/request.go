@@ -23,8 +23,8 @@ type AuthnRequest struct {
 	RequestedAuthContext *RequestedAuthnContext
 	Scoping              *Scoping
 
-	ForceAuthn bool `xml:",attr"`
-	IsPassive  bool `xml:",attr"`
+	ForceAuthn bool `xml:",attr,omitempty"`
+	IsPassive  bool `xml:",attr,omitempty"`
 
 	AssertionConsumerServiceIndex string `xml:",attr,omitempty"`
 	AssertionConsumerServiceURL   string `xml:",attr"`
