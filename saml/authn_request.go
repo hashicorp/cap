@@ -226,6 +226,8 @@ func WritePostBindingRequestHeader(w http.ResponseWriter) {
 func (sp *ServiceProvider) AuthnRequestRedirect(
 	relayState string, opts ...Option,
 ) (*url.URL, *core.AuthnRequest, error) {
+	const op = "saml.ServiceProvider.AuthnRequestRedirect"
+
 	requestID, err := sp.cfg.GenerateAuthRequestID()
 	if err != nil {
 		return nil, nil, err
@@ -238,21 +240,21 @@ func (sp *ServiceProvider) AuthnRequestRedirect(
 
 	output, err := xml.Marshal(authN)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("%s: failed to marshal authentication request: %w", op, err)
 	}
 
 	fmt.Println(string(output))
 
-	payload, err := b64Deflate(authN)
+	payload, err := Deflate(authN)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("%s: failed to deflate/compress request: %w", op, err)
 	}
 
 	b64Payload := base64.StdEncoding.EncodeToString(payload)
 
 	redirect, err := url.Parse(authN.Destination)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("%s: failed to parse destination URL: %w", op, err)
 	}
 
 	// if sp.SignRequest {
@@ -279,7 +281,9 @@ func (sp *ServiceProvider) AuthnRequestRedirect(
 	return redirect, authN, nil
 }
 
-func b64Deflate(authn *core.AuthnRequest) ([]byte, error) {
+// Deflate returns an AuthnRequest in the Deflate file format, applying default
+// compression.
+func Deflate(authn *core.AuthnRequest) ([]byte, error) {
 	buf := bytes.Buffer{}
 
 	fw, err := flate.NewWriter(&buf, flate.DefaultCompression)

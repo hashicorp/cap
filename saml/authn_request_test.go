@@ -1,7 +1,10 @@
 package saml_test
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -190,4 +193,42 @@ func Test_CreateAuthnRequest_Options(t *testing.T) {
 	})
 
 	r.NoError(err)
+}
+
+func Test_ServiceProvider_AuthnRequestRedirect(t *testing.T) {
+	r := require.New(t)
+
+	tp := testprovider.StartTestProvider(t)
+	defer tp.Close()
+
+	cfg, err := saml.NewConfig(
+		"http://test.me/entity",
+		"http://test.me/saml/acs",
+		fmt.Sprintf("%s/saml/metadata", tp.ServerURL()),
+	)
+
+	provider, err := saml.NewServiceProvider(cfg)
+	r.NoError(err)
+
+	redirectURL, _, err := provider.AuthnRequestRedirect("relayState")
+	r.NoError(err)
+
+	tp.SetExpectedIssuer("http://test.me/entity")
+	tp.SetExpectedACSURL("http://test.me/saml/acs")
+	tp.SetExpectedRelayState("relayState")
+
+	// The test server validates the request. So we don't have to do it here.
+	resp, err := http.Get(redirectURL.String())
+	r.NoError(err)
+	r.NotNil(resp)
+
+	body, err := io.ReadAll(resp.Body)
+	r.NoError(err)
+
+	samlRespPostData := &testprovider.SAMLResponsePostData{}
+	err = json.Unmarshal(body, samlRespPostData)
+	r.NoError(err)
+
+	r.Equal("http://test.me/saml/acs", samlRespPostData.Destination)
+	r.Equal("relayState", samlRespPostData.RelayState)
 }
