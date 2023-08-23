@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/xml"
+	"strings"
 	"time"
 )
 
@@ -163,6 +164,6 @@ type RequestedAuthnContext struct {
 type Extensions struct{}
 
 // CreateDocument creates an AuthnRequest XML document.
-func (a *AuthnRequest) CreateXMLDocument() ([]byte, error) {
-	return xml.Marshal(a)
+func (a *AuthnRequest) CreateXMLDocument(indent int) ([]byte, error) {
+	return xml.MarshalIndent(a, "", strings.Repeat("", indent))
 }
