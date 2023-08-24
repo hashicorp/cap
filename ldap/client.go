@@ -529,30 +529,21 @@ func (c *Client) filterGroupsSearch(userDN string, username string) ([]*ldap.Ent
 	}
 
 	var result *ldap.SearchResult
+	req := ldap.SearchRequest{
+		BaseDN:       c.conf.GroupDN,
+		Scope:        ldap.ScopeWholeSubtree,
+		DerefAliases: derefAliasMap[c.conf.DerefAliases],
+		Filter:       renderedQuery.String(),
+		Attributes: []string{
+			c.conf.GroupAttr,
+		},
+		SizeLimit: math.MaxInt32,
+	}
 	switch {
 	case c.conf.MaximumPageSize > 0:
-
-		result, err = c.conn.SearchWithPaging(&ldap.SearchRequest{
-			BaseDN:       c.conf.GroupDN,
-			Scope:        ldap.ScopeWholeSubtree,
-			DerefAliases: derefAliasMap[c.conf.DerefAliases],
-			Filter:       renderedQuery.String(),
-			Attributes: []string{
-				c.conf.GroupAttr,
-			},
-			SizeLimit: math.MaxInt32,
-		}, uint32(c.conf.MaximumPageSize))
+		result, err = c.conn.SearchWithPaging(&req, uint32(c.conf.MaximumPageSize))
 	default:
-		result, err = c.conn.Search(&ldap.SearchRequest{
-			BaseDN:       c.conf.GroupDN,
-			Scope:        ldap.ScopeWholeSubtree,
-			DerefAliases: derefAliasMap[c.conf.DerefAliases],
-			Filter:       renderedQuery.String(),
-			Attributes: []string{
-				c.conf.GroupAttr,
-			},
-			SizeLimit: math.MaxInt32,
-		})
+		result, err = c.conn.Search(&req)
 	}
 	if err != nil {
 		switch {
