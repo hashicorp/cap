@@ -8,9 +8,32 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"strings"
 
+	"github.com/go-ldap/ldap/v3"
 	"github.com/hashicorp/go-secure-stdlib/tlsutil"
 )
+
+var derefAliasMap = map[string]int{
+	"never":     ldap.NeverDerefAliases,
+	"finding":   ldap.DerefFindingBaseObj,
+	"searching": ldap.DerefInSearching,
+	"always":    ldap.DerefAlways,
+}
+
+func validateDerefAlias(deref string) (string, error) {
+	const op = "ldap.validateDerefAlias"
+	lowerDeref := strings.ToLower(deref)
+	_, found := derefAliasMap[lowerDeref]
+	switch {
+	case found:
+		return lowerDeref, nil
+	case deref == "":
+		return DefaultDerefAliases, nil
+	default:
+		return "", fmt.Errorf("%s: invalid dereference_aliases %q: %w", op, deref, ErrInvalidParameter)
+	}
+}
 
 const (
 	// DefaultTimeout is the timeout value used for both dialing and requests to
@@ -44,6 +67,9 @@ const (
 	// DefaultADUserPasswordAttribute defines the attribute name for the
 	// AD default password attribute which will always be excluded
 	DefaultADUserPasswordAttribute = "unicodePwd"
+
+	// DefaultDerefAliases defines the default for dereferencing aliases
+	DefaultDerefAliases = "never"
 )
 
 type ClientConfig struct {
@@ -178,6 +204,19 @@ type ClientConfig struct {
 	// group membership be included an authentication AuthResult.
 	IncludeUserGroups bool
 
+	// MaximumPageSize optionally specifies a maximum ldap search result size to
+	// use when retrieving the authenticated user's group memberships. This can
+	// be used to avoid reaching the LDAP server's max result size.
+	MaximumPageSize int `json:"max_page_size"`
+
+	// DerefAliases will control how aliases are dereferenced when
+	// performing the search. Possible values are: never, finding, searching,
+	// and always. If unset, a default of "never" is used. When set to
+	// "finding", it will only dereference aliases during name resolution of the
+	// base. When set to "searching", it will dereference aliases after name
+	// resolution.
+	DerefAliases string `json:"dereference_aliases"`
+
 	// DeprecatedVaultPre111GroupCNBehavior: if true, group searching reverts to
 	// the pre 1.1.1 Vault behavior.
 	// see: https://www.vaultproject.io/docs/upgrading/upgrade-to-1.1.1
@@ -220,6 +259,11 @@ func (c *ClientConfig) validate() error {
 		if _, err := tls.X509KeyPair([]byte(c.ClientTLSCert), []byte(c.ClientTLSKey)); err != nil {
 			return fmt.Errorf("%s: failed to parse client X509 key pair: %w", op, err)
 		}
+	}
+	var err error
+	c.DerefAliases, err = validateDerefAlias(c.DerefAliases)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
 	}
 	return nil
 }

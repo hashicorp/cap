@@ -93,6 +93,7 @@ func TestClient_NewClient(t *testing.T) {
 	tests := []struct {
 		name            string
 		conf            *ClientConfig
+		want            *Client
 		wantErr         bool
 		wantErrIs       error
 		wantErrContains string
@@ -134,6 +135,17 @@ func TestClient_NewClient(t *testing.T) {
 			name: "valid-tls-max",
 			conf: &ClientConfig{
 				TLSMaxVersion: "tls13",
+			},
+			want: &Client{
+				conf: &ClientConfig{
+					URLs:          []string{"ldaps://127.0.0.1:686"},
+					DerefAliases:  "never",
+					GroupFilter:   "(|(memberUid={{.Username}})(member={{.UserDN}})(uniqueMember={{.UserDN}}))",
+					GroupAttr:     "cn",
+					UserAttr:      "cn",
+					TLSMinVersion: "tls12",
+					TLSMaxVersion: "tls13",
+				},
 			},
 		},
 		{
@@ -183,9 +195,66 @@ func TestClient_NewClient(t *testing.T) {
 				ClientTLSKey:  td.ClientKey(),
 				ClientTLSCert: td.ClientCert(),
 			},
+			want: &Client{
+				conf: &ClientConfig{
+					URLs:          []string{"localhost"},
+					DerefAliases:  "never",
+					GroupFilter:   "(|(memberUid={{.Username}})(member={{.UserDN}})(uniqueMember={{.UserDN}}))",
+					GroupAttr:     "cn",
+					UserAttr:      "cn",
+					TLSMinVersion: "tls12",
+					TLSMaxVersion: "tls13",
+					Certificates:  []string{td.Cert()},
+					ClientTLSKey:  td.ClientKey(),
+					ClientTLSCert: td.ClientCert(),
+				},
+			},
+		},
+		{
+			name: "invalid-deref-aliases",
+			conf: &ClientConfig{
+				URLs:         []string{"localhost"},
+				DerefAliases: "invalid",
+			},
+			wantErr:         true,
+			wantErrContains: `invalid dereference_aliases "invalid"`,
+		},
+		{
+			name: "default-deref-aliases",
+			conf: &ClientConfig{
+				URLs: []string{"localhost"},
+			},
+			want: &Client{
+				conf: &ClientConfig{
+					URLs:          []string{"localhost"},
+					DerefAliases:  "never",
+					GroupFilter:   "(|(memberUid={{.Username}})(member={{.UserDN}})(uniqueMember={{.UserDN}}))",
+					GroupAttr:     "cn",
+					UserAttr:      "cn",
+					TLSMinVersion: "tls12",
+					TLSMaxVersion: "tls13",
+				},
+			},
+		},
+		{
+			name: "valid-deref-aliases",
+			conf: &ClientConfig{
+				URLs:         []string{"localhost"},
+				DerefAliases: "always",
+			},
+			want: &Client{
+				conf: &ClientConfig{
+					URLs:          []string{"localhost"},
+					DerefAliases:  "always",
+					GroupFilter:   "(|(memberUid={{.Username}})(member={{.UserDN}})(uniqueMember={{.UserDN}}))",
+					GroupAttr:     "cn",
+					UserAttr:      "cn",
+					TLSMinVersion: "tls12",
+					TLSMaxVersion: "tls13",
+				},
+			},
 		},
 	}
-
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
@@ -209,8 +278,9 @@ func TestClient_NewClient(t *testing.T) {
 				assert.Equal(DefaultGroupFilter, c.conf.GroupFilter)
 				assert.Equal(DefaultTLSMinVersion, c.conf.TLSMinVersion)
 				assert.Equal(DefaultTLSMaxVersion, c.conf.TLSMaxVersion)
-			} else {
-
+			}
+			if tc.want != nil {
+				assert.Equal(tc.want, c)
 			}
 		})
 	}

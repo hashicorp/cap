@@ -327,9 +327,10 @@ func (c *Client) getUserAttributes(userDN string) ([]Attribute, error) {
 	}
 
 	result, err := c.conn.Search(&ldap.SearchRequest{
-		BaseDN: userDN,
-		Scope:  ldap.ScopeBaseObject,
-		Filter: "(objectClass=*)",
+		BaseDN:       userDN,
+		Scope:        ldap.ScopeBaseObject,
+		DerefAliases: derefAliasMap[c.conf.DerefAliases],
+		Filter:       "(objectClass=*)",
 	})
 	switch {
 	case err != nil:
@@ -438,9 +439,10 @@ func (c *Client) tokenGroupsSearch(userDN string) ([]*ldap.Entry, []Warning, err
 		return nil, warnings, fmt.Errorf("%s: missing user dn: %w", op, ErrInvalidParameter)
 	}
 	result, err := c.conn.Search(&ldap.SearchRequest{
-		BaseDN: userDN,
-		Scope:  ldap.ScopeBaseObject,
-		Filter: "(objectClass=*)",
+		BaseDN:       userDN,
+		Scope:        ldap.ScopeBaseObject,
+		DerefAliases: derefAliasMap[c.conf.DerefAliases],
+		Filter:       "(objectClass=*)",
 		Attributes: []string{
 			"tokenGroups",
 		},
@@ -466,9 +468,10 @@ func (c *Client) tokenGroupsSearch(userDN string) ([]*ldap.Entry, []Warning, err
 		}
 
 		groupResult, err := c.conn.Search(&ldap.SearchRequest{
-			BaseDN: fmt.Sprintf("<SID=%s>", sidString),
-			Scope:  ldap.ScopeBaseObject,
-			Filter: "(objectClass=*)",
+			BaseDN:       fmt.Sprintf("<SID=%s>", sidString),
+			Scope:        ldap.ScopeBaseObject,
+			DerefAliases: derefAliasMap[c.conf.DerefAliases],
+			Filter:       "(objectClass=*)",
 			Attributes: []string{
 				"1.1", // RFC no attributes
 			},
@@ -525,15 +528,32 @@ func (c *Client) filterGroupsSearch(userDN string, username string) ([]*ldap.Ent
 		return nil, warnings, fmt.Errorf("%s: LDAP search failed due to template parsing error: %w", op, err)
 	}
 
-	result, err := c.conn.Search(&ldap.SearchRequest{
-		BaseDN: c.conf.GroupDN,
-		Scope:  ldap.ScopeWholeSubtree,
-		Filter: renderedQuery.String(),
-		Attributes: []string{
-			c.conf.GroupAttr,
-		},
-		SizeLimit: math.MaxInt32,
-	})
+	var result *ldap.SearchResult
+	switch {
+	case c.conf.MaximumPageSize > 0:
+
+		result, err = c.conn.SearchWithPaging(&ldap.SearchRequest{
+			BaseDN:       c.conf.GroupDN,
+			Scope:        ldap.ScopeWholeSubtree,
+			DerefAliases: derefAliasMap[c.conf.DerefAliases],
+			Filter:       renderedQuery.String(),
+			Attributes: []string{
+				c.conf.GroupAttr,
+			},
+			SizeLimit: math.MaxInt32,
+		}, uint32(c.conf.MaximumPageSize))
+	default:
+		result, err = c.conn.Search(&ldap.SearchRequest{
+			BaseDN:       c.conf.GroupDN,
+			Scope:        ldap.ScopeWholeSubtree,
+			DerefAliases: derefAliasMap[c.conf.DerefAliases],
+			Filter:       renderedQuery.String(),
+			Attributes: []string{
+				c.conf.GroupAttr,
+			},
+			SizeLimit: math.MaxInt32,
+		})
+	}
 	if err != nil {
 		switch {
 		case ldap.IsErrorWithCode(err, ldap.LDAPResultNoSuchObject):
@@ -631,10 +651,11 @@ func (c *Client) getUserBindDN(username string) (string, error) {
 		}
 
 		result, err := c.conn.Search(&ldap.SearchRequest{
-			BaseDN:    c.conf.UserDN,
-			Scope:     ldap.ScopeWholeSubtree,
-			Filter:    filter,
-			SizeLimit: math.MaxInt32,
+			BaseDN:       c.conf.UserDN,
+			Scope:        ldap.ScopeWholeSubtree,
+			DerefAliases: derefAliasMap[c.conf.DerefAliases],
+			Filter:       filter,
+			SizeLimit:    math.MaxInt32,
 		})
 		if err != nil {
 			return "", fmt.Errorf("%s: LDAP search for binddn failed using (baseDN: %q / filter: %q): %w", op, c.conf.UserDN, filter, err)
@@ -669,10 +690,11 @@ func (c *Client) getUserDN(bindDN, username string) (string, error) {
 		// Find the distinguished name for the user if userPrincipalName used for login
 		filter := fmt.Sprintf("(userPrincipalName=%s@%s)", escapeValue(username), c.conf.UPNDomain)
 		result, err := c.conn.Search(&ldap.SearchRequest{
-			BaseDN:    c.conf.UserDN,
-			Scope:     ldap.ScopeWholeSubtree,
-			Filter:    filter,
-			SizeLimit: math.MaxInt32,
+			BaseDN:       c.conf.UserDN,
+			Scope:        ldap.ScopeWholeSubtree,
+			DerefAliases: derefAliasMap[c.conf.DerefAliases],
+			Filter:       filter,
+			SizeLimit:    math.MaxInt32,
 		})
 		if err != nil {
 			return userDN, fmt.Errorf("%s: LDAP search failed for detecting user (baseDN: %q / filter: %q): %w", op, c.conf.UserDN, filter, err)
