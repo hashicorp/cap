@@ -90,7 +90,8 @@ func Test_CreateAuthnRequest(t *testing.T) {
 				r.Equal(core.ServiceBindingHTTPPost, got.ProtocolBinding)
 				r.Equal("http://test.me/saml/acs", got.AssertionConsumerServiceURL)
 				r.Equal("http://test.me/entity", got.Issuer.Value)
-				r.Nil(got.NameIDPolicy)
+				r.NotNil(got.NameIDPolicy)
+				r.True(got.NameIDPolicy.AllowCreate)
 				r.Nil(got.RequestedAuthContext)
 				r.False(got.ForceAuthn)
 			}
@@ -117,13 +118,12 @@ func Test_CreateAuthnRequest_Options(t *testing.T) {
 		got, err := provider.CreateAuthnRequest(
 			"abc123",
 			core.ServiceBindingHTTPPost,
-			saml.AllowCreate(),
+			saml.AllowCreate(false),
 		)
 
 		r.NoError(err)
 
-		r.NotNil(got.NameIDPolicy)
-		r.True(got.NameIDPolicy.AllowCreate)
+		r.Nil(got.NameIDPolicy)
 	})
 
 	t.Run("When option WithNameIDFormat is set", func(_ *testing.T) {

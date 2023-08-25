@@ -30,7 +30,7 @@ type authnRequestOptions struct {
 
 func authnRequestOptionsDefault() authnRequestOptions {
 	return authnRequestOptions{
-		allowCreate:     false,
+		allowCreate:     true,
 		nameIDFormat:    core.NameIDFormat(""),
 		forceAuthn:      false,
 		protocolBinding: core.ServiceBindingHTTPPost,
@@ -45,10 +45,10 @@ func getAuthnRequestOptions(opt ...Option) authnRequestOptions {
 
 // AllowCreate is a Boolean value used to indicate whether the identity provider is allowed, in the course
 // of fulfilling the request, to create a new identifier to represent the principal.
-func AllowCreate() Option {
+func AllowCreate(allow bool) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*authnRequestOptions); ok {
-			o.allowCreate = true
+			o.allowCreate = allow
 		}
 	}
 }
