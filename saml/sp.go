@@ -128,10 +128,9 @@ func (sp *ServiceProvider) CreateMetadata(opt ...Option) *metadata.EntityDescrip
 
 	spsso := metadata.EntityDescriptorSPSSO{}
 	spsso.EntityID = sp.cfg.EntityID
-	spsso.ValidUntil = validUntil
+	spsso.ValidUntil = &validUntil
 
 	spssoDescriptor := &metadata.SPSSODescriptor{}
-	spssoDescriptor.ValidUntil = validUntil
 	spssoDescriptor.ProtocolSupportEnumeration = metadata.ProtocolSupportEnumerationProtocol
 	spssoDescriptor.NameIDFormat = opts.nameIDFormats
 	spssoDescriptor.AuthnRequestsSigned = false // always false for now until request signing is supported.
