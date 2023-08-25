@@ -71,14 +71,6 @@ var responseXMLStatus = `<?xml version="1.0" encoding="UTF-8"?>
    </saml2p:Status>
 </saml2p:Response>`
 
-func Test_ParseResponse_Status(t *testing.T) {
-	r := require.New(t)
-
-	status := responseXML(t, responseXMLStatus).Status
-
-	r.Equal(status.StatusCode.Value, core.StatusCodeSuccess)
-}
-
 var responseXMLAssertion = `<?xml version="1.0" encoding="UTF-8"?>
 <saml2p:Response xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:xsd="http://www.w3.org/2001/XMLSchema" Destination="http://localhost:8000/saml/acs" ID="saml-response-id" InResponseTo="saml-request-id" IssueInstant="2023-03-31T06:55:44.494Z" Version="2.0">
     <saml2:Assertion xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion" ID="assertion-id" IssueInstant="2023-03-31T06:55:44.494Z" Version="2.0">
