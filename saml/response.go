@@ -13,6 +13,7 @@ import (
 	dsig "github.com/russellhaering/goxmldsig"
 
 	"github.com/hashicorp/cap/saml/models/core"
+	"github.com/hashicorp/cap/saml/models/metadata"
 )
 
 type parseResponseOptions struct {
@@ -78,18 +79,30 @@ func (sp *ServiceProvider) ParseResponse(
 	requestID string,
 	opt ...Option,
 ) (*core.Response, error) {
+	const op = "saml.(ServiceProvider).ParseResponse"
+	switch {
+	case sp == nil:
+		return nil, fmt.Errorf("%s: missing service provider %w", op, ErrInternal)
+	case samlResp == "":
+		return nil, fmt.Errorf("%s: missing saml response: %w", op, ErrInvalidParameter)
+	case requestID == "":
+		return nil, fmt.Errorf("%s: missing request ID: %w", op, ErrInvalidParameter)
+	}
 	opts := getParseResponseOptions(opt...)
 
 	// We use github.com/russellhaering/gosaml2 for SAMLResponse signature and condition validation.
 	ip, err := sp.internalParser(opts.skipSignatureValidation)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: unable to parse saml response: %w", op, err)
 	}
 
 	// This will validate the response and all assertions.
 	response, err := ip.ValidateEncodedResponse(samlResp)
-	if err != nil {
-		return nil, err
+	switch {
+	case err != nil:
+		return nil, fmt.Errorf("%s: unable to validate encoded response: %w", op, err)
+	case len(response.Assertions) == 0:
+		return nil, fmt.Errorf("%s: 3 %w", op, ErrMissingAssertions)
 	}
 
 	if !opts.skipRequestIDValidation {
@@ -110,55 +123,57 @@ func (sp *ServiceProvider) ParseResponse(
 	if !opts.skipAssertionConditionValidation {
 		for _, assert := range response.Assertions {
 			warnings, err := ip.VerifyAssertionConditions(&assert)
-			if err != nil {
-				return nil, err
-			}
-
-			if warnings.InvalidTime {
-				return nil, errors.New("invalid time")
-			}
-
-			if warnings.NotInAudience {
-				return nil, errors.New("invalid audience")
-			}
-
-			if assert.Subject == nil || assert.Subject.NameID == nil {
-				return nil, errors.New("subject missing")
-			}
-
-			if assert.AttributeStatement == nil {
-				return nil, errors.New("attribute statement missing")
+			switch {
+			case err != nil:
+				return nil, fmt.Errorf("%s: %w", op, err)
+			case warnings.InvalidTime:
+				return nil, fmt.Errorf("%s: %w", op, ErrInvalidTime)
+			case warnings.NotInAudience:
+				return nil, fmt.Errorf("%s: %w", op, ErrInvalidAudience)
+			case assert.Subject == nil || assert.Subject.NameID == nil:
+				return nil, fmt.Errorf("%s: %w", op, ErrMissingSubject)
+			case assert.AttributeStatement == nil:
+				return nil, fmt.Errorf("%s: %w", op, ErrMissingAttributeStmt)
 			}
 		}
 	}
 
 	// TODO: transform gosaml2 response to core.Response
 	var result core.Response
-	xml.Unmarshal([]byte(samlResp), &result)
-
+	if xml.Unmarshal([]byte(samlResp), &result); err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
 	return &result, nil
 }
 
 func (sp *ServiceProvider) internalParser(skipSignatureValidation bool) (*saml2.SAMLServiceProvider, error) {
+	const op = "saml.(ServiceProvider).internalParser"
+	switch {
+	case sp == nil:
+		return nil, fmt.Errorf("%s: missing service provider %w", op, ErrInternal)
+	}
+
 	idpMetadata, err := sp.IDPMetadata()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	switch {
+	case err != nil:
+		return nil, fmt.Errorf("%s: %w", op, err)
+	case len(idpMetadata.IDPSSODescriptor) != 1:
+		return nil, fmt.Errorf("%s: expected one IdP descriptor and got %d: %w", op, len(idpMetadata.IDPSSODescriptor), ErrInternal)
 	}
 
-	certStore := dsig.MemoryX509CertificateStore{
-		Roots: []*x509.Certificate{},
-	}
-
+	var certStore dsig.MemoryX509CertificateStore
 	for _, kd := range idpMetadata.IDPSSODescriptor[0].KeyDescriptor {
 		switch kd.Use {
-		case "", "signing":
+		case "", metadata.KeyTypeSigning:
 			for _, xcert := range kd.KeyInfo.X509Data.X509Certificates {
 				parsed, err := parseX509Certificate(xcert.Data)
 				if err != nil {
 					return nil, err
 				}
-
-				certStore.Roots = append(certStore.Roots, parsed)
+				certStore.Roots = append(certStore.Roots, parsed) // append works just fine with a nil slice
 			}
 		}
 	}
@@ -171,6 +186,32 @@ func (sp *ServiceProvider) internalParser(skipSignatureValidation bool) (*saml2.
 		AssertionConsumerServiceURL: sp.cfg.AssertionConsumerServiceURL,
 		SkipSignatureValidation:     skipSignatureValidation,
 	}, nil
+}
+
+// parseX509Certificate parses the contents of a <ds:X509Certificate> which is a
+// base64-encoded ASN.1 DER certificate. It does not parse PEM-encoded certificates.
+func parseCert(cert string) (*x509.Certificate, error) {
+	const op = "saml.parseCert"
+	switch {
+	case cert == "":
+		return nil, fmt.Errorf("%s: missing certificate: %w", op, ErrInvalidParameter)
+	default:
+		regex := regexp.MustCompile(`\s+`)
+		cert = regex.ReplaceAllString(cert, "")
+		if cert == "" {
+			return nil, fmt.Errorf("%s: certificate was only whitespace: %w", op, ErrInvalidParameter)
+		}
+	}
+	certBytes, err := base64.StdEncoding.DecodeString(cert)
+	if err != nil {
+		return nil, fmt.Errorf("cannot decode certificate: %s", err)
+	}
+	parsedCert, err := x509.ParseCertificate(certBytes)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse certificate: %s", err)
+	}
+
+	return parsedCert, nil
 }
 
 // parseX509Certificate parses the contents of a <ds:X509Certificate> which is a
