@@ -10,9 +10,9 @@ import (
 	"net/url"
 	"strings"
 	"text/template"
-	"time"
 
 	"github.com/hashicorp/cap/oidc"
+	"github.com/jonboulle/clockwork"
 
 	"github.com/hashicorp/cap/saml/models/core"
 )
@@ -22,6 +22,7 @@ const (
 )
 
 type authnRequestOptions struct {
+	clock                 clockwork.Clock
 	allowCreate           bool
 	nameIDFormat          core.NameIDFormat
 	forceAuthn            bool
@@ -32,6 +33,7 @@ type authnRequestOptions struct {
 
 func authnRequestOptionsDefault() authnRequestOptions {
 	return authnRequestOptions{
+		clock:           clockwork.NewRealClock(),
 		allowCreate:     false,
 		nameIDFormat:    core.NameIDFormat(""),
 		forceAuthn:      false,
@@ -107,6 +109,15 @@ func WithIndent(indent int) Option {
 	}
 }
 
+// WithClock changes the clock used when generating requests.
+func WithClock(clock clockwork.Clock) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*authnRequestOptions); ok {
+			o.clock = clock
+		}
+	}
+}
+
 // CreateAuthNRequest creates an Authentication Request object.
 // The defaults follow the deployment profile for federation interoperability.
 // See: 3.1.1 https://kantarainitiative.github.io/SAMLprofiles/saml2int.html#_service_provider_requirements [INT_SAML]
@@ -155,7 +166,7 @@ func (sp *ServiceProvider) CreateAuthnRequest(
 	// AssertionConsumerServiceIndex attribute (i.e., the desired endpoint MUST be the default,
 	// or identified via the AssertionConsumerServiceURL attribute)."
 	ar.AssertionConsumerServiceURL = sp.cfg.AssertionConsumerServiceURL
-	ar.IssueInstant = time.Now().UTC()
+	ar.IssueInstant = opts.clock.Now().UTC()
 	ar.Destination = destination
 
 	ar.Issuer = &core.Issuer{}
