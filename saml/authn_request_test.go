@@ -25,27 +25,40 @@ func Test_CreateAuthnRequest(t *testing.T) {
 		"http://test.me/saml/acs",
 		fmt.Sprintf("%s/saml/metadata", tp.ServerURL()),
 	)
+	r.NoError(err)
 
 	provider, err := saml.NewServiceProvider(cfg)
 	r.NoError(err)
 
 	cases := []struct {
-		name    string
-		id      string
-		binding core.ServiceBinding
-		err     string
+		name        string
+		id          string
+		binding     core.ServiceBinding
+		opts        []saml.Option
+		expectedACS string
+		err         string
 	}{
 		{
-			name:    "With service binding post",
-			id:      "abc123",
-			binding: core.ServiceBindingHTTPPost,
-			err:     "",
+			name:        "With service binding post",
+			id:          "abc123",
+			binding:     core.ServiceBindingHTTPPost,
+			expectedACS: "http://test.me/saml/acs",
+			err:         "",
 		},
 		{
-			name:    "With service binding redirect",
-			id:      "abc123",
-			binding: core.ServiceBindingHTTPRedirect,
-			err:     "",
+			name:        "With service binding redirect",
+			id:          "abc123",
+			binding:     core.ServiceBindingHTTPRedirect,
+			expectedACS: "http://test.me/saml/acs",
+			err:         "",
+		},
+		{
+			name:        "With service binding redirect and custom acs",
+			id:          "abc123",
+			binding:     core.ServiceBindingHTTPRedirect,
+			opts:        []saml.Option{saml.WithAssertionConsumerServiceURL("http://secondary.me/saml/acs")},
+			expectedACS: "http://secondary.me/saml/acs",
+			err:         "",
 		},
 		{
 			name:    "When there is no ID provided",
@@ -70,7 +83,7 @@ func Test_CreateAuthnRequest(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			r := require.New(t)
-			got, err := provider.CreateAuthnRequest(c.id, c.binding)
+			got, err := provider.CreateAuthnRequest(c.id, c.binding, c.opts...)
 			if c.err != "" {
 				r.Error(err)
 				r.ErrorContains(err, c.err)
@@ -89,7 +102,7 @@ func Test_CreateAuthnRequest(t *testing.T) {
 				r.Equal(c.id, got.ID)
 				r.Equal("2.0", got.Version)
 				r.Equal(core.ServiceBindingHTTPPost, got.ProtocolBinding)
-				r.Equal("http://test.me/saml/acs", got.AssertionConsumerServiceURL)
+				r.Equal(c.expectedACS, got.AssertionConsumerServiceURL)
 				r.Equal("http://test.me/entity", got.Issuer.Value)
 				r.Nil(got.NameIDPolicy)
 				r.Nil(got.RequestedAuthContext)

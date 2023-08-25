@@ -145,6 +145,7 @@ func WithGenerateAuthRequestID(generateAuthRequestID GenerateAuthRequestIDFunc) 
 // - WithValidUntil
 // - WithMetadataXML
 // - WithMetadataParameters
+// - WithGenerateAuthRequestID
 func NewConfig(entityID, acs, metadataURL string, opt ...Option) (*Config, error) {
 	const op = "saml.NewConfig"
 

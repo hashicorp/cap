@@ -1,9 +1,15 @@
-package saml
+package saml_test
 
 import (
+	"encoding/base64"
+	"fmt"
 	"testing"
+	"time"
 
+	"github.com/hashicorp/cap/saml"
 	"github.com/hashicorp/cap/saml/models/core"
+	testprovider "github.com/hashicorp/cap/saml/test"
+	"github.com/jonboulle/clockwork"
 	saml2 "github.com/russellhaering/gosaml2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,14 +26,14 @@ func TestServiceProvider_ParseResponse(t *testing.T) {
 
 	metadataURL := "https://samltest.id/saml/idp"
 
-	testCfg, err := NewConfig(testEntityID, testAcs, metadataURL)
+	testCfg, err := saml.NewConfig(testEntityID, testAcs, metadataURL)
 	require.NoError(t, err)
-	testSp, err := NewServiceProvider(testCfg)
+	testSp, err := saml.NewServiceProvider(testCfg)
 	require.NoError(t, err)
 
 	tests := []struct {
 		name            string
-		sp              *ServiceProvider
+		sp              *saml.ServiceProvider
 		samlResp        string
 		requestID       string
 		want            *core.Response
@@ -45,20 +51,20 @@ func TestServiceProvider_ParseResponse(t *testing.T) {
 		},
 		{
 			name:            "nil-sp",
-			wantErrIs:       ErrInternal,
+			wantErrIs:       saml.ErrInternal,
 			wantErrContains: "missing service provider",
 		},
 		{
 			name:            "missing-saml-response",
 			sp:              testSp,
-			wantErrIs:       ErrInvalidParameter,
+			wantErrIs:       saml.ErrInvalidParameter,
 			wantErrContains: "missing saml response",
 		},
 		{
 			name:            "missing-request-id",
 			sp:              testSp,
 			samlResp:        testExpiredResp,
-			wantErrIs:       ErrInvalidParameter,
+			wantErrIs:       saml.ErrInvalidParameter,
 			wantErrContains: "missing request ID",
 		},
 	}
@@ -83,3 +89,112 @@ func TestServiceProvider_ParseResponse(t *testing.T) {
 		})
 	}
 }
+
+func TestServiceProvider_ParseResponseCustomACS(t *testing.T) {
+	r := require.New(t)
+
+	fakeTime, err := time.Parse("2006-01-02", "2015-07-15")
+	r.NoError(err)
+
+	tp := testprovider.StartTestProvider(t)
+	defer tp.Close()
+
+	cfg, err := saml.NewConfig(
+		"http://test.me/entity",
+		"http://test.me/saml/acs",
+		fmt.Sprintf("%s/saml/metadata", tp.ServerURL()),
+	)
+	r.NoError(err)
+
+	sp, err := saml.NewServiceProvider(cfg)
+	r.NoError(err)
+
+	encodedResponse := base64.StdEncoding.EncodeToString([]byte(responseSigned))
+
+	type testCase struct {
+		name string
+		opts []saml.Option
+		err  string
+	}
+
+	for _, c := range []testCase{
+		{
+			name: "default url",
+			opts: []saml.Option{
+				saml.WithClock(clockwork.NewFakeClockAt(fakeTime)),
+				saml.InsecureSkipSignatureValidation(),
+			},
+		},
+		{
+			name: "valid acs url",
+			opts: []saml.Option{
+				saml.WithClock(clockwork.NewFakeClockAt(fakeTime)),
+				saml.InsecureSkipSignatureValidation(),
+				saml.WithAssertionConsumerServiceURL("http://test.me/saml/acs"),
+			},
+		},
+		{
+			name: "invalid acs url",
+			opts: []saml.Option{
+				saml.WithClock(clockwork.NewFakeClockAt(fakeTime)),
+				saml.InsecureSkipSignatureValidation(),
+				saml.WithAssertionConsumerServiceURL("http://badurl.me"),
+			},
+			err: "Unrecognized Destination value, Expected: http://badurl.me, Actual: http://test.me/saml/acs",
+		},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			_, err = sp.ParseResponse(
+				encodedResponse,
+				"ONELOGIN_4fee3b046395c4e751011e97f8900b5273d56685",
+				c.opts...,
+			)
+			if c.err == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, c.err)
+			}
+		})
+	}
+
+}
+
+// From https://www.samltool.com/generic_sso_res.php
+const responseSigned = `
+<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="_8e8dc5f69a98cc4c1ff3427e5ce34606fd672f91e6" Version="2.0" IssueInstant="2014-07-17T01:01:48Z" Destination="http://test.me/saml/acs" InResponseTo="ONELOGIN_4fee3b046395c4e751011e97f8900b5273d56685">
+  <saml:Issuer>http://test.idp</saml:Issuer>
+  <samlp:Status>
+    <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
+  </samlp:Status>
+  <saml:Assertion xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" ID="_d71a3a8e9fcc45c9e9d248ef7049393fc8f04e5f75" Version="2.0" IssueInstant="2014-07-17T01:01:48Z">
+    <saml:Issuer>http://test.idp</saml:Issuer>
+    <saml:Subject>
+      <saml:NameID SPNameQualifier="http://test.me/saml/acs" Format="urn:oasis:names:tc:SAML:2.0:nameid-format:transient">_ce3d2948b4cf20146dee0a0b3dd6f69b6cf86f62d7</saml:NameID>
+      <saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
+        <saml:SubjectConfirmationData NotOnOrAfter="2024-01-18T06:21:48Z" Recipient="http://test.me/saml/acs" InResponseTo="ONELOGIN_4fee3b046395c4e751011e97f8900b5273d56685"/>
+      </saml:SubjectConfirmation>
+    </saml:Subject>
+    <saml:Conditions NotBefore="2014-07-17T01:01:18Z" NotOnOrAfter="2024-01-18T06:21:48Z">
+      <saml:AudienceRestriction>
+        <saml:Audience>http://test.me/entity</saml:Audience>
+      </saml:AudienceRestriction>
+    </saml:Conditions>
+    <saml:AuthnStatement AuthnInstant="2014-07-17T01:01:48Z" SessionNotOnOrAfter="2024-07-17T09:01:48Z" SessionIndex="_be9967abd904ddcae3c0eb4189adbe3f71e327cf93">
+      <saml:AuthnContext>
+        <saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:Password</saml:AuthnContextClassRef>
+      </saml:AuthnContext>
+    </saml:AuthnStatement>
+    <saml:AttributeStatement>
+      <saml:Attribute Name="uid" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic">
+        <saml:AttributeValue xsi:type="xs:string">test</saml:AttributeValue>
+      </saml:Attribute>
+      <saml:Attribute Name="mail" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic">
+        <saml:AttributeValue xsi:type="xs:string">test@example.com</saml:AttributeValue>
+      </saml:Attribute>
+      <saml:Attribute Name="eduPersonAffiliation" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic">
+        <saml:AttributeValue xsi:type="xs:string">users</saml:AttributeValue>
+        <saml:AttributeValue xsi:type="xs:string">examplerole1</saml:AttributeValue>
+      </saml:Attribute>
+    </saml:AttributeStatement>
+  </saml:Assertion>
+</samlp:Response>`

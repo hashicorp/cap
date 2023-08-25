@@ -10,9 +10,9 @@ import (
 	"net/url"
 	"strings"
 	"text/template"
-	"time"
 
 	"github.com/hashicorp/cap/oidc"
+	"github.com/jonboulle/clockwork"
 
 	"github.com/hashicorp/cap/saml/models/core"
 )
@@ -22,17 +22,20 @@ const (
 )
 
 type authnRequestOptions struct {
-	allowCreate           bool
-	nameIDFormat          core.NameIDFormat
-	forceAuthn            bool
-	protocolBinding       core.ServiceBinding
-	authnContextClassRefs []string
-	indent                int
+	clock                       clockwork.Clock
+	allowCreate                 bool
+	nameIDFormat                core.NameIDFormat
+	forceAuthn                  bool
+	protocolBinding             core.ServiceBinding
+	authnContextClassRefs       []string
+	indent                      int
+	assertionConsumerServiceURL string
 }
 
 func authnRequestOptionsDefault() authnRequestOptions {
 	return authnRequestOptions{
 		allowCreate:     false,
+		clock:           clockwork.NewRealClock(),
 		nameIDFormat:    core.NameIDFormat(""),
 		forceAuthn:      false,
 		protocolBinding: core.ServiceBindingHTTPPost,
@@ -107,6 +110,31 @@ func WithIndent(indent int) Option {
 	}
 }
 
+// WithClock changes the clock used when generating requests.
+func WithClock(clock clockwork.Clock) Option {
+	return func(o interface{}) {
+		switch opts := o.(type) {
+		case *authnRequestOptions:
+			opts.clock = clock
+		case *parseResponseOptions:
+			opts.clock = clock
+		}
+	}
+}
+
+// WithAssertionConsumerServiceURL changes the Assertion Consumer Service URL
+// to use in the Auth Request or during the response validation
+func WithAssertionConsumerServiceURL(url string) Option {
+	return func(o interface{}) {
+		switch opts := o.(type) {
+		case *authnRequestOptions:
+			opts.assertionConsumerServiceURL = url
+		case *parseResponseOptions:
+			opts.assertionConsumerServiceURL = url
+		}
+	}
+}
+
 // CreateAuthNRequest creates an Authentication Request object.
 // The defaults follow the deployment profile for federation interoperability.
 // See: 3.1.1 https://kantarainitiative.github.io/SAMLprofiles/saml2int.html#_service_provider_requirements [INT_SAML]
@@ -117,6 +145,7 @@ func WithIndent(indent int) Option {
 // - WithIDFormat
 // - WithProtocolBinding
 // - WithAuthContextClassRefs
+// - WithAssertionConsumerServiceURL
 func (sp *ServiceProvider) CreateAuthnRequest(
 	id string,
 	binding core.ServiceBinding,
@@ -155,7 +184,11 @@ func (sp *ServiceProvider) CreateAuthnRequest(
 	// AssertionConsumerServiceIndex attribute (i.e., the desired endpoint MUST be the default,
 	// or identified via the AssertionConsumerServiceURL attribute)."
 	ar.AssertionConsumerServiceURL = sp.cfg.AssertionConsumerServiceURL
-	ar.IssueInstant = time.Now().UTC()
+	if opts.assertionConsumerServiceURL != "" {
+		ar.AssertionConsumerServiceURL = opts.assertionConsumerServiceURL
+	}
+
+	ar.IssueInstant = opts.clock.Now().UTC()
 	ar.Destination = destination
 
 	ar.Issuer = &core.Issuer{}
