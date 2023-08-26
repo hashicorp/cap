@@ -165,5 +165,5 @@ type Extensions struct{}
 
 // CreateDocument creates an AuthnRequest XML document.
 func (a *AuthnRequest) CreateXMLDocument(indent int) ([]byte, error) {
-	return xml.MarshalIndent(a, "", strings.Repeat("", indent))
+	return xml.MarshalIndent(a, "", strings.Repeat(" ", indent))
 }
