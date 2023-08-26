@@ -32,7 +32,7 @@ func main() {
 	http.HandleFunc("/saml/acs", handler.ACSHandlerFunc(sp))
 	http.HandleFunc("/saml/auth/redirect", handler.RedirectBindingHandlerFunc(sp))
 	http.HandleFunc("/saml/auth/post", handler.PostBindingHandlerFunc(sp))
-	http.HandleFunc("/metadata", handler.MetadaHandlerFunc(sp))
+	http.HandleFunc("/metadata", handler.MetadataHandlerFunc(sp))
 	http.HandleFunc("/login", func(w http.ResponseWriter, _ *http.Request) {
 		ts, _ := template.New("sso").Parse(
 			`<html><form method="GET" action="/saml/auth/redirect"><button type="submit">Submit Redirect</button></form></html>
