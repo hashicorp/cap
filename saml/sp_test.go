@@ -49,7 +49,8 @@ func Test_NewServiceProvider(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		t.Run(c.name, func(_ *testing.T) {
+		t.Run(c.name, func(t *testing.T) {
+			r := require.New(t)
 			got, err := saml.NewServiceProvider(c.cfg)
 
 			if c.err != "" {
@@ -105,7 +106,8 @@ func Test_ServiceProvider_FetchMetadata_ErrorCases(t *testing.T) {
 		provider, err := saml.NewServiceProvider(cfg)
 		r.NoError(err)
 
-		t.Run(c.name, func(_ *testing.T) {
+		t.Run(c.name, func(t *testing.T) {
+			r := require.New(t)
 			got, err := provider.IDPMetadata()
 			r.Nil(got)
 			r.Error(err)
@@ -138,15 +140,25 @@ func Test_ServiceProvider_CreateMetadata(t *testing.T) {
 	r.NoError(err)
 
 	cases := []struct {
-		name string
+		name          string
+		nameIDFormats []core.NameIDFormat
 	}{
 		{
 			name: "",
 		},
+		{
+			name:          "email",
+			nameIDFormats: []core.NameIDFormat{core.NameIDFormatEmail},
+		},
 	}
 	for _, c := range cases {
-		t.Run(c.name, func(_ *testing.T) {
-			got := provider.CreateMetadata()
+		t.Run(c.name, func(t *testing.T) {
+			r := require.New(t)
+			opts := []saml.Option{}
+			if c.nameIDFormats != nil {
+				opts = append(opts, saml.WithNameIDFormats(c.nameIDFormats))
+			}
+			got := provider.CreateMetadata(opts...)
 
 			r.Equal(&now, got.ValidUntil)
 			r.Equal("http://test.me/entity", got.EntityID)
@@ -167,7 +179,7 @@ func Test_ServiceProvider_CreateMetadata(t *testing.T) {
 				"http://test.me/saml/acs",
 				got.SPSSODescriptor[0].AssertionConsumerService[0].Location,
 			)
-			r.Contains(got.SPSSODescriptor[0].NameIDFormat, core.NameIDFormatEmail)
+			r.Equal(got.SPSSODescriptor[0].NameIDFormat, c.nameIDFormats)
 		})
 	}
 }
@@ -186,7 +198,8 @@ func Test_CreateMetadata_Options(t *testing.T) {
 	provider, err := saml.NewServiceProvider(cfg)
 	r.NoError(err)
 
-	t.Run("When option InsecureWantAssertionsUnsigned is set", func(_ *testing.T) {
+	t.Run("When option InsecureWantAssertionsUnsigned is set", func(t *testing.T) {
+		r := require.New(t)
 		got := provider.CreateMetadata(
 			saml.InsecureWantAssertionsUnsigned(),
 		)
@@ -194,16 +207,17 @@ func Test_CreateMetadata_Options(t *testing.T) {
 		r.False(got.SPSSODescriptor[0].WantAssertionsSigned)
 	})
 
-	t.Run("When option WithAdditionalNameIDFormat is set", func(_ *testing.T) {
+	t.Run("When option WithAdditionalNameIDFormat is set", func(t *testing.T) {
+		r := require.New(t)
 		got := provider.CreateMetadata(
 			saml.WithAdditionalNameIDFormat(core.NameIDFormatTransient),
 		)
 
-		r.Len(got.SPSSODescriptor[0].NameIDFormat, 2)
-		r.Contains(got.SPSSODescriptor[0].NameIDFormat, core.NameIDFormatTransient)
+		r.Equal(got.SPSSODescriptor[0].NameIDFormat, []core.NameIDFormat{core.NameIDFormatTransient})
 	})
 
-	t.Run("When option WithNameIDFormats is set", func(_ *testing.T) {
+	t.Run("When option WithNameIDFormats is set", func(t *testing.T) {
+		r := require.New(t)
 		got := provider.CreateMetadata(
 			saml.WithNameIDFormats([]core.NameIDFormat{
 				core.NameIDFormatEntity,
@@ -218,7 +232,8 @@ func Test_CreateMetadata_Options(t *testing.T) {
 		})
 	})
 
-	t.Run("When option WithACSServiceBinding is set", func(_ *testing.T) {
+	t.Run("When option WithACSServiceBinding is set", func(t *testing.T) {
+		r := require.New(t)
 		got := provider.CreateMetadata(
 			saml.WithACSServiceBinding(core.ServiceBindingHTTPRedirect),
 		)
@@ -230,7 +245,8 @@ func Test_CreateMetadata_Options(t *testing.T) {
 		)
 	})
 
-	t.Run("When option WithAdditionalACSEndpoint is set", func(_ *testing.T) {
+	t.Run("When option WithAdditionalACSEndpoint is set", func(t *testing.T) {
+		r := require.New(t)
 		redirectEndpoint, err := url.Parse("http://cap.saml.test/acs/redirect")
 		r.NoError(err)
 

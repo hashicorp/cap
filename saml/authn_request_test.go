@@ -68,7 +68,8 @@ func Test_CreateAuthnRequest(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		t.Run(c.name, func(_ *testing.T) {
+		t.Run(c.name, func(t *testing.T) {
+			r := require.New(t)
 			got, err := provider.CreateAuthnRequest(c.id, c.binding)
 			if c.err != "" {
 				r.Error(err)
@@ -113,7 +114,8 @@ func Test_CreateAuthnRequest_Options(t *testing.T) {
 	provider, err := saml.NewServiceProvider(cfg)
 	r.NoError(err)
 
-	t.Run("When option AllowCreate is set", func(_ *testing.T) {
+	t.Run("When option AllowCreate is set", func(t *testing.T) {
+		r := require.New(t)
 		got, err := provider.CreateAuthnRequest(
 			"abc123",
 			core.ServiceBindingHTTPPost,
@@ -126,7 +128,8 @@ func Test_CreateAuthnRequest_Options(t *testing.T) {
 		r.True(got.NameIDPolicy.AllowCreate)
 	})
 
-	t.Run("When option WithNameIDFormat is set", func(_ *testing.T) {
+	t.Run("When option WithNameIDFormat is set", func(t *testing.T) {
+		r := require.New(t)
 		got, err := provider.CreateAuthnRequest(
 			"abc123",
 			core.ServiceBindingHTTPPost,
@@ -140,7 +143,8 @@ func Test_CreateAuthnRequest_Options(t *testing.T) {
 		r.Equal(core.NameIDFormatEmail, got.NameIDPolicy.Format)
 	})
 
-	t.Run("When option ForceAuthn is set", func(_ *testing.T) {
+	t.Run("When option ForceAuthn is set", func(t *testing.T) {
+		r := require.New(t)
 		got, err := provider.CreateAuthnRequest(
 			"abc123",
 			core.ServiceBindingHTTPPost,
@@ -151,7 +155,8 @@ func Test_CreateAuthnRequest_Options(t *testing.T) {
 		r.True(got.ForceAuthn)
 	})
 
-	t.Run("When option WithProtocolBinding is set", func(_ *testing.T) {
+	t.Run("When option WithProtocolBinding is set", func(t *testing.T) {
+		r := require.New(t)
 		got, err := provider.CreateAuthnRequest(
 			"abc123",
 			core.ServiceBindingHTTPPost,
@@ -162,7 +167,8 @@ func Test_CreateAuthnRequest_Options(t *testing.T) {
 		r.Equal(core.ServiceBindingHTTPRedirect, got.ProtocolBinding)
 	})
 
-	t.Run("When option WithAuthnContextRefs is set", func(_ *testing.T) {
+	t.Run("When option WithAuthnContextRefs is set", func(t *testing.T) {
+		r := require.New(t)
 		got, err := provider.CreateAuthnRequest(
 			"abc123",
 			core.ServiceBindingHTTPPost,
@@ -179,7 +185,8 @@ func Test_CreateAuthnRequest_Options(t *testing.T) {
 		r.Equal(core.ComparisonExact, got.RequestedAuthContext.Comparison)
 	})
 
-	t.Run("When more than one option is set", func(_ *testing.T) {
+	t.Run("When more than one option is set", func(t *testing.T) {
+		r := require.New(t)
 		got, err := provider.CreateAuthnRequest(
 			"abc123",
 			core.ServiceBindingHTTPPost,

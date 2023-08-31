@@ -11,8 +11,6 @@ import (
 )
 
 func Test_NewConfig(t *testing.T) {
-	r := require.New(t)
-
 	entityID := "http://test.me/entity"
 	acs := "http://test.me/sso/acs"
 	metadata := "http://test.me/sso/metadata"
@@ -54,7 +52,8 @@ func Test_NewConfig(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		t.Run(c.name, func(_ *testing.T) {
+		t.Run(c.name, func(t *testing.T) {
+			r := require.New(t)
 			got, err := saml.NewConfig(
 				c.entityID,
 				c.acs,

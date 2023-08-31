@@ -27,10 +27,7 @@ type metadataOptions struct {
 func metadataOptionsDefault() metadataOptions {
 	return metadataOptions{
 		wantAssertionsSigned: true,
-		nameIDFormats: []core.NameIDFormat{
-			core.NameIDFormatEmail,
-		},
-		acsServiceBinding: core.ServiceBindingHTTPPost,
+		acsServiceBinding:    core.ServiceBindingHTTPPost,
 	}
 }
 
