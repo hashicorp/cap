@@ -148,7 +148,7 @@ func Test_ServiceProvider_CreateMetadata(t *testing.T) {
 		t.Run(c.name, func(_ *testing.T) {
 			got := provider.CreateMetadata()
 
-			r.Equal(now, got.ValidUntil)
+			r.Equal(&now, got.ValidUntil)
 			r.Equal("http://test.me/entity", got.EntityID)
 
 			r.Len(got.SPSSODescriptor, 1)
