@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"text/template"
 	"time"
 
@@ -26,6 +27,7 @@ type authnRequestOptions struct {
 	forceAuthn            bool
 	protocolBinding       core.ServiceBinding
 	authnContextClassRefs []string
+	indent                int
 }
 
 func authnRequestOptionsDefault() authnRequestOptions {
@@ -92,6 +94,15 @@ func WithAuthContextClassRefs(cfs []string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*authnRequestOptions); ok {
 			o.authnContextClassRefs = cfs
+		}
+	}
+}
+
+// WithIndent indent the XML document when marshalling it.
+func WithIndent(indent int) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*authnRequestOptions); ok {
+			o.indent = indent
 		}
 	}
 }
@@ -182,7 +193,9 @@ func (sp *ServiceProvider) CreateAuthnRequest(
 }
 
 // AuthnRequestPost creates an AuthRequest with HTTP-Post binding.
-func (sp *ServiceProvider) AuthnRequestPost(relayState string) ([]byte, *core.AuthnRequest, error) {
+func (sp *ServiceProvider) AuthnRequestPost(
+	relayState string, opt ...Option,
+) ([]byte, *core.AuthnRequest, error) {
 	requestID, err := sp.cfg.GenerateAuthRequestID()
 	if err != nil {
 		return nil, nil, err
@@ -193,7 +206,8 @@ func (sp *ServiceProvider) AuthnRequestPost(relayState string) ([]byte, *core.Au
 		return nil, nil, err
 	}
 
-	payload, err := authN.CreateXMLDocument()
+	opts := getAuthnRequestOptions(opt...)
+	payload, err := authN.CreateXMLDocument(opts.indent)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -238,14 +252,7 @@ func (sp *ServiceProvider) AuthnRequestRedirect(
 		return nil, nil, err
 	}
 
-	output, err := xml.Marshal(authN)
-	if err != nil {
-		return nil, nil, fmt.Errorf("%s: failed to marshal authentication request: %w", op, err)
-	}
-
-	fmt.Println(string(output))
-
-	payload, err := Deflate(authN)
+	payload, err := Deflate(authN, opts...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: failed to deflate/compress request: %w", op, err)
 	}
@@ -283,8 +290,9 @@ func (sp *ServiceProvider) AuthnRequestRedirect(
 
 // Deflate returns an AuthnRequest in the Deflate file format, applying default
 // compression.
-func Deflate(authn *core.AuthnRequest) ([]byte, error) {
+func Deflate(authn *core.AuthnRequest, opt ...Option) ([]byte, error) {
 	buf := bytes.Buffer{}
+	opts := getAuthnRequestOptions(opt...)
 
 	fw, err := flate.NewWriter(&buf, flate.DefaultCompression)
 	if err != nil {
@@ -292,7 +300,9 @@ func Deflate(authn *core.AuthnRequest) ([]byte, error) {
 	}
 	defer fw.Close()
 
-	err = xml.NewEncoder(fw).Encode(authn)
+	encoder := xml.NewEncoder(fw)
+	encoder.Indent("", strings.Repeat(" ", opts.indent))
+	err = encoder.Encode(authn)
 	if err != nil {
 		return nil, err
 	}
