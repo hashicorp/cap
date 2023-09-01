@@ -30,7 +30,25 @@ jobs:
         fi
 
     - name: Build
-      run: find . -name go.mod -execdir go build ./... \;
+      run: |
+        set -e
+        exit_status=
+        for f in $(find . -name go.mod)
+        do
+          pushd $(dirname $f) > /dev/null
+          go build ./... || exit_status=$?
+          popd > /dev/null
+        done
+        exit $status
 
     - name: Test
-      run: find . -name go.mod -execdir go test ./... \;
+      run: |
+        set -e
+        exit_status=
+        for f in $(find . -name go.mod)
+        do
+          pushd $(dirname $f) > /dev/null
+          go test -test.v ./... || exit_status=$?
+          popd > /dev/null
+        done
+        exit $exit_status
