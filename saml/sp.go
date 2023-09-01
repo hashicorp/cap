@@ -21,7 +21,7 @@ type metadataOptions struct {
 	wantAssertionsSigned bool
 	nameIDFormats        []core.NameIDFormat
 	acsServiceBinding    core.ServiceBinding
-	addtionalACSs        []metadata.Endpoint
+	additionalACSs       []metadata.Endpoint
 }
 
 func metadataOptionsDefault() metadataOptions {
@@ -72,7 +72,7 @@ func WithACSServiceBinding(b core.ServiceBinding) Option {
 func WithAdditionalACSEndpoint(b core.ServiceBinding, location *url.URL) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*metadataOptions); ok {
-			o.addtionalACSs = append(o.addtionalACSs, metadata.Endpoint{
+			o.additionalACSs = append(o.additionalACSs, metadata.Endpoint{
 				Binding:  b,
 				Location: location.String(),
 			})
@@ -142,7 +142,7 @@ func (sp *ServiceProvider) CreateMetadata(opt ...Option) *metadata.EntityDescrip
 		},
 	}
 
-	for i, a := range opts.addtionalACSs {
+	for i, a := range opts.additionalACSs {
 		spssoDescriptor.AssertionConsumerService = append(
 			spssoDescriptor.AssertionConsumerService,
 			metadata.IndexedEndpoint{

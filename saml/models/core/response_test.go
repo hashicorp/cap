@@ -182,12 +182,12 @@ var responseXMLAssertions = `<?xml version="1.0" encoding="UTF-8"?>
    </saml2:Assertion>
 </saml2p:Response>`
 
-func responseXML(t *testing.T, ssoRes string) core.Response {
+func responseXML(t *testing.T, ssoRes string) core.ResponseOld {
 	t.Helper()
 
 	r := require.New(t)
 
-	res := core.Response{}
+	res := core.ResponseOld{}
 
 	err := xml.Unmarshal([]byte(ssoRes), &res)
 	r.NoError(err)
