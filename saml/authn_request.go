@@ -107,7 +107,7 @@ func WithIndent(indent int) Option {
 	}
 }
 
-// CreateAuthNRequest creates an Authentication Request object.
+// CreateAuthnRequest creates an Authentication Request object.
 // The defaults follow the deployment profile for federation interoperability.
 // See: 3.1.1 https://kantarainitiative.github.io/SAMLprofiles/saml2int.html#_service_provider_requirements [INT_SAML]
 //
@@ -182,8 +182,8 @@ func (sp *ServiceProvider) CreateAuthnRequest(
 	// in a <samlp:RequestedAuthnContext> element in its requests, with the Comparison attribute set to exact."
 	if len(opts.authnContextClassRefs) > 0 {
 		ar.RequestedAuthContext = &core.RequestedAuthnContext{
-			AuthnConextClassRef: opts.authnContextClassRefs,
-			Comparison:          core.ComparisonExact,
+			AuthnContextClassRef: opts.authnContextClassRefs,
+			Comparison:           core.ComparisonExact,
 		}
 	}
 
