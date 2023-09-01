@@ -251,8 +251,40 @@ func (p *TestProvider) metadataHandler(w http.ResponseWriter, _ *http.Request) {
 	r.NoError(err)
 }
 
-func (p *TestProvider) loginHandlerPost(w http.ResponseWriter, r *http.Request) {
+func (p *TestProvider) loginHandlerPost(w http.ResponseWriter, req *http.Request) {
+	p.t.Helper()
+	r := require.New(p.t)
+
+	err := req.ParseForm()
+	r.NoError(err)
+
+	rawReq := req.FormValue("SAMLRequest")
+	r.NotEmpty(rawReq)
+
+	// do not check the base64 encoded saml request if not explicitly set.
+	if p.expectedB64EncSAMLRequest != "" {
+		r.Equal(p.expectedB64EncSAMLRequest, rawReq)
+	}
+
+	relayState := req.FormValue("RelayState")
+
+	r.Equal(p.expectedRelayState, relayState, "relay state doesn't match")
 	http.Error(w, "not implemented", http.StatusNotImplemented)
+
+	samlReq := p.parseRequestPost(rawReq)
+
+	p.validateRequest(samlReq)
+
+	samlResponseData := &SAMLResponsePostData{
+		SAMLResponse: responseSigned,
+		RelayState:   relayState,
+		Destination:  samlReq.AssertionConsumerServiceURL,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	err = json.NewEncoder(w).Encode(samlResponseData)
+	r.NoError(err, "failed to encode SAML response data")
 }
 
 func (p *TestProvider) loginHandlerRedirect(w http.ResponseWriter, req *http.Request) {
@@ -273,6 +305,24 @@ func (p *TestProvider) loginHandlerRedirect(w http.ResponseWriter, req *http.Req
 
 	samlReq := p.parseRequestRedirect(rawReq)
 	r.NotNil(samlReq, "the saml request must not be nil")
+
+	p.validateRequest(samlReq)
+
+	samlResponseData := &SAMLResponsePostData{
+		SAMLResponse: responseSigned,
+		RelayState:   relayState,
+		Destination:  samlReq.AssertionConsumerServiceURL,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	err := json.NewEncoder(w).Encode(samlResponseData)
+	r.NoError(err, "failed to encode SAML response data")
+}
+
+func (p *TestProvider) validateRequest(samlReq *core.AuthnRequest) {
+	p.t.Helper()
+	r := require.New(p.t)
 
 	r.Equal(
 		p.expectedVersion,
@@ -332,17 +382,6 @@ func (p *TestProvider) loginHandlerRedirect(w http.ResponseWriter, req *http.Req
 			"expected request ID doesn't match the ID in the SAML request",
 		)
 	}
-
-	samlResponseData := &SAMLResponsePostData{
-		SAMLResponse: responseSigned,
-		RelayState:   relayState,
-		Destination:  samlReq.AssertionConsumerServiceURL,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	err := json.NewEncoder(w).Encode(samlResponseData)
-	r.NoError(err, "failed to encode SAML response data")
 }
 
 func (p *TestProvider) parseRequestRedirect(request string) *core.AuthnRequest {
@@ -354,6 +393,20 @@ func (p *TestProvider) parseRequestRedirect(request string) *core.AuthnRequest {
 
 	raw, err := io.ReadAll(flate.NewReader(bytes.NewReader(deflated)))
 	r.NoError(err, "couldn't uncompress (deflated) SAML request")
+
+	req := core.AuthnRequest{}
+	err = xml.Unmarshal(raw, &req)
+	r.NoError(err, "couldn't unmarshal SAML request")
+
+	return &req
+}
+
+func (p *TestProvider) parseRequestPost(request string) *core.AuthnRequest {
+	p.t.Helper()
+	r := require.New(p.t)
+
+	raw, err := base64.StdEncoding.DecodeString(request)
+	r.NoError(err, "couldn't base64 decode SAML request")
 
 	req := core.AuthnRequest{}
 	err = xml.Unmarshal(raw, &req)

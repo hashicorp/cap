@@ -4,7 +4,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"regexp"
@@ -148,12 +147,7 @@ func (sp *ServiceProvider) ParseResponse(
 		}
 	}
 
-	// TODO: transform gosaml2 response to core.Response
-	var result core.Response
-	if xml.Unmarshal([]byte(samlResp), &result); err != nil {
-		return nil, fmt.Errorf("%s: %w", op, err)
-	}
-	return &result, nil
+	return (*core.Response)(response), nil
 }
 
 func (sp *ServiceProvider) internalParser(
@@ -204,7 +198,7 @@ func (sp *ServiceProvider) internalParser(
 
 // parseX509Certificate parses the contents of a <ds:X509Certificate> which is a
 // base64-encoded ASN.1 DER certificate. It does not parse PEM-encoded certificates.
-func parseCert(cert string) (*x509.Certificate, error) {
+func parseX509Certificate(cert string) (*x509.Certificate, error) {
 	const op = "saml.parseCert"
 	switch {
 	case cert == "":
@@ -223,24 +217,6 @@ func parseCert(cert string) (*x509.Certificate, error) {
 	parsedCert, err := x509.ParseCertificate(certBytes)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse certificate: %s", err)
-	}
-
-	return parsedCert, nil
-}
-
-// parseX509Certificate parses the contents of a <ds:X509Certificate> which is a
-// base64-encoded ASN.1 DER certificate. It does not parse PEM-encoded certificates.
-func parseX509Certificate(cert string) (*x509.Certificate, error) {
-	regex := regexp.MustCompile(`\s+`)
-	cert = regex.ReplaceAllString(cert, "")
-	certBytes, err := base64.StdEncoding.DecodeString(cert)
-	if err != nil {
-		return nil, fmt.Errorf("cannot parse certificate: %s", err)
-	}
-
-	parsedCert, err := x509.ParseCertificate(certBytes)
-	if err != nil {
-		return nil, err
 	}
 
 	return parsedCert, nil

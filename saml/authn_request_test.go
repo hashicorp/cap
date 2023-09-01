@@ -192,7 +192,7 @@ func Test_CreateAuthnRequest_Options(t *testing.T) {
 
 		r.NoError(err)
 		r.Contains(
-			got.RequestedAuthContext.AuthnConextClassRef,
+			got.RequestedAuthContext.AuthnContextClassRef,
 			"urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport",
 		)
 		r.Equal(core.ComparisonExact, got.RequestedAuthContext.Comparison)

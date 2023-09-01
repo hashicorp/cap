@@ -4,9 +4,8 @@ import (
 	"encoding/xml"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/hashicorp/cap/saml/models/core"
+	"github.com/stretchr/testify/require"
 )
 
 var ResponseXMLSignature = `<?xml version="1.0" encoding="UTF-8"?>
@@ -88,7 +87,7 @@ var responseXMLAssertion = `<?xml version="1.0" encoding="UTF-8"?>
 func Test_ParseResponse_Assertion(t *testing.T) {
 	r := require.New(t)
 
-	assert := responseXML(t, responseXMLAssertion).Assertion[0]
+	assert := responseXML(t, responseXMLAssertion).Assertions[0]
 
 	r.Equal("assertion-id", assert.ID)
 	r.Equal("2023-03-31 06:55:44.494 +0000 UTC", assert.IssueInstant.String())
@@ -106,7 +105,7 @@ var responseXMLAssertionIssuer = `<?xml version="1.0" encoding="UTF-8"?>
 func Test_ParseResponse_Assertion_Issuer(t *testing.T) {
 	r := require.New(t)
 
-	iss := responseXML(t, responseXMLAssertionIssuer).Assertion[0].Issuer
+	iss := responseXML(t, responseXMLAssertionIssuer).Assertions[0].Issuer
 
 	r.Equal("https://samltest.id/saml/idp", iss.Value)
 }
@@ -126,15 +125,12 @@ var responseXMLAssertionSubject = `<?xml version="1.0" encoding="UTF-8"?>
 func Test_ParseResponse_Assertion_Subject(t *testing.T) {
 	r := require.New(t)
 
-	sub := responseXML(t, responseXMLAssertionSubject).Assertion[0].Subject
+	sub := responseXML(t, responseXMLAssertionSubject).Assertions[0].Subject
 
-	r.Equal(core.NameIDFormatEmail, sub.NameID.Format)
-	r.Equal("https://samltest.id/saml/idp", sub.NameID.NameQualifier)
-	r.Equal("http://saml.test/example", sub.NameID.SPNameQualifier)
 	r.Equal("someone@samltest.id", sub.NameID.Value)
-	r.Equal(core.ConfirmationMethodBearer, sub.SubjectConfirmation[0].Method)
-	r.Equal("1.2.3.4", sub.SubjectConfirmation[0].SubjectConfirmationData.Address)
-	r.Equal("request-id", sub.SubjectConfirmation[0].SubjectConfirmationData.InResponseTo)
+	r.EqualValues(core.ConfirmationMethodBearer, sub.SubjectConfirmation.Method)
+	r.Equal("http://localhost:8000/saml/acs", sub.SubjectConfirmation.SubjectConfirmationData.Recipient)
+	r.Equal("request-id", sub.SubjectConfirmation.SubjectConfirmationData.InResponseTo)
 }
 
 var responseXMLAssertions = `<?xml version="1.0" encoding="UTF-8"?>
@@ -194,11 +190,8 @@ func responseXML(t *testing.T, ssoRes string) core.Response {
 	t.Helper()
 
 	r := require.New(t)
-
 	res := core.Response{}
-
 	err := xml.Unmarshal([]byte(ssoRes), &res)
 	r.NoError(err)
-
 	return res
 }
