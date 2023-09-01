@@ -109,7 +109,7 @@ func TestServiceProvider_ParseResponseCustomACS(t *testing.T) {
 	sp, err := saml.NewServiceProvider(cfg)
 	r.NoError(err)
 
-	encodedResponse := base64.StdEncoding.EncodeToString([]byte(responseSigned))
+	encodedResponse := base64.StdEncoding.EncodeToString([]byte(responseUnsigned))
 
 	type testCase struct {
 		name string
@@ -160,7 +160,7 @@ func TestServiceProvider_ParseResponseCustomACS(t *testing.T) {
 }
 
 // From https://www.samltool.com/generic_sso_res.php
-const responseSigned = `
+const responseUnsigned = `
 <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="_8e8dc5f69a98cc4c1ff3427e5ce34606fd672f91e6" Version="2.0" IssueInstant="2014-07-17T01:01:48Z" Destination="http://test.me/saml/acs" InResponseTo="ONELOGIN_4fee3b046395c4e751011e97f8900b5273d56685">
   <saml:Issuer>http://test.idp</saml:Issuer>
   <samlp:Status>

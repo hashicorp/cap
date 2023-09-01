@@ -140,6 +140,7 @@ func WithAssertionConsumerServiceURL(url string) Option {
 // See: 3.1.1 https://kantarainitiative.github.io/SAMLprofiles/saml2int.html#_service_provider_requirements [INT_SAML]
 //
 // Options:
+// - WithClock
 // - ForceAuthn
 // - AllowCreate
 // - WithIDFormat
