@@ -14,7 +14,7 @@ func ACSHandlerFunc(sp *saml.ServiceProvider) http.HandlerFunc {
 
 		res, err := sp.ParseResponse(samlResp, "responseID", saml.InsecureSkipRequestIDValidation())
 		if err != nil {
-			fmt.Println("failed ot handle SAML response:", err.Error())
+			fmt.Println("failed to handle SAML response:", err.Error())
 			http.Error(w, "failed to handle SAML response", http.StatusUnauthorized)
 			return
 		}

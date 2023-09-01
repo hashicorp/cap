@@ -113,7 +113,7 @@ type IDPList struct {
 // presenter.
 // See 3.4.1.3 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
 type IDPEntry struct {
-	// ProividerID is the unique identifier of the identity provider.
+	// ProviderID is the unique identifier of the identity provider.
 	ProviderID string `xml:",attr"`
 
 	// Name is a human-readable name for the identity provider.
@@ -157,13 +157,13 @@ const (
 type RequestedAuthnContext struct {
 	XMLName xml.Name `xml:"urn:oasis:names:tc:SAML:2.0:protocol RequestedAuthnContext"`
 
-	AuthnConextClassRef []string   `xml:"urn:oasis:names:tc:SAML:2.0:assertion AuthnContextClassRef"`
-	Comparison          Comparison `xml:",attr"`
+	AuthnContextClassRef []string   `xml:"urn:oasis:names:tc:SAML:2.0:assertion AuthnContextClassRef"`
+	Comparison           Comparison `xml:",attr"`
 }
 
 type Extensions struct{}
 
-// CreateDocument creates an AuthnRequest XML document.
+// CreateXMLDocument creates an AuthnRequest XML document.
 func (a *AuthnRequest) CreateXMLDocument(indent int) ([]byte, error) {
 	return xml.MarshalIndent(a, "", strings.Repeat(" ", indent))
 }
