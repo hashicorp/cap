@@ -7,6 +7,7 @@ require (
 	github.com/crewjam/go-xmlsec v0.0.0-20200414151428-d2b1a58f7262
 	github.com/hashicorp/cap v0.3.1
 	github.com/hashicorp/go-uuid v1.0.3
+	github.com/jonboulle/clockwork v0.4.0
 	github.com/russellhaering/gosaml2 v0.9.1
 	github.com/russellhaering/goxmldsig v1.4.0
 	github.com/stretchr/testify v1.8.4
@@ -21,7 +22,6 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-hclog v1.5.0 // indirect
-	github.com/jonboulle/clockwork v0.4.0 // indirect
 	github.com/ma314smith/signedxml v1.1.1 // indirect
 	github.com/mattermost/xml-roundtrip-validator v0.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect

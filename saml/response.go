@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/jonboulle/clockwork"
 	saml2 "github.com/russellhaering/gosaml2"
 	dsig "github.com/russellhaering/goxmldsig"
 
@@ -16,13 +17,16 @@ import (
 )
 
 type parseResponseOptions struct {
+	clock                            clockwork.Clock
 	skipRequestIDValidation          bool
 	skipAssertionConditionValidation bool
 	skipSignatureValidation          bool
+	assertionConsumerServiceURL      string
 }
 
 func parseResponseOptionsDefault() parseResponseOptions {
 	return parseResponseOptions{
+		clock:                            clockwork.NewRealClock(),
 		skipRequestIDValidation:          false,
 		skipAssertionConditionValidation: false,
 		skipSignatureValidation:          false,
@@ -73,6 +77,8 @@ func InsecureSkipSignatureValidation() Option {
 // - InsecureSkipRequestIDValidation
 // - InsecureSkipAssertionConditionValidation
 // - InsecureSkipSignatureValidation
+// - WithAssertionConsumerServiceURL
+// - WithClock
 func (sp *ServiceProvider) ParseResponse(
 	samlResp string,
 	requestID string,
@@ -90,7 +96,11 @@ func (sp *ServiceProvider) ParseResponse(
 	opts := getParseResponseOptions(opt...)
 
 	// We use github.com/russellhaering/gosaml2 for SAMLResponse signature and condition validation.
-	ip, err := sp.internalParser(opts.skipSignatureValidation)
+	ip, err := sp.internalParser(
+		opts.skipSignatureValidation,
+		opts.assertionConsumerServiceURL,
+		opts.clock,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to parse saml response: %w", op, err)
 	}
@@ -140,13 +150,12 @@ func (sp *ServiceProvider) ParseResponse(
 	return (*core.Response)(response), nil
 }
 
-func (sp *ServiceProvider) internalParser(skipSignatureValidation bool) (*saml2.SAMLServiceProvider, error) {
+func (sp *ServiceProvider) internalParser(
+	skipSignatureValidation bool,
+	assertionConsumerServiceURL string,
+	clock clockwork.Clock,
+) (*saml2.SAMLServiceProvider, error) {
 	const op = "saml.(ServiceProvider).internalParser"
-	switch {
-	case sp == nil:
-		return nil, fmt.Errorf("%s: missing service provider %w", op, ErrInternal)
-	}
-
 	idpMetadata, err := sp.IDPMetadata()
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
@@ -172,13 +181,18 @@ func (sp *ServiceProvider) internalParser(skipSignatureValidation bool) (*saml2.
 		}
 	}
 
+	if assertionConsumerServiceURL == "" {
+		assertionConsumerServiceURL = sp.cfg.AssertionConsumerServiceURL
+	}
+
 	return &saml2.SAMLServiceProvider{
 		IdentityProviderIssuer:      idpMetadata.EntityID,
 		IDPCertificateStore:         &certStore,
 		ServiceProviderIssuer:       sp.cfg.EntityID,
 		AudienceURI:                 sp.cfg.EntityID,
-		AssertionConsumerServiceURL: sp.cfg.AssertionConsumerServiceURL,
+		AssertionConsumerServiceURL: assertionConsumerServiceURL,
 		SkipSignatureValidation:     skipSignatureValidation,
+		Clock:                       dsig.NewFakeClock(clock),
 	}, nil
 }
 
