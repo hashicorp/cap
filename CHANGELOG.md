@@ -2,6 +2,11 @@
 
 Canonical reference for changes, improvements, and bugfixes for cap.
 
+## Next
+
+* LDAP
+  * Add worker pool for LDAP token group lookups ([**PR**](https://github.com/hashicorp/cap/pull/98))
+
 ## 0.3.4
 
 ### Bug fixes
