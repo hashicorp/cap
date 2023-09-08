@@ -470,8 +470,8 @@ func (c *Client) tokenGroupsSearch(userDN string) ([]*ldap.Entry, []Warning, err
 		// groups. See: https://github.com/hashicorp/vault/pull/22659
 		const maxWorkers = 10
 		var wg sync.WaitGroup
-		var lock sync.Mutex
-		taskChan := make(chan string) // intentionally an unbuffered chan so we can iterate (range) over it before it's closed.
+		taskChan := make(chan string)                      // intentionally an unbuffered chan so we can iterate (range) over it before it's closed.
+		tokenGrpChan := make(chan *ldap.Entry, maxWorkers) // let's use a buffered chan so the workers have some room to outpace each other
 		for i := 0; i < maxWorkers; i++ {
 			wg.Add(1)
 			go func() {
@@ -495,12 +495,11 @@ func (c *Client) tokenGroupsSearch(userDN string) ([]*ldap.Entry, []Warning, err
 						warnings = append(warnings, fmtWarning("%s: unable to find the group sid (baseDN: %q / filter: %q): %s", op, fmt.Sprintf("<SID=%s>", sidString), "(objectClass=*)", sidString))
 						continue
 					}
-					lock.Lock()
-					groupEntries = append(groupEntries, groupResult.Entries[0])
-					lock.Unlock()
+					tokenGrpChan <- groupResult.Entries[0]
 				}
 			}()
 		}
+		// map the token groups into a work queue
 		for _, sidBytes := range groupAttrValues {
 			sidString, err := sidBytesToString(sidBytes)
 			if err != nil {
@@ -512,6 +511,11 @@ func (c *Client) tokenGroupsSearch(userDN string) ([]*ldap.Entry, []Warning, err
 		// closing the taskChan will allow the workers to start iterating
 		// (range) - this unblocks them
 		close(taskChan)
+
+		// reduce the group entries
+		for i := 0; i < len(groupAttrValues); i++ {
+			groupEntries = append(groupEntries, <-tokenGrpChan) // this will block until a worker adds a group entry to the queue (aka chan)
+		}
 
 		// wait for all the workers to finish up the token group lookups and
 		// adding all the groups to the slice of group entries
