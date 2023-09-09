@@ -62,7 +62,11 @@ func AllowCreate() Option {
 }
 
 // WithNameIDFormat will set an NameIDPolicy object with the
-// given NameIDFormat. It implies AllowCreate=true.
+// given NameIDFormat. It implies allowCreate=true as recommended by
+// the SAML 2.0 spec, which says:
+// "Requesters that do not make specific use of this (AllowCreate) attribute SHOULD generally set it to “true”
+// to maximize interoperability."
+// See https://www.oasis-open.org/committees/download.php/56776/sstc-saml-core-errata-2.0-wd-07.pdf
 func WithNameIDFormat(f core.NameIDFormat) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*authnRequestOptions); ok {
