@@ -178,7 +178,7 @@ func (sp *ServiceProvider) internalParser(
 			for _, xcert := range kd.KeyInfo.X509Data.X509Certificates {
 				parsed, err := parseX509Certificate(xcert.Data)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("%s: unable to parse cert: %w", op, err)
 				}
 				certStore.Roots = append(certStore.Roots, parsed) // append works just fine with a nil slice
 			}

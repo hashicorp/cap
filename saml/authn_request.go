@@ -249,7 +249,7 @@ func (sp *ServiceProvider) AuthnRequestPost(
 	b64Payload := base64.StdEncoding.EncodeToString(payload)
 
 	tmpl := template.Must(
-		template.New("post-binding").Parse(PostBindingTempl),
+		template.New("post-binding").Parse(postBindingTempl),
 	)
 
 	buf := bytes.Buffer{}

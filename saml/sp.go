@@ -15,7 +15,7 @@ import (
 )
 
 //go:embed authn_request.gohtml
-var PostBindingTempl string
+var postBindingTempl string
 
 type metadataOptions struct {
 	wantAssertionsSigned bool
@@ -37,6 +37,8 @@ func getMetadataOptions(opt ...Option) metadataOptions {
 	return opts
 }
 
+// InsecureWantAssertionsUnsigned provides a way to optionally request that you
+// want insecure/unsigned assertions.
 func InsecureWantAssertionsUnsigned() Option {
 	return func(o interface{}) {
 		if o, ok := o.(*metadataOptions); ok {
@@ -55,6 +57,7 @@ func WithMetadataNameIDFormat(format ...core.NameIDFormat) Option {
 	}
 }
 
+// WithACSServiceBinding provides an optional service binding.
 func WithACSServiceBinding(b core.ServiceBinding) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*metadataOptions); ok {
@@ -75,6 +78,7 @@ func WithAdditionalACSEndpoint(b core.ServiceBinding, location url.URL) Option {
 	}
 }
 
+// ServiceProvider defines a type for service providers
 type ServiceProvider struct {
 	cfg *Config
 }

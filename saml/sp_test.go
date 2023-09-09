@@ -16,6 +16,7 @@ import (
 )
 
 func Test_NewServiceProvider(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 	exampleURL := "http://test.me"
 
@@ -56,16 +57,17 @@ func Test_NewServiceProvider(t *testing.T) {
 			if c.err != "" {
 				r.Error(err)
 				r.ErrorContains(err, c.err)
-			} else {
-				r.NoError(err)
-				r.NotNil(got)
-				r.NotNil(got.Config())
+				return
 			}
+			r.NoError(err)
+			r.NotNil(got)
+			r.NotNil(got.Config())
 		})
 	}
 }
 
 func Test_ServiceProvider_FetchMetadata_ErrorCases(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -117,6 +119,7 @@ func Test_ServiceProvider_FetchMetadata_ErrorCases(t *testing.T) {
 }
 
 func Test_ServiceProvider_CreateMetadata(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	entityID := "http://test.me/entity"
@@ -185,6 +188,7 @@ func Test_ServiceProvider_CreateMetadata(t *testing.T) {
 }
 
 func Test_CreateMetadata_Options(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	fakeURL := "http://fake.test.url"

@@ -47,6 +47,7 @@ var exampleIDPSSODescriptor = `<?xml version="1.0" encoding="UTF-8"?>
 </EntityDescriptor>`
 
 func Test_IDPSSODescriptor(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	ed := &metadata.EntityDescriptorIDPSSO{}
@@ -74,6 +75,7 @@ var exampleIDPSSOKeyDescriptor = `<?xml version="1.0" encoding="UTF-8"?>
 </EntityDescriptor>`
 
 func Test_IDPSSODescriptor_KeyDescriptor(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	ed := &metadata.EntityDescriptorIDPSSO{}
@@ -98,6 +100,7 @@ var exampleIDPSSODescriptorArtifactResolutionService = `<?xml version="1.0" enco
 </EntityDescriptor>`
 
 func Test_IDPSSODescriptor_ArtifactResolutionService(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	ed := &metadata.EntityDescriptorIDPSSO{}
@@ -126,6 +129,7 @@ var exampleIDPSSODescriptorSLO = `<?xml version="1.0" encoding="UTF-8"?>
 </EntityDescriptor>`
 
 func Test_IDPSSODescriptor_SLO(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	ed := &metadata.EntityDescriptorIDPSSO{}
@@ -155,6 +159,7 @@ var exampleIDPSSODescriptorSSO = `<?xml version="1.0" encoding="UTF-8"?>
 </EntityDescriptor>`
 
 func Test_IDPSSODescriptor_SSO(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	ed := &metadata.EntityDescriptorIDPSSO{}
@@ -190,6 +195,7 @@ var exampleIDPSSODescriptorAttributes = `<?xml version="1.0" encoding="UTF-8"?>
 </EntityDescriptor>`
 
 func Test_IDPSSODescriptor_Attributes(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	ed := &metadata.EntityDescriptorIDPSSO{}
