@@ -91,6 +91,7 @@ func TestServiceProvider_ParseResponse(t *testing.T) {
 }
 
 func TestServiceProvider_ParseResponseCustomACS(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	fakeTime, err := time.Parse("2006-01-02", "2015-07-15")
@@ -151,9 +152,9 @@ func TestServiceProvider_ParseResponseCustomACS(t *testing.T) {
 			)
 			if c.err == "" {
 				require.NoError(t, err)
-			} else {
-				require.ErrorContains(t, err, c.err)
+				return
 			}
+			require.ErrorContains(t, err, c.err)
 		})
 	}
 

@@ -16,6 +16,7 @@ import (
 )
 
 func Test_NewServiceProvider(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 	exampleURL := "http://test.me"
 
@@ -56,16 +57,17 @@ func Test_NewServiceProvider(t *testing.T) {
 			if c.err != "" {
 				r.Error(err)
 				r.ErrorContains(err, c.err)
-			} else {
-				r.NoError(err)
-				r.NotNil(got)
-				r.NotNil(got.Config())
+				return
 			}
+			r.NoError(err)
+			r.NotNil(got)
+			r.NotNil(got.Config())
 		})
 	}
 }
 
 func Test_ServiceProvider_FetchMetadata_ErrorCases(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -117,6 +119,7 @@ func Test_ServiceProvider_FetchMetadata_ErrorCases(t *testing.T) {
 }
 
 func Test_ServiceProvider_CreateMetadata(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	entityID := "http://test.me/entity"
@@ -156,7 +159,7 @@ func Test_ServiceProvider_CreateMetadata(t *testing.T) {
 			r := require.New(t)
 			opts := []saml.Option{}
 			if c.nameIDFormats != nil {
-				opts = append(opts, saml.WithNameIDFormats(c.nameIDFormats))
+				opts = append(opts, saml.WithMetadataNameIDFormat(c.nameIDFormats...))
 			}
 			got := provider.CreateMetadata(opts...)
 
@@ -185,6 +188,7 @@ func Test_ServiceProvider_CreateMetadata(t *testing.T) {
 }
 
 func Test_CreateMetadata_Options(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	fakeURL := "http://fake.test.url"
@@ -210,7 +214,7 @@ func Test_CreateMetadata_Options(t *testing.T) {
 	t.Run("When option WithAdditionalNameIDFormat is set", func(t *testing.T) {
 		r := require.New(t)
 		got := provider.CreateMetadata(
-			saml.WithAdditionalNameIDFormat(core.NameIDFormatTransient),
+			saml.WithMetadataNameIDFormat(core.NameIDFormatTransient),
 		)
 
 		r.Equal(got.SPSSODescriptor[0].NameIDFormat, []core.NameIDFormat{core.NameIDFormatTransient})
@@ -219,10 +223,7 @@ func Test_CreateMetadata_Options(t *testing.T) {
 	t.Run("When option WithNameIDFormats is set", func(t *testing.T) {
 		r := require.New(t)
 		got := provider.CreateMetadata(
-			saml.WithNameIDFormats([]core.NameIDFormat{
-				core.NameIDFormatEntity,
-				core.NameIDFormatUnspecified,
-			}),
+			saml.WithMetadataNameIDFormat(core.NameIDFormatEntity, core.NameIDFormatUnspecified),
 		)
 
 		r.Len(got.SPSSODescriptor[0].NameIDFormat, 2)
@@ -253,7 +254,7 @@ func Test_CreateMetadata_Options(t *testing.T) {
 		got := provider.CreateMetadata(
 			saml.WithAdditionalACSEndpoint(
 				core.ServiceBindingHTTPRedirect,
-				redirectEndpoint,
+				*redirectEndpoint,
 			),
 		)
 

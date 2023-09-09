@@ -156,6 +156,10 @@ func (sp *ServiceProvider) internalParser(
 	clock clockwork.Clock,
 ) (*saml2.SAMLServiceProvider, error) {
 	const op = "saml.(ServiceProvider).internalParser"
+	switch {
+	case isNil(clock):
+		return nil, fmt.Errorf("%s: missing clock: %w", op, ErrInvalidParameter)
+	}
 	idpMetadata, err := sp.IDPMetadata()
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
@@ -174,7 +178,7 @@ func (sp *ServiceProvider) internalParser(
 			for _, xcert := range kd.KeyInfo.X509Data.X509Certificates {
 				parsed, err := parseX509Certificate(xcert.Data)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("%s: unable to parse cert: %w", op, err)
 				}
 				certStore.Roots = append(certStore.Roots, parsed) // append works just fine with a nil slice
 			}

@@ -232,7 +232,7 @@ type configOptions struct {
 
 func configOptionsDefault() configOptions {
 	return configOptions{
-		withValidUntil: DefaultValidUntil,
+		withValidUntil: defaultValidUntil,
 	}
 }
 
@@ -245,7 +245,7 @@ func getConfigOptions(opt ...Option) configOptions {
 		opts.withGenerateAuthRequestID = DefaultGenerateAuthRequestID
 	}
 	if opts.withValidUntil == nil {
-		opts.withValidUntil = DefaultValidUntil
+		opts.withValidUntil = defaultValidUntil
 	}
 
 	return opts
@@ -264,8 +264,8 @@ func DefaultGenerateAuthRequestID() (string, error) {
 	return fmt.Sprintf("_%s", newID), nil
 }
 
-// DefaultValidUntil returns a timestamp with one year
+// defaultValidUntil returns a timestamp with one year
 // added to the time when this function is called.
-func DefaultValidUntil() time.Time {
+func defaultValidUntil() time.Time {
 	return time.Now().Add(time.Hour * 24 * 365)
 }

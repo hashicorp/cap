@@ -7,7 +7,14 @@ import (
 	"github.com/hashicorp/cap/saml"
 )
 
-func ACSHandlerFunc(sp *saml.ServiceProvider) http.HandlerFunc {
+// ACSHandlerFunc creates a handler function that handles a SAML
+// ACS request
+func ACSHandlerFunc(sp *saml.ServiceProvider) (http.HandlerFunc, error) {
+	const op = "handler.ACSHandler"
+	switch {
+	case sp == nil:
+		return nil, fmt.Errorf("%s: missing service provider", op)
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 		samlResp := r.PostForm.Get("SAMLResponse")
@@ -20,5 +27,5 @@ func ACSHandlerFunc(sp *saml.ServiceProvider) http.HandlerFunc {
 		}
 
 		fmt.Fprintf(w, "Authenticated! %+v", res)
-	}
+	}, nil
 }

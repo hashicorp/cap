@@ -11,10 +11,12 @@ import (
 )
 
 func Test_NewConfig(t *testing.T) {
-	entityID := "http://test.me/entity"
-	acs := "http://test.me/sso/acs"
-	metadata := "http://test.me/sso/metadata"
-
+	t.Parallel()
+	const (
+		entityID = "http://test.me/entity"
+		acs      = "http://test.me/sso/acs"
+		metadata = "http://test.me/sso/metadata"
+	)
 	cases := []struct {
 		name        string
 		entityID    string
@@ -62,21 +64,22 @@ func Test_NewConfig(t *testing.T) {
 
 			if c.expectedErr != "" {
 				r.ErrorContains(err, c.expectedErr)
-			} else {
-				r.NoError(err)
-
-				r.Equal(got.EntityID, "http://test.me/entity")
-				r.Equal(got.AssertionConsumerServiceURL, "http://test.me/sso/acs")
-				r.Equal(got.MetadataURL, "http://test.me/sso/metadata")
-
-				r.NotNil(got.GenerateAuthRequestID)
-				r.NotNil(got.ValidUntil)
+				return
 			}
+			r.NoError(err)
+
+			r.Equal(got.EntityID, "http://test.me/entity")
+			r.Equal(got.AssertionConsumerServiceURL, "http://test.me/sso/acs")
+			r.Equal(got.MetadataURL, "http://test.me/sso/metadata")
+
+			r.NotNil(got.GenerateAuthRequestID)
+			r.NotNil(got.ValidUntil)
 		})
 	}
 }
 
 func Test_GenerateAuthRequestID(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	id, err := saml.DefaultGenerateAuthRequestID()

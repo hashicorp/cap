@@ -9,7 +9,12 @@ import (
 )
 
 // PostBindingHandlerFunc creates a handler function that handles a HTTP-POST binding SAML request.
-func PostBindingHandlerFunc(sp *saml.ServiceProvider) http.HandlerFunc {
+func PostBindingHandlerFunc(sp *saml.ServiceProvider) (http.HandlerFunc, error) {
+	const op = "handler.PostBindingHandlerFunc"
+	switch {
+	case sp == nil:
+		return nil, fmt.Errorf("%s: missing service provider", op)
+	}
 	return func(w http.ResponseWriter, _ *http.Request) {
 		templ, _, err := sp.AuthnRequestPost("")
 		if err != nil {
@@ -33,5 +38,5 @@ func PostBindingHandlerFunc(sp *saml.ServiceProvider) http.HandlerFunc {
 			)
 			return
 		}
-	}
+	}, nil
 }

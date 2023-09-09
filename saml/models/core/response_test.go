@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var ResponseXMLSignature = `<?xml version="1.0" encoding="UTF-8"?>
+var responseXMLSignature = `<?xml version="1.0" encoding="UTF-8"?>
 <saml2p:Response xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:xsd="http://www.w3.org/2001/XMLSchema" Destination="http://localhost:8000/saml/acs" ID="saml-response-id" InResponseTo="saml-request-id" IssueInstant="2023-03-31T06:55:44.494Z" Version="2.0">
    <ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
       <ds:SignedInfo>
@@ -39,13 +39,13 @@ var responseXMLContainer = `<?xml version="1.0" encoding="UTF-8"?>
 </saml2p:Response>`
 
 func Test_ParseResponse_ResponseContainer(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	res := responseXML(t, responseXMLContainer)
 
 	r.Equal(res.Destination, "http://localhost:8000/saml/acs")
 	r.Equal(res.ID, "saml-response-id")
-	// r.Equal(res.InResponseTo, "saml-request-id")
 	r.Equal(res.IssueInstant.String(), "2023-03-31 06:55:44.494 +0000 UTC")
 	r.Equal(res.Version, "2.0")
 }
@@ -56,6 +56,7 @@ var responseXMLIssuer = `<?xml version="1.0" encoding="UTF-8"?>
 </saml2p:Response>`
 
 func Test_ParseResponse_Issuer(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	iss := responseXML(t, responseXMLIssuer).Issuer
@@ -70,14 +71,6 @@ var responseXMLStatus = `<?xml version="1.0" encoding="UTF-8"?>
    </saml2p:Status>
 </saml2p:Response>`
 
-// func Test_ParseResponse_Status(t *testing.T) {
-// 	r := require.New(t)
-
-// 	status := responseXML(t, responseXMLStatus).Status
-
-// 	r.Equal(status.StatusCode.Value, core.StatusCodeSuccess)
-// }
-
 var responseXMLAssertion = `<?xml version="1.0" encoding="UTF-8"?>
 <saml2p:Response xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:xsd="http://www.w3.org/2001/XMLSchema" Destination="http://localhost:8000/saml/acs" ID="saml-response-id" InResponseTo="saml-request-id" IssueInstant="2023-03-31T06:55:44.494Z" Version="2.0">
     <saml2:Assertion xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion" ID="assertion-id" IssueInstant="2023-03-31T06:55:44.494Z" Version="2.0">
@@ -85,6 +78,7 @@ var responseXMLAssertion = `<?xml version="1.0" encoding="UTF-8"?>
 </saml2p:Response>`
 
 func Test_ParseResponse_Assertion(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	assert := responseXML(t, responseXMLAssertion).Assertions[0]
@@ -103,6 +97,7 @@ var responseXMLAssertionIssuer = `<?xml version="1.0" encoding="UTF-8"?>
 </saml2p:Response>`
 
 func Test_ParseResponse_Assertion_Issuer(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	iss := responseXML(t, responseXMLAssertionIssuer).Assertions[0].Issuer
@@ -123,6 +118,7 @@ var responseXMLAssertionSubject = `<?xml version="1.0" encoding="UTF-8"?>
 </saml2p:Response>`
 
 func Test_ParseResponse_Assertion_Subject(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	sub := responseXML(t, responseXMLAssertionSubject).Assertions[0].Subject
