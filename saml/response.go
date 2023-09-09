@@ -156,6 +156,10 @@ func (sp *ServiceProvider) internalParser(
 	clock clockwork.Clock,
 ) (*saml2.SAMLServiceProvider, error) {
 	const op = "saml.(ServiceProvider).internalParser"
+	switch {
+	case isNil(clock):
+		return nil, fmt.Errorf("%s: missing clock: %w", op, ErrInvalidParameter)
+	}
 	idpMetadata, err := sp.IDPMetadata()
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
