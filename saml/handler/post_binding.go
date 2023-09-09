@@ -21,6 +21,18 @@ func PostBindingHandlerFunc(sp *saml.ServiceProvider) http.HandlerFunc {
 			return
 		}
 
+		err = saml.WritePostBindingRequestHeader(w)
+		if err != nil {
+			http.Error(
+				w,
+				fmt.Sprintf(
+					"failed to write content headers: %s",
+					err.Error(),
+				),
+				http.StatusInternalServerError,
+			)
+		}
+
 		_, err = w.Write(templ)
 		if err != nil {
 			http.Error(

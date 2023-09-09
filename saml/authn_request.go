@@ -272,10 +272,19 @@ func (sp *ServiceProvider) AuthnRequestPost(
 	return buf.Bytes(), authN, nil
 }
 
-func WritePostBindingRequestHeader(w http.ResponseWriter) {
+// WritePostBindingRequestHeader writes recommended content headers when using the SAML HTTP POST binding.
+func WritePostBindingRequestHeader(w http.ResponseWriter) error {
+	const op = "saml.WritePostBindingHeader"
+
+	if w == nil {
+		return fmt.Errorf("%s: response writer is nil", op)
+	}
+
 	w.Header().
 		Add("Content-Security-Policy", fmt.Sprintf("script-src '%s'", postBindingScriptSha256))
 	w.Header().Add("Content-type", "text/html")
+
+	return nil
 }
 
 func (sp *ServiceProvider) AuthnRequestRedirect(
