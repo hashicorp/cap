@@ -11,7 +11,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/hashicorp/cap/oidc"
 	"github.com/jonboulle/clockwork"
 
 	"github.com/hashicorp/cap/saml/models/core"
@@ -155,11 +154,11 @@ func (sp *ServiceProvider) CreateAuthnRequest(
 	const op = "saml.ServiceProvider.CreateAuthnRequest"
 
 	if id == "" {
-		return nil, fmt.Errorf("%s: no ID provided: %w", op, oidc.ErrInvalidParameter)
+		return nil, fmt.Errorf("%s: no ID provided: %w", op, ErrInvalidParameter)
 	}
 
 	if binding == "" {
-		return nil, fmt.Errorf("%s: no binding provided: %w", op, oidc.ErrInvalidParameter)
+		return nil, fmt.Errorf("%s: no binding provided: %w", op, ErrInvalidParameter)
 	}
 
 	opts := getAuthnRequestOptions(opt...)
