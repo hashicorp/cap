@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/cap/saml"
@@ -116,6 +117,119 @@ func Test_ServiceProvider_FetchMetadata_ErrorCases(t *testing.T) {
 	}
 }
 
+func Test_ServiceProvider_FetchMetadata_Cache(t *testing.T) {
+	type testServer struct {
+		fail          bool
+		failOnRefresh bool
+	}
+
+	newTestServer := func(t *testing.T, failOnRefresh bool) string {
+		t.Helper()
+
+		ts := &testServer{false, failOnRefresh}
+
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			if !ts.fail {
+				w.Write([]byte(exampleIDPSSODescriptorX))
+			}
+			ts.fail = ts.fail || ts.failOnRefresh
+		}))
+		t.Cleanup(s.Close)
+
+		return s.URL
+	}
+
+	cases := []struct {
+		name                 string
+		newTime              string
+		shoudBeCached        bool
+		opts                 []saml.Option
+		failOnRefresh        bool
+		expectErrorOnRefresh bool
+	}{
+		{
+			name:          "is cached",
+			shoudBeCached: true,
+		},
+		{
+			name:          "cache is disabled",
+			opts:          []saml.Option{saml.WithCache(false)},
+			shoudBeCached: false,
+		},
+		{
+			name:          "stale cached document should not be used",
+			newTime:       "2017-07-26",
+			shoudBeCached: false,
+		},
+		{
+			name:                 "is not cached once validUntil is reached",
+			newTime:              "2018-07-25",
+			expectErrorOnRefresh: true,
+		},
+		{
+			name:                 "a stale document should not be used if refreshing fails",
+			newTime:              "2017-07-26",
+			failOnRefresh:        true,
+			expectErrorOnRefresh: true,
+		},
+		{
+			name:          "use stale document",
+			opts:          []saml.Option{saml.WithStale(true)},
+			newTime:       "2017-07-26",
+			failOnRefresh: true,
+			shoudBeCached: true,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			r := require.New(t)
+
+			url := newTestServer(t, tt.failOnRefresh)
+			metaURL := fmt.Sprintf("%s/saml/metadata", url)
+			cfg, err := saml.NewConfig(
+				metaURL,
+				metaURL,
+				metaURL,
+			)
+			r.NoError(err)
+
+			provider, err := saml.NewServiceProvider(cfg)
+			r.NoError(err)
+
+			newTime, err := time.Parse("2006-01-02", "2017-07-25")
+			r.NoError(err)
+
+			opts := append([]saml.Option{saml.WithClock(clockwork.NewFakeClockAt(newTime))}, tt.opts...)
+
+			got1, err := provider.IDPMetadata(opts...)
+			r.NoError(err)
+			r.NotNil(got1)
+
+			if tt.newTime != "" {
+				newTime, err = time.Parse("2006-01-02", tt.newTime)
+				r.NoError(err)
+				opts = append(opts, saml.WithClock(clockwork.NewFakeClockAt(newTime)))
+			}
+
+			got2, err := provider.IDPMetadata(opts...)
+			if tt.expectErrorOnRefresh {
+				r.Error(err)
+				return
+			} else {
+				r.NoError(err)
+			}
+			r.NotNil(got2)
+
+			if tt.shoudBeCached {
+				r.True(got1 == got2)
+			} else {
+				r.False(got1 == got2)
+			}
+		})
+	}
+}
+
 func Test_ServiceProvider_CreateMetadata(t *testing.T) {
 	r := require.New(t)
 
@@ -133,6 +247,7 @@ func Test_ServiceProvider_CreateMetadata(t *testing.T) {
 		acs,
 		meta,
 	)
+	r.NoError(err)
 
 	cfg.ValidUntil = validUntil
 
@@ -281,3 +396,32 @@ func Test_CreateMetadata_Options(t *testing.T) {
 		)
 	})
 }
+
+var exampleIDPSSODescriptorX = `<md:EntityDescriptor entityID="https://sso.example.info/entity" validUntil="2017-08-30T19:10:29Z" cacheDuration="PT15M"
+xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
+xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+xmlns:mdrpi="urn:oasis:names:tc:SAML:metadata:rpi"
+xmlns:mdattr="urn:oasis:names:tc:SAML:metadata:attribute"
+xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+<!-- insert ds:Signature element (omitted) -->
+<md:Extensions>
+  <mdrpi:RegistrationInfo registrationAuthority="https://registrar.example.net"/>
+  <mdrpi:PublicationInfo creationInstant="2017-08-16T19:10:29Z" publisher="https://registrar.example.net"/>
+  <mdattr:EntityAttributes>
+	<saml:Attribute Name="http://registrar.example.net/entity-category" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+	  <saml:AttributeValue>https://registrar.example.net/category/self-certified</saml:AttributeValue>
+	</saml:Attribute>
+  </mdattr:EntityAttributes>
+</md:Extensions>
+<!-- insert one or more concrete instances of the md:RoleDescriptor abstract type (see below) -->
+<md:Organization>
+  <md:OrganizationName xml:lang="en">...</md:OrganizationName>
+  <md:OrganizationDisplayName xml:lang="en">...</md:OrganizationDisplayName>
+  <md:OrganizationURL xml:lang="en">https://www.example.info/</md:OrganizationURL>
+</md:Organization>
+<md:ContactPerson contactType="technical">
+  <md:SurName>SAML Technical Support</md:SurName>
+  <md:EmailAddress>mailto:technical-support@example.info</md:EmailAddress>
+</md:ContactPerson>
+</md:EntityDescriptor>
+`

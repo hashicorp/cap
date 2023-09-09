@@ -37,9 +37,9 @@ const (
 
 // DescriptorCommon defines common fields used in Entity- and EntitiesDescriptor.
 type DescriptorCommon struct {
-	ID            string        `xml:",attr,omitempty"`
-	ValidUntil    *time.Time    `xml:"validUntil,attr,omitempty"`
-	CacheDuration time.Duration `xml:"cacheDuration,attr,omitempty"`
+	ID            string     `xml:",attr,omitempty"`
+	ValidUntil    *time.Time `xml:"validUntil,attr,omitempty"`
+	CacheDuration *Duration  `xml:"cacheDuration,attr,omitempty"`
 	Signature     *dsig.Signature
 }
 

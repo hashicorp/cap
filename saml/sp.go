@@ -8,9 +8,12 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sync"
+	"time"
 
 	"github.com/hashicorp/cap/saml/models/core"
 	"github.com/hashicorp/cap/saml/models/metadata"
+	"github.com/jonboulle/clockwork"
 	dsig "github.com/russellhaering/goxmldsig/types"
 )
 
@@ -82,6 +85,10 @@ func WithAdditionalACSEndpoint(b core.ServiceBinding, location *url.URL) Option 
 
 type ServiceProvider struct {
 	cfg *Config
+
+	metadata            *metadata.EntityDescriptorIDPSSO
+	metadataCachedUntil *time.Time
+	metadataLock        sync.Mutex
 }
 
 // NewServiceProvider creates a new ServiceProvider.
@@ -157,21 +164,101 @@ func (sp *ServiceProvider) CreateMetadata(opt ...Option) *metadata.EntityDescrip
 	return &spsso
 }
 
+type idpMetadataOptions struct {
+	cache    bool
+	useStale bool
+	clock    clockwork.Clock
+}
+
+func idpMetadataOptionsDefault() idpMetadataOptions {
+	return idpMetadataOptions{
+		cache:    true,
+		useStale: false,
+		clock:    clockwork.NewRealClock(),
+	}
+}
+
+func getIDPMetadataOptions(opt ...Option) idpMetadataOptions {
+	opts := idpMetadataOptionsDefault()
+	ApplyOpts(&opts, opt...)
+	return opts
+}
+
+// WithCache control whether we should cache IDP Metadata.
+func WithCache(cache bool) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*idpMetadataOptions); ok {
+			o.cache = cache
+		}
+	}
+}
+
+// WithStale control whether we should use a stale IDP Metadata document if
+// refreshing it fails.
+func WithStale(stale bool) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*idpMetadataOptions); ok {
+			o.useStale = stale
+		}
+	}
+}
+
 // IDPMetadata fetches the metadata XML document from the configured identity provider.
-func (sp *ServiceProvider) IDPMetadata() (*metadata.EntityDescriptorIDPSSO, error) {
+// Options:
+// - WithClock
+// - WithCache
+// - WithStale
+func (sp *ServiceProvider) IDPMetadata(opt ...Option) (*metadata.EntityDescriptorIDPSSO, error) {
 	const op = "saml.ServiceProvider.FetchIDPMetadata"
+
+	opts := getIDPMetadataOptions(opt...)
 
 	var err error
 	var ed *metadata.EntityDescriptorIDPSSO
+
+	isValid := func(md *metadata.EntityDescriptorIDPSSO) bool {
+		if md == nil {
+			return false
+		}
+		if md.ValidUntil == nil {
+			return true
+		}
+		return opts.clock.Now().Before(*md.ValidUntil)
+	}
+
+	isAlive := func(md *metadata.EntityDescriptorIDPSSO, expireAt *time.Time) bool {
+		if md == nil || !opts.cache || expireAt == nil {
+			return false
+		}
+
+		return opts.clock.Now().Before(*expireAt)
+	}
+
+	if opts.cache {
+		// We only take the lock when caching is enabled so that requests can be
+		// done concurrently when it is not
+		sp.metadataLock.Lock()
+		defer sp.metadataLock.Unlock()
+
+		if !isValid(sp.metadata) {
+			sp.metadata = nil
+			sp.metadataCachedUntil = nil
+		} else if isAlive(sp.metadata, sp.metadataCachedUntil) {
+			return sp.metadata, nil
+		}
+	}
 
 	// Order of switch case determines IDP metadata config precedence
 	switch {
 	case sp.cfg.MetadataURL != "":
 		ed, err = fetchIDPMetadata(sp.cfg.MetadataURL)
-		if err != nil {
+		if err != nil && opts.useStale && isValid(sp.metadata) {
+			// An error occured but we have a cached metadata document that
+			// we can use
+			return sp.metadata, nil
+		} else if err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
-		return ed, nil
 
 	case sp.cfg.MetadataXML != "":
 		ed, err = parseIDPMetadata([]byte(sp.cfg.MetadataXML))
@@ -187,6 +274,17 @@ func (sp *ServiceProvider) IDPMetadata() (*metadata.EntityDescriptorIDPSSO, erro
 
 	default:
 		return nil, fmt.Errorf("%s: no IDP metadata configuration set: %w", op, ErrInvalidParameter)
+	}
+
+	if !isValid(ed) {
+		return nil, fmt.Errorf("the IDP configuration was only valid until %s", ed.ValidUntil.Format(time.RFC3339))
+	}
+
+	sp.metadata = ed
+	sp.metadataCachedUntil = nil
+	if sp.metadata.CacheDuration != nil {
+		cachedUntil := opts.clock.Now().Add(time.Duration(*sp.metadata.CacheDuration))
+		sp.metadataCachedUntil = &cachedUntil
 	}
 
 	return ed, err
