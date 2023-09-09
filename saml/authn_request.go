@@ -305,6 +305,7 @@ func WritePostBindingRequestHeader(w http.ResponseWriter) error {
 	return nil
 }
 
+// AuthRequestRedirect creates a SAML authentication request with HTTP redirect binding.
 func (sp *ServiceProvider) AuthnRequestRedirect(
 	relayState string, opts ...Option,
 ) (*url.URL, *core.AuthnRequest, error) {
