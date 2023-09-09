@@ -126,6 +126,3 @@ update-ui-assets*
 test*.hcl
 
 # vim: set filetype=conf :
-
-# saml demo binary
-saml/demo/demo
