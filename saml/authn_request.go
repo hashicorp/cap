@@ -17,7 +17,11 @@ import (
 )
 
 const (
-	postBindingScriptSha256 = "T8Q9GZiIVtYoNIdF6UW5hDNgJudFDijQM/usO+xUkes="
+	// postBindingScriptSha256 is a base64 encoded sha256 hash generated from the javascript within the script tag in ./authn_request.gohtml.
+	// The hash is set in the Content-Security-Policy header when using the SAML HTTP POST-Binding Authentication Request.
+	// You can read more about the header and how the hash is generated here: https://content-security-policy.com/hash/
+	// As the POST-Binding script is static, this value is static as well and shouldn't change.
+	postBindingScriptSha256 = "sha256-T8Q9GZiIVtYoNIdF6UW5hDNgJudFDijQM/usO+xUkes="
 )
 
 type authnRequestOptions struct {
