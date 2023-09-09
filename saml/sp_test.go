@@ -253,7 +253,7 @@ func Test_CreateMetadata_Options(t *testing.T) {
 		got := provider.CreateMetadata(
 			saml.WithAdditionalACSEndpoint(
 				core.ServiceBindingHTTPRedirect,
-				redirectEndpoint,
+				*redirectEndpoint,
 			),
 		)
 

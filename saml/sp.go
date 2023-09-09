@@ -69,7 +69,8 @@ func WithACSServiceBinding(b core.ServiceBinding) Option {
 	}
 }
 
-func WithAdditionalACSEndpoint(b core.ServiceBinding, location *url.URL) Option {
+// WithAdditionalACSEndpoint provides an optional additional ACS endpoint
+func WithAdditionalACSEndpoint(b core.ServiceBinding, location url.URL) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*metadataOptions); ok {
 			o.additionalACSs = append(o.additionalACSs, metadata.Endpoint{
