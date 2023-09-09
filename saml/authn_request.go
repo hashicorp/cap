@@ -237,20 +237,34 @@ func (sp *ServiceProvider) CreateAuthnRequest(
 func (sp *ServiceProvider) AuthnRequestPost(
 	relayState string, opt ...Option,
 ) ([]byte, *core.AuthnRequest, error) {
+	const op = "saml.ServiceProvider.AuthnRequestPost"
+
 	requestID, err := sp.cfg.GenerateAuthRequestID()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf(
+			"%s: failed to generate authentication request ID: %w",
+			op,
+			ErrInternal,
+		)
 	}
 
 	authN, err := sp.CreateAuthnRequest(requestID, core.ServiceBindingHTTPPost)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf(
+			"%s: failed to create authentication request: %w",
+			op,
+			ErrInternal,
+		)
 	}
 
 	opts := getAuthnRequestOptions(opt...)
 	payload, err := authN.CreateXMLDocument(opts.indent)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf(
+			"%s: failed to create request XML: %w",
+			op,
+			ErrInternal,
+		)
 	}
 
 	b64Payload := base64.StdEncoding.EncodeToString(payload)
@@ -266,7 +280,11 @@ func (sp *ServiceProvider) AuthnRequestPost(
 		"SAMLRequest": b64Payload,
 		"RelayState":  relayState,
 	}); err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf(
+			"%s: failed to execute POST binding template: %w",
+			op,
+			ErrInternal,
+		)
 	}
 
 	return buf.Bytes(), authN, nil
