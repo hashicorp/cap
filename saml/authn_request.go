@@ -313,12 +313,20 @@ func (sp *ServiceProvider) AuthnRequestRedirect(
 
 	requestID, err := sp.cfg.GenerateAuthRequestID()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf(
+			"%s: failed to generate authentication request ID: %w",
+			op,
+			err,
+		)
 	}
 
 	authN, err := sp.CreateAuthnRequest(requestID, core.ServiceBindingHTTPRedirect, opts...)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf(
+			"%s: failed to create SAML auth request: %w",
+			op,
+			err,
+		)
 	}
 
 	payload, err := Deflate(authN, opts...)
@@ -360,24 +368,25 @@ func (sp *ServiceProvider) AuthnRequestRedirect(
 // Deflate returns an AuthnRequest in the Deflate file format, applying default
 // compression.
 func Deflate(authn *core.AuthnRequest, opt ...Option) ([]byte, error) {
+	const op = "saml.Deflate"
+
 	buf := bytes.Buffer{}
 	opts := getAuthnRequestOptions(opt...)
 
 	fw, err := flate.NewWriter(&buf, flate.DefaultCompression)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: failed to create new flate writer: %w", op, err)
 	}
-	defer fw.Close()
 
 	encoder := xml.NewEncoder(fw)
 	encoder.Indent("", strings.Repeat(" ", opts.indent))
 	err = encoder.Encode(authn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: failed to XML encode SAML authn request: %w", op, err)
 	}
 
 	if err := fw.Close(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: failed to close flate writer: %w", op, err)
 	}
 
 	return buf.Bytes(), nil
