@@ -15,6 +15,7 @@ import (
 )
 
 func Test_CreateAuthnRequest(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	tp := testprovider.StartTestProvider(t)
@@ -87,32 +88,33 @@ func Test_CreateAuthnRequest(t *testing.T) {
 			if c.err != "" {
 				r.Error(err)
 				r.ErrorContains(err, c.err)
-			} else {
-				r.NoError(err)
-
-				switch c.binding {
-				case core.ServiceBindingHTTPPost:
-					loc := fmt.Sprintf("%s/saml/login/post", tp.ServerURL())
-					r.Equal(loc, got.Destination)
-				case core.ServiceBindingHTTPRedirect:
-					loc := fmt.Sprintf("%s/saml/login/redirect", tp.ServerURL())
-					r.Equal(loc, got.Destination)
-				}
-
-				r.Equal(c.id, got.ID)
-				r.Equal("2.0", got.Version)
-				r.Equal(core.ServiceBindingHTTPPost, got.ProtocolBinding)
-				r.Equal(c.expectedACS, got.AssertionConsumerServiceURL)
-				r.Equal("http://test.me/entity", got.Issuer.Value)
-				r.Nil(got.NameIDPolicy)
-				r.Nil(got.RequestedAuthContext)
-				r.False(got.ForceAuthn)
+				return
 			}
+			r.NoError(err)
+
+			switch c.binding {
+			case core.ServiceBindingHTTPPost:
+				loc := fmt.Sprintf("%s/saml/login/post", tp.ServerURL())
+				r.Equal(loc, got.Destination)
+			case core.ServiceBindingHTTPRedirect:
+				loc := fmt.Sprintf("%s/saml/login/redirect", tp.ServerURL())
+				r.Equal(loc, got.Destination)
+			}
+
+			r.Equal(c.id, got.ID)
+			r.Equal("2.0", got.Version)
+			r.Equal(core.ServiceBindingHTTPPost, got.ProtocolBinding)
+			r.Equal(c.expectedACS, got.AssertionConsumerServiceURL)
+			r.Equal("http://test.me/entity", got.Issuer.Value)
+			r.Nil(got.NameIDPolicy)
+			r.Nil(got.RequestedAuthContext)
+			r.False(got.ForceAuthn)
 		})
 	}
 }
 
 func Test_CreateAuthnRequest_Options(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	tp := testprovider.StartTestProvider(t)
@@ -216,6 +218,7 @@ func Test_CreateAuthnRequest_Options(t *testing.T) {
 }
 
 func Test_ServiceProvider_AuthnRequestRedirect(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	tp := testprovider.StartTestProvider(t)
