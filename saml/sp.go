@@ -45,18 +45,12 @@ func InsecureWantAssertionsUnsigned() Option {
 	}
 }
 
-func WithAdditionalNameIDFormat(format core.NameIDFormat) Option {
+// WithMetadataNameIDFormat provides an optional name ID formats, which are
+// added to the existing set.
+func WithMetadataNameIDFormat(format ...core.NameIDFormat) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*metadataOptions); ok {
-			o.nameIDFormats = append(o.nameIDFormats, format)
-		}
-	}
-}
-
-func WithNameIDFormats(formats []core.NameIDFormat) Option {
-	return func(o interface{}) {
-		if o, ok := o.(*metadataOptions); ok {
-			o.nameIDFormats = formats
+			o.nameIDFormats = append(o.nameIDFormats, format...)
 		}
 	}
 }
