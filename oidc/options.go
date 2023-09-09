@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
-
 	"github.com/hashicorp/cap/oidc/internal/strutils"
 )
 
