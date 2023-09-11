@@ -142,24 +142,24 @@ func Test_ServiceProvider_FetchMetadata_Cache(t *testing.T) {
 	cases := []struct {
 		name                 string
 		newTime              string
-		shoudBeCached        bool
+		shouldBeCached       bool
 		opts                 []saml.Option
 		failOnRefresh        bool
 		expectErrorOnRefresh bool
 	}{
 		{
-			name:          "is cached",
-			shoudBeCached: true,
+			name:           "is cached",
+			shouldBeCached: true,
 		},
 		{
-			name:          "cache is disabled",
-			opts:          []saml.Option{saml.WithCache(false)},
-			shoudBeCached: false,
+			name:           "cache is disabled",
+			opts:           []saml.Option{saml.WithCache(false)},
+			shouldBeCached: false,
 		},
 		{
-			name:          "stale cached document should not be used",
-			newTime:       "2017-07-26",
-			shoudBeCached: false,
+			name:           "stale cached document should not be used",
+			newTime:        "2017-07-26",
+			shouldBeCached: false,
 		},
 		{
 			name:                 "is not cached once validUntil is reached",
@@ -173,11 +173,11 @@ func Test_ServiceProvider_FetchMetadata_Cache(t *testing.T) {
 			expectErrorOnRefresh: true,
 		},
 		{
-			name:          "use stale document",
-			opts:          []saml.Option{saml.WithStale(true)},
-			newTime:       "2017-07-26",
-			failOnRefresh: true,
-			shoudBeCached: true,
+			name:           "use stale document",
+			opts:           []saml.Option{saml.WithStale(true)},
+			newTime:        "2017-07-26",
+			failOnRefresh:  true,
+			shouldBeCached: true,
 		},
 	}
 
@@ -221,7 +221,7 @@ func Test_ServiceProvider_FetchMetadata_Cache(t *testing.T) {
 			}
 			r.NotNil(got2)
 
-			if tt.shoudBeCached {
+			if tt.shouldBeCached {
 				r.True(got1 == got2)
 			} else {
 				r.False(got1 == got2)

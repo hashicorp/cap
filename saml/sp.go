@@ -240,10 +240,11 @@ func (sp *ServiceProvider) IDPMetadata(opt ...Option) (*metadata.EntityDescripto
 		sp.metadataLock.Lock()
 		defer sp.metadataLock.Unlock()
 
-		if !isValid(sp.metadata) {
+		switch {
+		case !isValid(sp.metadata):
 			sp.metadata = nil
 			sp.metadataCachedUntil = nil
-		} else if isAlive(sp.metadata, sp.metadataCachedUntil) {
+		case isValid(sp.metadata) && isAlive(sp.metadata, sp.metadataCachedUntil):
 			return sp.metadata, nil
 		}
 	}
@@ -252,11 +253,12 @@ func (sp *ServiceProvider) IDPMetadata(opt ...Option) (*metadata.EntityDescripto
 	switch {
 	case sp.cfg.MetadataURL != "":
 		ed, err = fetchIDPMetadata(sp.cfg.MetadataURL)
-		if err != nil && opts.useStale && isValid(sp.metadata) {
-			// An error occured but we have a cached metadata document that
+		switch {
+		case err != nil && opts.useStale && isValid(sp.metadata):
+			// An error occurred but we have a cached metadata document that
 			// we can use
 			return sp.metadata, nil
-		} else if err != nil {
+		case err != nil:
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
 

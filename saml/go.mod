@@ -16,6 +16,7 @@ require (
 require (
 	github.com/coreos/go-oidc/v3 v3.6.0 // indirect
 	github.com/crewjam/errset v0.0.0-20160219153700-f78d65de925c // indirect
+	github.com/crewjam/saml v0.4.13 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/color v1.15.0 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.0 // indirect
