@@ -218,9 +218,8 @@ func Test_ServiceProvider_FetchMetadata_Cache(t *testing.T) {
 			if tt.expectErrorOnRefresh {
 				r.Error(err)
 				return
-			} else {
-				r.NoError(err)
-			}
+			} 
+			r.NoError(err)
 			r.NotNil(got2)
 
 			if tt.shouldBeCached {
