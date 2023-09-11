@@ -11,14 +11,17 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/hashicorp/cap/oidc"
 	"github.com/jonboulle/clockwork"
 
 	"github.com/hashicorp/cap/saml/models/core"
 )
 
 const (
-	postBindingScriptSha256 = "T8Q9GZiIVtYoNIdF6UW5hDNgJudFDijQM/usO+xUkes="
+	// postBindingScriptSha256 is a base64 encoded sha256 hash generated from the javascript within the script tag in ./authn_request.gohtml.
+	// The hash is set in the Content-Security-Policy header when using the SAML HTTP POST-Binding Authentication Request.
+	// You can read more about the header and how the hash is generated here: https://content-security-policy.com/hash/
+	// As the POST-Binding script is static, this value is static as well and shouldn't change.
+	postBindingScriptSha256 = "sha256-T8Q9GZiIVtYoNIdF6UW5hDNgJudFDijQM/usO+xUkes="
 )
 
 type authnRequestOptions struct {
@@ -59,7 +62,11 @@ func AllowCreate() Option {
 }
 
 // WithNameIDFormat will set an NameIDPolicy object with the
-// given NameIDFormat. It implies AllowCreate=true.
+// given NameIDFormat. It implies allowCreate=true as recommended by
+// the SAML 2.0 spec, which says:
+// "Requesters that do not make specific use of this (AllowCreate) attribute SHOULD generally set it to “true”
+// to maximize interoperability."
+// See https://www.oasis-open.org/committees/download.php/56776/sstc-saml-core-errata-2.0-wd-07.pdf
 func WithNameIDFormat(f core.NameIDFormat) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*authnRequestOptions); ok {
@@ -157,11 +164,11 @@ func (sp *ServiceProvider) CreateAuthnRequest(
 	const op = "saml.ServiceProvider.CreateAuthnRequest"
 
 	if id == "" {
-		return nil, fmt.Errorf("%s: no ID provided: %w", op, oidc.ErrInvalidParameter)
+		return nil, fmt.Errorf("%s: no ID provided: %w", op, ErrInvalidParameter)
 	}
 
 	if binding == "" {
-		return nil, fmt.Errorf("%s: no binding provided: %w", op, oidc.ErrInvalidParameter)
+		return nil, fmt.Errorf("%s: no binding provided: %w", op, ErrInvalidParameter)
 	}
 
 	opts := getAuthnRequestOptions(opt...)
@@ -232,26 +239,40 @@ func (sp *ServiceProvider) CreateAuthnRequest(
 func (sp *ServiceProvider) AuthnRequestPost(
 	relayState string, opt ...Option,
 ) ([]byte, *core.AuthnRequest, error) {
+	const op = "saml.ServiceProvider.AuthnRequestPost"
+
 	requestID, err := sp.cfg.GenerateAuthRequestID()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf(
+			"%s: failed to generate authentication request ID: %w",
+			op,
+			ErrInternal,
+		)
 	}
 
 	authN, err := sp.CreateAuthnRequest(requestID, core.ServiceBindingHTTPPost)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf(
+			"%s: failed to create authentication request: %w",
+			op,
+			ErrInternal,
+		)
 	}
 
 	opts := getAuthnRequestOptions(opt...)
 	payload, err := authN.CreateXMLDocument(opts.indent)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf(
+			"%s: failed to create request XML: %w",
+			op,
+			ErrInternal,
+		)
 	}
 
 	b64Payload := base64.StdEncoding.EncodeToString(payload)
 
 	tmpl := template.Must(
-		template.New("post-binding").Parse(PostBindingTempl),
+		template.New("post-binding").Parse(postBindingTempl),
 	)
 
 	buf := bytes.Buffer{}
@@ -261,18 +282,32 @@ func (sp *ServiceProvider) AuthnRequestPost(
 		"SAMLRequest": b64Payload,
 		"RelayState":  relayState,
 	}); err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf(
+			"%s: failed to execute POST binding template: %w",
+			op,
+			ErrInternal,
+		)
 	}
 
 	return buf.Bytes(), authN, nil
 }
 
-func WritePostBindingRequestHeader(w http.ResponseWriter) {
+// WritePostBindingRequestHeader writes recommended content headers when using the SAML HTTP POST binding.
+func WritePostBindingRequestHeader(w http.ResponseWriter) error {
+	const op = "saml.WritePostBindingHeader"
+
+	if w == nil {
+		return fmt.Errorf("%s: response writer is nil", op)
+	}
+
 	w.Header().
 		Add("Content-Security-Policy", fmt.Sprintf("script-src '%s'", postBindingScriptSha256))
 	w.Header().Add("Content-type", "text/html")
+
+	return nil
 }
 
+// AuthRequestRedirect creates a SAML authentication request with HTTP redirect binding.
 func (sp *ServiceProvider) AuthnRequestRedirect(
 	relayState string, opts ...Option,
 ) (*url.URL, *core.AuthnRequest, error) {
@@ -280,12 +315,20 @@ func (sp *ServiceProvider) AuthnRequestRedirect(
 
 	requestID, err := sp.cfg.GenerateAuthRequestID()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf(
+			"%s: failed to generate authentication request ID: %w",
+			op,
+			err,
+		)
 	}
 
 	authN, err := sp.CreateAuthnRequest(requestID, core.ServiceBindingHTTPRedirect, opts...)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf(
+			"%s: failed to create SAML auth request: %w",
+			op,
+			err,
+		)
 	}
 
 	payload, err := Deflate(authN, opts...)
@@ -327,24 +370,25 @@ func (sp *ServiceProvider) AuthnRequestRedirect(
 // Deflate returns an AuthnRequest in the Deflate file format, applying default
 // compression.
 func Deflate(authn *core.AuthnRequest, opt ...Option) ([]byte, error) {
+	const op = "saml.Deflate"
+
 	buf := bytes.Buffer{}
 	opts := getAuthnRequestOptions(opt...)
 
 	fw, err := flate.NewWriter(&buf, flate.DefaultCompression)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: failed to create new flate writer: %w", op, err)
 	}
-	defer fw.Close()
 
 	encoder := xml.NewEncoder(fw)
 	encoder.Indent("", strings.Repeat(" ", opts.indent))
 	err = encoder.Encode(authn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: failed to XML encode SAML authn request: %w", op, err)
 	}
 
 	if err := fw.Close(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: failed to close flate writer: %w", op, err)
 	}
 
 	return buf.Bytes(), nil

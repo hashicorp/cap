@@ -29,10 +29,22 @@ func main() {
 	sp, err := saml.NewServiceProvider(cfg)
 	exitOnError(err)
 
-	http.HandleFunc("/saml/acs", handler.ACSHandlerFunc(sp))
-	http.HandleFunc("/saml/auth/redirect", handler.RedirectBindingHandlerFunc(sp))
-	http.HandleFunc("/saml/auth/post", handler.PostBindingHandlerFunc(sp))
-	http.HandleFunc("/metadata", handler.MetadataHandlerFunc(sp))
+	acsHandler, err := handler.ACSHandlerFunc(sp)
+	exitOnError(err)
+
+	redirectHandler, err := handler.RedirectBindingHandlerFunc(sp)
+	exitOnError(err)
+
+	postBindHandler, err := handler.PostBindingHandlerFunc(sp)
+	exitOnError(err)
+
+	metadataHandler, err := handler.MetadataHandlerFunc(sp)
+	exitOnError(err)
+
+	http.HandleFunc("/saml/acs", acsHandler)
+	http.HandleFunc("/saml/auth/redirect", redirectHandler)
+	http.HandleFunc("/saml/auth/post", postBindHandler)
+	http.HandleFunc("/metadata", metadataHandler)
 	http.HandleFunc("/login", func(w http.ResponseWriter, _ *http.Request) {
 		ts, _ := template.New("sso").Parse(
 			`<html><form method="GET" action="/saml/auth/redirect"><button type="submit">Submit Redirect</button></form></html>

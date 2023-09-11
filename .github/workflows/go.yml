@@ -2,9 +2,9 @@ name: Go
 
 on:
   push:
-    branches: [ main, saml-lib ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, saml-lib ]
+    branches: [ main ]
 
 jobs:
 

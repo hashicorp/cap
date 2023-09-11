@@ -56,6 +56,7 @@ var exampleSPSSODescriptor = `<EntityDescriptor
 </EntityDescriptor>`
 
 func Test_SPSSODescriptor(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	ed := &metadata.EntityDescriptorSPSSO{}
@@ -89,6 +90,7 @@ var exampleSLOService = `<EntityDescriptor
 </EntityDescriptor>`
 
 func Test_SPSSODescriptor_SLOService(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	ed := &metadata.EntityDescriptorSPSSO{}
@@ -129,6 +131,7 @@ var exampleNameIDService = `<EntityDescriptor
 </EntityDescriptor>`
 
 func Test_SPSSODescriptor_ManageNameIDService(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	ed := &metadata.EntityDescriptorSPSSO{}
@@ -160,6 +163,7 @@ var exampleNameIDFormats = `<EntityDescriptor
 </EntityDescriptor>`
 
 func Test_SPSSODescriptor_NameIDFormats(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	ed := &metadata.EntityDescriptorSPSSO{}
@@ -193,6 +197,7 @@ var exampleACS = `<EntityDescriptor
 </EntityDescriptor>`
 
 func Test_SPSSODescriptor_ACS(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	ed := &metadata.EntityDescriptorSPSSO{}
@@ -250,6 +255,7 @@ var exampleAttributeConsumingService = `<EntityDescriptor
 // <saml:AttributeValue type="xs:string">By-Tor</saml:AttributeValue>
 
 func Test_SPSSODescriptor_AttributeConsumingService(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	ed := &metadata.EntityDescriptorSPSSO{}
@@ -332,22 +338,3 @@ x5Ql0ejivIJAYcMGUyA+/YwJg2FGoA==
         </KeyDescriptor>
     </SPSSODescriptor>
 </EntityDescriptor>`
-
-// func Test_SPSSODescriptor_KeyDescritpor(t *testing.T) {
-// 	r := require.New(t)
-
-// 	ed := &metadata.EntityDescriptor{}
-
-// 	err := xml.Unmarshal([]byte(exampleKeyDescriptor), ed)
-// 	r.NoError(err)
-
-// 	keyDescriptor := ed.SPSSODescriptor[0].KeyDescriptor
-
-// 	r.Len(keyDescriptor, 2)
-
-// 	r.Equal(keyDescriptor[0].Use, metadata.KeyTypeSigning)
-// 	r.NotEmpty(keyDescriptor[0].KeyInfo.X509Data, "")
-
-// 	r.Equal(keyDescriptor[1].Use, metadata.KeyTypeEncryption)
-// 	r.NotEmpty(keyDescriptor[1].KeyInfo.X509Data, "")
-// }

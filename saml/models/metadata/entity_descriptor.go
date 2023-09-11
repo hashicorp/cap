@@ -119,8 +119,6 @@ type KeyDescriptor struct {
 type KeyInfo struct {
 	dsig.KeyInfo
 	KeyName string
-	// XMLName  xml.Name `xml:"http://www.w3.org/2000/09/xmldsig# KeyInfo"`
-	// X509Data X509Data `xml:"X509Data"`
 }
 
 // EncyrptionMethod describes the encryption algorithm applied to the cipher data.

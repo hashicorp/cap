@@ -18,7 +18,7 @@ import (
 )
 
 //go:embed authn_request.gohtml
-var PostBindingTempl string
+var postBindingTempl string
 
 type metadataOptions struct {
 	wantAssertionsSigned bool
@@ -40,6 +40,8 @@ func getMetadataOptions(opt ...Option) metadataOptions {
 	return opts
 }
 
+// InsecureWantAssertionsUnsigned provides a way to optionally request that you
+// want insecure/unsigned assertions.
 func InsecureWantAssertionsUnsigned() Option {
 	return func(o interface{}) {
 		if o, ok := o.(*metadataOptions); ok {
@@ -48,22 +50,17 @@ func InsecureWantAssertionsUnsigned() Option {
 	}
 }
 
-func WithAdditionalNameIDFormat(format core.NameIDFormat) Option {
+// WithMetadataNameIDFormat provides an optional name ID formats, which are
+// added to the existing set.
+func WithMetadataNameIDFormat(format ...core.NameIDFormat) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*metadataOptions); ok {
-			o.nameIDFormats = append(o.nameIDFormats, format)
+			o.nameIDFormats = append(o.nameIDFormats, format...)
 		}
 	}
 }
 
-func WithNameIDFormats(formats []core.NameIDFormat) Option {
-	return func(o interface{}) {
-		if o, ok := o.(*metadataOptions); ok {
-			o.nameIDFormats = formats
-		}
-	}
-}
-
+// WithACSServiceBinding provides an optional service binding.
 func WithACSServiceBinding(b core.ServiceBinding) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*metadataOptions); ok {
@@ -72,7 +69,8 @@ func WithACSServiceBinding(b core.ServiceBinding) Option {
 	}
 }
 
-func WithAdditionalACSEndpoint(b core.ServiceBinding, location *url.URL) Option {
+// WithAdditionalACSEndpoint provides an optional additional ACS endpoint
+func WithAdditionalACSEndpoint(b core.ServiceBinding, location url.URL) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*metadataOptions); ok {
 			o.additionalACSs = append(o.additionalACSs, metadata.Endpoint{
@@ -83,6 +81,7 @@ func WithAdditionalACSEndpoint(b core.ServiceBinding, location *url.URL) Option 
 	}
 }
 
+// ServiceProvider defines a type for service providers
 type ServiceProvider struct {
 	cfg *Config
 
