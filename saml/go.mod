@@ -5,6 +5,7 @@ go 1.19
 require (
 	github.com/beevik/etree v1.2.0
 	github.com/crewjam/go-xmlsec v0.0.0-20200414151428-d2b1a58f7262
+	github.com/crewjam/saml v0.4.13
 	github.com/hashicorp/cap v0.3.1
 	github.com/hashicorp/go-uuid v1.0.3
 	github.com/jonboulle/clockwork v0.4.0
@@ -16,7 +17,6 @@ require (
 require (
 	github.com/coreos/go-oidc/v3 v3.6.0 // indirect
 	github.com/crewjam/errset v0.0.0-20160219153700-f78d65de925c // indirect
-	github.com/crewjam/saml v0.4.13 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/color v1.15.0 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.0 // indirect
