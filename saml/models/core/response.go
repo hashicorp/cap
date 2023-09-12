@@ -33,7 +33,7 @@ type Attribute struct {
 }
 
 // SubjectNameID returns the value of the NameID element if it exists in
-// the Assertion. Otherwise, it returns an empty string.
+// the Subject of the Assertion. Otherwise, it returns an empty string.
 func (a *Assertion) SubjectNameID() string {
 	if a.Subject == nil || a.Subject.NameID == nil {
 		return ""
