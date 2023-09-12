@@ -81,12 +81,12 @@ func Test_ParseResponse_Assertion(t *testing.T) {
 	t.Parallel()
 	r := require.New(t)
 
-	assert := responseXML(t, responseXMLAssertion).Assertions[0]
+	response := responseXML(t, responseXMLAssertion)
+	assertion := response.Assertions()[0]
 
-	r.Equal("assertion-id", assert.ID)
-	r.Equal("2023-03-31 06:55:44.494 +0000 UTC", assert.IssueInstant.String())
-	r.Equal("2.0", assert.Version)
-
+	r.Equal("assertion-id", assertion.ID)
+	r.Equal("2023-03-31 06:55:44.494 +0000 UTC", assertion.IssueInstant.String())
+	r.Equal("2.0", assertion.Version)
 }
 
 var responseXMLAssertionIssuer = `<?xml version="1.0" encoding="UTF-8"?>
@@ -100,7 +100,9 @@ func Test_ParseResponse_Assertion_Issuer(t *testing.T) {
 	t.Parallel()
 	r := require.New(t)
 
-	iss := responseXML(t, responseXMLAssertionIssuer).Assertions[0].Issuer
+	response := responseXML(t, responseXMLAssertionIssuer)
+	assertions := response.Assertions()
+	iss := assertions[0].Issuer
 
 	r.Equal("https://samltest.id/saml/idp", iss.Value)
 }
@@ -121,7 +123,9 @@ func Test_ParseResponse_Assertion_Subject(t *testing.T) {
 	t.Parallel()
 	r := require.New(t)
 
-	sub := responseXML(t, responseXMLAssertionSubject).Assertions[0].Subject
+	response := responseXML(t, responseXMLAssertionSubject)
+	assertions := response.Assertions()
+	sub := assertions[0].Subject
 
 	r.Equal("someone@samltest.id", sub.NameID.Value)
 	r.EqualValues(core.ConfirmationMethodBearer, sub.SubjectConfirmation.Method)
