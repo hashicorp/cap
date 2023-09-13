@@ -125,6 +125,8 @@ func WithClock(clock clockwork.Clock) Option {
 			opts.clock = clock
 		case *parseResponseOptions:
 			opts.clock = clock
+		case *idpMetadataOptions:
+			opts.clock = clock
 		}
 	}
 }

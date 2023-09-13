@@ -5,6 +5,7 @@ go 1.19
 require (
 	github.com/beevik/etree v1.2.0
 	github.com/crewjam/go-xmlsec v0.0.0-20200414151428-d2b1a58f7262
+	github.com/crewjam/saml v0.4.13
 	github.com/hashicorp/go-uuid v1.0.3
 	github.com/jonboulle/clockwork v0.4.0
 	github.com/russellhaering/gosaml2 v0.9.1
