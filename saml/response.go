@@ -4,7 +4,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"regexp"
 
@@ -102,7 +101,7 @@ func (sp *ServiceProvider) ParseResponse(
 		opts.clock,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("%s: unable to parse saml response: %w", op, err)
+		return nil, fmt.Errorf("%s: error initializing parser: %w", op, err)
 	}
 
 	// This will validate the response and all assertions.
@@ -111,35 +110,37 @@ func (sp *ServiceProvider) ParseResponse(
 	case err != nil:
 		return nil, fmt.Errorf("%s: unable to validate encoded response: %w", op, err)
 	case len(response.Assertions) == 0:
-		return nil, fmt.Errorf("%s: 3 %w", op, ErrMissingAssertions)
-	}
-
-	if !opts.skipRequestIDValidation {
-		if response.InResponseTo != requestID {
-			return nil, fmt.Errorf(
-				"InResponseTo (%s) doesn't match the expected requestID (%s)",
-				response.InResponseTo,
-				requestID,
-			)
-		}
-	}
-
-	if len(response.Assertions) == 0 {
-		return nil, errors.New("missing assertions")
-	}
-
-	// Verify conditions for all assertions
-	if !opts.skipAssertionConditionValidation {
+		// note: this is currently unreachable since the call to
+		// ip.ValidateEncodedResponse(...) above will return an err if there are
+		// no assertions, but we've left this here since it's a required for our
+		// implementation as well.
+		return nil, fmt.Errorf("%s: %w", op, ErrMissingAssertions)
+	case !opts.skipRequestIDValidation && response.InResponseTo != requestID:
+		return nil, fmt.Errorf(
+			"InResponseTo (%s) doesn't match the expected requestID (%s)",
+			response.InResponseTo,
+			requestID,
+		)
+	case !opts.skipAssertionConditionValidation:
+		// Verify conditions for all assertions
 		for _, assert := range response.Assertions {
 			warnings, err := ip.VerifyAssertionConditions(&assert)
 			switch {
 			case err != nil:
 				return nil, fmt.Errorf("%s: %w", op, err)
 			case warnings.InvalidTime:
+				// note: this is currently unreachable since the call to
+				// ip.ValidateEncodedResponse(...) above will return an err if
+				// the time is invalid, but we've left this here since it's a
+				// required for our implementation as well.
 				return nil, fmt.Errorf("%s: %w", op, ErrInvalidTime)
 			case warnings.NotInAudience:
 				return nil, fmt.Errorf("%s: %w", op, ErrInvalidAudience)
 			case assert.Subject == nil || assert.Subject.NameID == nil:
+				// note: this is currently unreachable since the call to
+				// ip.ValidateEncodedResponse(...) above will return an err if
+				// there isn't a subject, but we've left this here since it's a
+				// required for our implementation as well.
 				return nil, fmt.Errorf("%s: %w", op, ErrMissingSubject)
 			case assert.AttributeStatement == nil:
 				return nil, fmt.Errorf("%s: %w", op, ErrMissingAttributeStmt)

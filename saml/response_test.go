@@ -20,15 +20,24 @@ var testExpiredResp = `PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHNhb
 // TODO: add the ability to sign requests, so we can write more complete unit tests
 func TestServiceProvider_ParseResponse(t *testing.T) {
 	t.Parallel()
-	testEntityID := "http://saml.julz/example"
-
-	testAcs := "http://localhost:8000/saml/acs"
-
-	metadataURL := "https://samltest.id/saml/idp"
+	const (
+		testRequestId = "bc5a5baa-94e0-58a8-872c-e51491d2b3ee"
+		testEntityID  = "http://saml.julz/example"
+		testAcs       = "http://localhost:8000/saml/acs"
+		metadataURL   = "https://samltest.id/saml/idp"
+	)
 
 	testCfg, err := saml.NewConfig(testEntityID, testAcs, metadataURL)
 	require.NoError(t, err)
 	testSp, err := saml.NewServiceProvider(testCfg)
+	require.NoError(t, err)
+
+	fakeTime, err := time.Parse("2006-01-02 15:04:05", "2023-08-25 14:33:53")
+	require.NoError(t, err)
+
+	testCfgWithBadMetadata, err := saml.NewConfig(testEntityID, testAcs, "https://samltest.id/saml/idp-invalid")
+	require.NoError(t, err)
+	testSpWithInvalidMetadataURL, err := saml.NewServiceProvider(testCfgWithBadMetadata)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -36,13 +45,108 @@ func TestServiceProvider_ParseResponse(t *testing.T) {
 		sp              *saml.ServiceProvider
 		samlResp        string
 		requestID       string
+		opts            []saml.Option
 		want            *core.Response
 		wantErrContains string
 		wantErrIs       error
 		wantErrAs       error
 	}{
 		{
-			name:            "simple-success",
+			name:     "success",
+			sp:       testSp,
+			samlResp: testExpiredResp,
+			opts: []saml.Option{
+				saml.WithClock(clockwork.NewFakeClockAt(fakeTime)),
+			},
+			requestID: testRequestId,
+		},
+		{
+			name:     "err-assertion-missing-attribute-stmt",
+			sp:       testSp,
+			samlResp: base64.StdEncoding.EncodeToString([]byte(testRespInvalidAssertionMissingAttributeStmt)),
+			opts: []saml.Option{
+				saml.WithClock(clockwork.NewFakeClockAt(fakeTime)),
+				saml.InsecureSkipSignatureValidation(),
+			},
+			requestID:       testRequestId,
+			wantErrContains: "attribute statement missing",
+		},
+		{
+			name:     "err-assertion-missing-subject",
+			sp:       testSp,
+			samlResp: base64.StdEncoding.EncodeToString([]byte(testRespInvalidAssertionMissingSubject)),
+			opts: []saml.Option{
+				saml.WithClock(clockwork.NewFakeClockAt(fakeTime)),
+				saml.InsecureSkipSignatureValidation(),
+			},
+			requestID:       testRequestId,
+			wantErrContains: "unable to validate encoded response: missing Subject element",
+		},
+		{
+			name:     "err-assertion-missing-not-before",
+			sp:       testSp,
+			samlResp: base64.StdEncoding.EncodeToString([]byte(testRespInvalidAssertionMissingNotBefore)),
+			opts: []saml.Option{
+				saml.WithClock(clockwork.NewFakeClockAt(fakeTime)),
+				saml.InsecureSkipSignatureValidation(),
+			},
+			requestID:       testRequestId,
+			wantErrContains: "missing NotBefore attribute on Conditions element",
+		},
+		{
+			name:     "err-assertion-invalid-audience",
+			sp:       testSp,
+			samlResp: base64.StdEncoding.EncodeToString([]byte(testRespInvalidAssertionAudience)),
+			opts: []saml.Option{
+				saml.WithClock(clockwork.NewFakeClockAt(fakeTime)),
+				saml.InsecureSkipSignatureValidation(),
+			},
+			requestID:       testRequestId,
+			wantErrContains: "invalid audience",
+		},
+		{
+			name:     "err-no-assertions",
+			sp:       testSp,
+			samlResp: base64.StdEncoding.EncodeToString([]byte(testRespNoAssertions)),
+			opts: []saml.Option{
+				saml.WithClock(clockwork.NewFakeClockAt(fakeTime)),
+				saml.InsecureSkipSignatureValidation(),
+			},
+			requestID:       testRequestId,
+			wantErrContains: "unable to validate encoded response: missing Assertion element",
+		},
+		{
+			name:     "err-bad-metatdata-url",
+			sp:       testSpWithInvalidMetadataURL,
+			samlResp: testExpiredResp,
+			opts: []saml.Option{
+				saml.WithClock(clockwork.NewFakeClockAt(fakeTime)),
+			},
+			requestID:       "invalid-request-id",
+			wantErrContains: "error initializing parser: saml.(ServiceProvider).internalParser: saml.ServiceProvider.FetchIDPMetadata: failed to parse identity provider XML metadata",
+		},
+		{
+			name:     "err-unable-to-parse-resp",
+			sp:       testSp,
+			samlResp: "unable-to-parse-resp",
+			opts: []saml.Option{
+				saml.WithClock(clockwork.NewFakeClockAt(fakeTime)),
+			},
+			requestID:       testRequestId,
+			wantErrContains: "unable to validate encoded response: illegal base64 data",
+		},
+		{
+			name:     "err-in-response-to",
+			sp:       testSp,
+			samlResp: testExpiredResp,
+			opts: []saml.Option{
+				saml.WithClock(clockwork.NewFakeClockAt(fakeTime)),
+			},
+			requestID:       "invalid-request-id",
+			wantErrContains: "doesn't match the expected requestID (invalid-request-id)",
+		},
+		{
+			name:            "expired",
 			sp:              testSp,
 			samlResp:        testExpiredResp,
 			requestID:       "request-id",
@@ -71,7 +175,7 @@ func TestServiceProvider_ParseResponse(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			got, err := tc.sp.ParseResponse(tc.samlResp, tc.requestID)
+			got, err := tc.sp.ParseResponse(tc.samlResp, tc.requestID, tc.opts...)
 			if tc.wantErrContains != "" {
 				require.Error(err)
 				assert.Empty(got)
@@ -85,7 +189,12 @@ func TestServiceProvider_ParseResponse(t *testing.T) {
 				return
 			}
 			require.NoError(err)
-			assert.Equal(tc.want, got)
+			assert.Equal(testRequestId, got.InResponseTo)
+			assert.Equal("http://localhost:8000/saml/acs", got.Destination)
+			assert.Equal("urn:oasis:names:tc:SAML:2.0:status:Success", got.Status.StatusCode.Value)
+			assert.Equal(metadataURL, got.Issuer.Value)
+			assert.Equal("msmith@samltest.id", got.Assertions[0].Subject.NameID.Value)
+			assert.Equal("_35ea90b711d6f385345f0dbdd7d0ed5b", got.Assertions[0].ID)
 		})
 	}
 }
@@ -199,3 +308,442 @@ const responseUnsigned = `
     </saml:AttributeStatement>
   </saml:Assertion>
 </samlp:Response>`
+
+const testRespNoAssertions = `
+<?xml version="1.0" encoding="UTF-8"?>
+<saml2p:Response Destination="http://localhost:8000/saml/acs" ID="_8849c2ee532fcdb781f2a1776eac3741" InResponseTo="bc5a5baa-94e0-58a8-872c-e51491d2b3ee" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
+	xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol"
+	xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+	<saml2:Issuer
+		xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">https://samltest.id/saml/idp</saml2:Issuer>
+	<ds:Signature
+		xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+		<ds:SignedInfo>
+			<ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+			<ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+			<ds:Reference URI="#_8849c2ee532fcdb781f2a1776eac3741">
+				<ds:Transforms>
+					<ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+					<ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#">
+						<ec:InclusiveNamespaces PrefixList="xsd"
+							xmlns:ec="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+						</ds:Transform>
+					</ds:Transforms>
+					<ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+					<ds:DigestValue>RV485uKGJZmNA1o56gxxk+VZkvxMqtlHZA2iHH8ZU1Q=</ds:DigestValue>
+				</ds:Reference>
+			</ds:SignedInfo>
+			<ds:SignatureValue>d3Lpc6hcSB7bwCzMrO3wfZrNiGk5gZ8rKRKOQENDP2q+p3+LkDmSBt6zzyxn33MCSJt+dPHpF14YMAK/N3PnWwSSUp0j5kzOc9Ka5NdianE0NgYnU0qjhFJbThAQz7hRowS4J49hS/6MuSQ0Z7nBBCeDgeD6PYRApKMvlOtkBGPJaLT2mRy/gnQ+CC6udUdJyvSgb9n43lvxdaaZWrDK3Wga98YlkcRHLrmPAAM8KxYWnkopio6YINU4D5mZjsEsnUkH41WgcwgmS2xzP3ICnNc3WH9NHrVKp9at2DBwrYDIses6FXgYq+iUWK2191jWpIC3qVAB0cOilmRXwtEH7g==</ds:SignatureValue>
+			<ds:KeyInfo>
+				<ds:X509Data>
+					<ds:X509Certificate>MIIDEjCCAfqgAwIBAgIVAMECQ1tjghafm5OxWDh9hwZfxthWMA0GCSqGSIb3DQEBCwUAMBYxFDAS
+BgNVBAMMC3NhbWx0ZXN0LmlkMB4XDTE4MDgyNDIxMTQwOVoXDTM4MDgyNDIxMTQwOVowFjEUMBIG
+A1UEAwwLc2FtbHRlc3QuaWQwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC0Z4QX1NFK
+s71ufbQwoQoW7qkNAJRIANGA4iM0ThYghul3pC+FwrGv37aTxWXfA1UG9njKbbDreiDAZKngCgyj
+xj0uJ4lArgkr4AOEjj5zXA81uGHARfUBctvQcsZpBIxDOvUUImAl+3NqLgMGF2fktxMG7kX3GEVN
+c1klbN3dfYsaw5dUrw25DheL9np7G/+28GwHPvLb4aptOiONbCaVvh9UMHEA9F7c0zfF/cL5fOpd
+Va54wTI0u12CsFKt78h6lEGG5jUs/qX9clZncJM7EFkN3imPPy+0HC8nspXiH/MZW8o2cqWRkrw3
+MzBZW3Ojk5nQj40V6NUbjb7kfejzAgMBAAGjVzBVMB0GA1UdDgQWBBQT6Y9J3Tw/hOGc8PNV7JEE
+4k2ZNTA0BgNVHREELTArggtzYW1sdGVzdC5pZIYcaHR0cHM6Ly9zYW1sdGVzdC5pZC9zYW1sL2lk
+cDANBgkqhkiG9w0BAQsFAAOCAQEASk3guKfTkVhEaIVvxEPNR2w3vWt3fwmwJCccW98XXLWgNbu3
+YaMb2RSn7Th4p3h+mfyk2don6au7Uyzc1Jd39RNv80TG5iQoxfCgphy1FYmmdaSfO8wvDtHTTNiL
+ArAxOYtzfYbzb5QrNNH/gQEN8RJaEf/g/1GTw9x/103dSMK0RXtl+fRs2nblD1JJKSQ3AdhxK/we
+P3aUPtLxVVJ9wMOQOfcy02l+hHMb6uAjsPOpOVKqi3M8XmcUZOpx4swtgGdeoSpeRyrtMvRwdcci
+NBp9UZome44qZAYH1iqrpmmjsfI9pJItsgWu3kXPjhSfj1AJGR1l9JGvJrHki1iHTA==</ds:X509Certificate>
+				</ds:X509Data>
+			</ds:KeyInfo>
+		</ds:Signature>
+		<saml2p:Status>
+			<saml2p:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
+		</saml2p:Status>
+	</saml2p:Response>
+`
+
+const testRespInvalidAssertionAudience = `
+<?xml version="1.0" encoding="UTF-8"?>
+<saml2p:Response Destination="http://localhost:8000/saml/acs" ID="_8849c2ee532fcdb781f2a1776eac3741" InResponseTo="bc5a5baa-94e0-58a8-872c-e51491d2b3ee" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
+	xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol"
+	xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+	<saml2:Issuer
+		xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">https://samltest.id/saml/idp</saml2:Issuer>
+	<ds:Signature
+		xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+		<ds:SignedInfo>
+			<ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+			<ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+			<ds:Reference URI="#_8849c2ee532fcdb781f2a1776eac3741">
+				<ds:Transforms>
+					<ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+					<ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#">
+						<ec:InclusiveNamespaces PrefixList="xsd"
+							xmlns:ec="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+						</ds:Transform>
+					</ds:Transforms>
+					<ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+					<ds:DigestValue>RV485uKGJZmNA1o56gxxk+VZkvxMqtlHZA2iHH8ZU1Q=</ds:DigestValue>
+				</ds:Reference>
+			</ds:SignedInfo>
+			<ds:SignatureValue>d3Lpc6hcSB7bwCzMrO3wfZrNiGk5gZ8rKRKOQENDP2q+p3+LkDmSBt6zzyxn33MCSJt+dPHpF14YMAK/N3PnWwSSUp0j5kzOc9Ka5NdianE0NgYnU0qjhFJbThAQz7hRowS4J49hS/6MuSQ0Z7nBBCeDgeD6PYRApKMvlOtkBGPJaLT2mRy/gnQ+CC6udUdJyvSgb9n43lvxdaaZWrDK3Wga98YlkcRHLrmPAAM8KxYWnkopio6YINU4D5mZjsEsnUkH41WgcwgmS2xzP3ICnNc3WH9NHrVKp9at2DBwrYDIses6FXgYq+iUWK2191jWpIC3qVAB0cOilmRXwtEH7g==</ds:SignatureValue>
+			<ds:KeyInfo>
+				<ds:X509Data>
+					<ds:X509Certificate>MIIDEjCCAfqgAwIBAgIVAMECQ1tjghafm5OxWDh9hwZfxthWMA0GCSqGSIb3DQEBCwUAMBYxFDAS
+BgNVBAMMC3NhbWx0ZXN0LmlkMB4XDTE4MDgyNDIxMTQwOVoXDTM4MDgyNDIxMTQwOVowFjEUMBIG
+A1UEAwwLc2FtbHRlc3QuaWQwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC0Z4QX1NFK
+s71ufbQwoQoW7qkNAJRIANGA4iM0ThYghul3pC+FwrGv37aTxWXfA1UG9njKbbDreiDAZKngCgyj
+xj0uJ4lArgkr4AOEjj5zXA81uGHARfUBctvQcsZpBIxDOvUUImAl+3NqLgMGF2fktxMG7kX3GEVN
+c1klbN3dfYsaw5dUrw25DheL9np7G/+28GwHPvLb4aptOiONbCaVvh9UMHEA9F7c0zfF/cL5fOpd
+Va54wTI0u12CsFKt78h6lEGG5jUs/qX9clZncJM7EFkN3imPPy+0HC8nspXiH/MZW8o2cqWRkrw3
+MzBZW3Ojk5nQj40V6NUbjb7kfejzAgMBAAGjVzBVMB0GA1UdDgQWBBQT6Y9J3Tw/hOGc8PNV7JEE
+4k2ZNTA0BgNVHREELTArggtzYW1sdGVzdC5pZIYcaHR0cHM6Ly9zYW1sdGVzdC5pZC9zYW1sL2lk
+cDANBgkqhkiG9w0BAQsFAAOCAQEASk3guKfTkVhEaIVvxEPNR2w3vWt3fwmwJCccW98XXLWgNbu3
+YaMb2RSn7Th4p3h+mfyk2don6au7Uyzc1Jd39RNv80TG5iQoxfCgphy1FYmmdaSfO8wvDtHTTNiL
+ArAxOYtzfYbzb5QrNNH/gQEN8RJaEf/g/1GTw9x/103dSMK0RXtl+fRs2nblD1JJKSQ3AdhxK/we
+P3aUPtLxVVJ9wMOQOfcy02l+hHMb6uAjsPOpOVKqi3M8XmcUZOpx4swtgGdeoSpeRyrtMvRwdcci
+NBp9UZome44qZAYH1iqrpmmjsfI9pJItsgWu3kXPjhSfj1AJGR1l9JGvJrHki1iHTA==</ds:X509Certificate>
+				</ds:X509Data>
+			</ds:KeyInfo>
+		</ds:Signature>
+		<saml2p:Status>
+			<saml2p:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
+		</saml2p:Status>
+		<saml2:Assertion ID="_35ea90b711d6f385345f0dbdd7d0ed5b" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
+			xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">
+			<saml2:Issuer>https://samltest.id/saml/idp</saml2:Issuer>
+			<saml2:Subject>
+				<saml2:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" NameQualifier="https://samltest.id/saml/idp" SPNameQualifier="http://saml.julz/example"
+					xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">msmith@samltest.id
+				</saml2:NameID>
+				<saml2:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
+					<saml2:SubjectConfirmationData Address="104.28.39.34" InResponseTo="bc5a5baa-94e0-58a8-872c-e51491d2b3ee" NotOnOrAfter="2023-08-25T14:37:53.693Z" Recipient="http://localhost:8000/saml/acs"/>
+				</saml2:SubjectConfirmation>
+			</saml2:Subject>
+			<saml2:Conditions NotBefore="2023-08-25T14:32:53.680Z" NotOnOrAfter="2023-08-25T14:37:53.680Z">
+				<saml2:AudienceRestriction>
+					<! -- audience is intentionally invalid -->. 
+					<saml2:Audience>http://saml.julz/invalid-audience</saml2:Audience>
+				</saml2:AudienceRestriction>
+			</saml2:Conditions>
+			<saml2:AuthnStatement AuthnInstant="2023-08-25T14:31:56.064Z" SessionIndex="_f72a63ee3782b47c89f60e81adde0ab0">
+				<saml2:SubjectLocality Address="104.28.39.34"/>
+				<saml2:AuthnContext>
+					<saml2:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml2:AuthnContextClassRef>
+				</saml2:AuthnContext>
+			</saml2:AuthnStatement>
+			<saml2:AttributeStatement>
+				<saml2:Attribute FriendlyName="eduPersonEntitlement" Name="urn:oid:1.3.6.1.4.1.5923.1.1.1.7" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>Ambassador</saml2:AttributeValue>
+					<saml2:AttributeValue>None</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute Name="urn:oasis:names:tc:SAML:attribute:subject-id" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue
+						xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xsd:string">msmith@samltest.id
+					</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="uid" Name="urn:oid:0.9.2342.19200300.100.1.1" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>morty</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="telephoneNumber" Name="urn:oid:2.5.4.20" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>+1-555-555-5505</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="role" Name="https://samltest.id/attributes/role" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue
+						xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xsd:string">janitor@samltest.id
+					</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="mail" Name="urn:oid:0.9.2342.19200300.100.1.3" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>msmith@samltest.id</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="sn" Name="urn:oid:2.5.4.4" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>Smith</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="displayName" Name="urn:oid:2.16.840.1.113730.3.1.241" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>Morty Smith</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="givenName" Name="urn:oid:2.5.4.42" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>Mortimer</saml2:AttributeValue>
+				</saml2:Attribute>
+			</saml2:AttributeStatement>
+		</saml2:Assertion>
+	</saml2p:Response>`
+
+const testRespInvalidAssertionMissingNotBefore = `
+<?xml version="1.0" encoding="UTF-8"?>
+<saml2p:Response Destination="http://localhost:8000/saml/acs" ID="_8849c2ee532fcdb781f2a1776eac3741" InResponseTo="bc5a5baa-94e0-58a8-872c-e51491d2b3ee" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
+	xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol"
+	xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+	<saml2:Issuer
+		xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">https://samltest.id/saml/idp</saml2:Issuer>
+	<ds:Signature
+		xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+		<ds:SignedInfo>
+			<ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+			<ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+			<ds:Reference URI="#_8849c2ee532fcdb781f2a1776eac3741">
+				<ds:Transforms>
+					<ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+					<ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#">
+						<ec:InclusiveNamespaces PrefixList="xsd"
+							xmlns:ec="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+						</ds:Transform>
+					</ds:Transforms>
+					<ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+					<ds:DigestValue>RV485uKGJZmNA1o56gxxk+VZkvxMqtlHZA2iHH8ZU1Q=</ds:DigestValue>
+				</ds:Reference>
+			</ds:SignedInfo>
+			<ds:SignatureValue>d3Lpc6hcSB7bwCzMrO3wfZrNiGk5gZ8rKRKOQENDP2q+p3+LkDmSBt6zzyxn33MCSJt+dPHpF14YMAK/N3PnWwSSUp0j5kzOc9Ka5NdianE0NgYnU0qjhFJbThAQz7hRowS4J49hS/6MuSQ0Z7nBBCeDgeD6PYRApKMvlOtkBGPJaLT2mRy/gnQ+CC6udUdJyvSgb9n43lvxdaaZWrDK3Wga98YlkcRHLrmPAAM8KxYWnkopio6YINU4D5mZjsEsnUkH41WgcwgmS2xzP3ICnNc3WH9NHrVKp9at2DBwrYDIses6FXgYq+iUWK2191jWpIC3qVAB0cOilmRXwtEH7g==</ds:SignatureValue>
+			<ds:KeyInfo>
+				<ds:X509Data>
+					<ds:X509Certificate>MIIDEjCCAfqgAwIBAgIVAMECQ1tjghafm5OxWDh9hwZfxthWMA0GCSqGSIb3DQEBCwUAMBYxFDAS
+BgNVBAMMC3NhbWx0ZXN0LmlkMB4XDTE4MDgyNDIxMTQwOVoXDTM4MDgyNDIxMTQwOVowFjEUMBIG
+A1UEAwwLc2FtbHRlc3QuaWQwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC0Z4QX1NFK
+s71ufbQwoQoW7qkNAJRIANGA4iM0ThYghul3pC+FwrGv37aTxWXfA1UG9njKbbDreiDAZKngCgyj
+xj0uJ4lArgkr4AOEjj5zXA81uGHARfUBctvQcsZpBIxDOvUUImAl+3NqLgMGF2fktxMG7kX3GEVN
+c1klbN3dfYsaw5dUrw25DheL9np7G/+28GwHPvLb4aptOiONbCaVvh9UMHEA9F7c0zfF/cL5fOpd
+Va54wTI0u12CsFKt78h6lEGG5jUs/qX9clZncJM7EFkN3imPPy+0HC8nspXiH/MZW8o2cqWRkrw3
+MzBZW3Ojk5nQj40V6NUbjb7kfejzAgMBAAGjVzBVMB0GA1UdDgQWBBQT6Y9J3Tw/hOGc8PNV7JEE
+4k2ZNTA0BgNVHREELTArggtzYW1sdGVzdC5pZIYcaHR0cHM6Ly9zYW1sdGVzdC5pZC9zYW1sL2lk
+cDANBgkqhkiG9w0BAQsFAAOCAQEASk3guKfTkVhEaIVvxEPNR2w3vWt3fwmwJCccW98XXLWgNbu3
+YaMb2RSn7Th4p3h+mfyk2don6au7Uyzc1Jd39RNv80TG5iQoxfCgphy1FYmmdaSfO8wvDtHTTNiL
+ArAxOYtzfYbzb5QrNNH/gQEN8RJaEf/g/1GTw9x/103dSMK0RXtl+fRs2nblD1JJKSQ3AdhxK/we
+P3aUPtLxVVJ9wMOQOfcy02l+hHMb6uAjsPOpOVKqi3M8XmcUZOpx4swtgGdeoSpeRyrtMvRwdcci
+NBp9UZome44qZAYH1iqrpmmjsfI9pJItsgWu3kXPjhSfj1AJGR1l9JGvJrHki1iHTA==</ds:X509Certificate>
+				</ds:X509Data>
+			</ds:KeyInfo>
+		</ds:Signature>
+		<saml2p:Status>
+			<saml2p:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
+		</saml2p:Status>
+		<saml2:Assertion ID="_35ea90b711d6f385345f0dbdd7d0ed5b" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
+			xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">
+			<saml2:Issuer>https://samltest.id/saml/idp</saml2:Issuer>
+			<saml2:Subject>
+				<saml2:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" NameQualifier="https://samltest.id/saml/idp" SPNameQualifier="http://saml.julz/example"
+					xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">msmith@samltest.id
+				</saml2:NameID>
+				<saml2:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
+					<saml2:SubjectConfirmationData Address="104.28.39.34" InResponseTo="bc5a5baa-94e0-58a8-872c-e51491d2b3ee" NotOnOrAfter="2023-08-25T14:37:53.693Z" Recipient="http://localhost:8000/saml/acs"/>
+				</saml2:SubjectConfirmation>
+			</saml2:Subject>
+			<!-- intentionally missing NotBefore -->
+			<saml2:Conditions NotOnOrAfter="2023-08-25T14:37:53.680Z">
+				<saml2:AudienceRestriction>
+					<saml2:Audience>http://saml.julz/example</saml2:Audience>
+				</saml2:AudienceRestriction>
+			</saml2:Conditions>
+			<saml2:AuthnStatement AuthnInstant="2023-08-25T14:31:56.064Z" SessionIndex="_f72a63ee3782b47c89f60e81adde0ab0">
+				<saml2:SubjectLocality Address="104.28.39.34"/>
+				<saml2:AuthnContext>
+					<saml2:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml2:AuthnContextClassRef>
+				</saml2:AuthnContext>
+			</saml2:AuthnStatement>
+			<saml2:AttributeStatement>
+				<saml2:Attribute FriendlyName="eduPersonEntitlement" Name="urn:oid:1.3.6.1.4.1.5923.1.1.1.7" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>Ambassador</saml2:AttributeValue>
+					<saml2:AttributeValue>None</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute Name="urn:oasis:names:tc:SAML:attribute:subject-id" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue
+						xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xsd:string">msmith@samltest.id
+					</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="uid" Name="urn:oid:0.9.2342.19200300.100.1.1" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>morty</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="telephoneNumber" Name="urn:oid:2.5.4.20" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>+1-555-555-5505</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="role" Name="https://samltest.id/attributes/role" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue
+						xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xsd:string">janitor@samltest.id
+					</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="mail" Name="urn:oid:0.9.2342.19200300.100.1.3" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>msmith@samltest.id</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="sn" Name="urn:oid:2.5.4.4" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>Smith</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="displayName" Name="urn:oid:2.16.840.1.113730.3.1.241" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>Morty Smith</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="givenName" Name="urn:oid:2.5.4.42" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>Mortimer</saml2:AttributeValue>
+				</saml2:Attribute>
+			</saml2:AttributeStatement>
+		</saml2:Assertion>
+</saml2p:Response>
+`
+
+const testRespInvalidAssertionMissingSubject = `
+<?xml version="1.0" encoding="UTF-8"?>
+<saml2p:Response Destination="http://localhost:8000/saml/acs" ID="_8849c2ee532fcdb781f2a1776eac3741" InResponseTo="bc5a5baa-94e0-58a8-872c-e51491d2b3ee" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
+	xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol"
+	xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+	<saml2:Issuer
+		xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">https://samltest.id/saml/idp</saml2:Issuer>
+	<ds:Signature
+		xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+		<ds:SignedInfo>
+			<ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+			<ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+			<ds:Reference URI="#_8849c2ee532fcdb781f2a1776eac3741">
+				<ds:Transforms>
+					<ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+					<ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#">
+						<ec:InclusiveNamespaces PrefixList="xsd"
+							xmlns:ec="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+						</ds:Transform>
+					</ds:Transforms>
+					<ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+					<ds:DigestValue>RV485uKGJZmNA1o56gxxk+VZkvxMqtlHZA2iHH8ZU1Q=</ds:DigestValue>
+				</ds:Reference>
+			</ds:SignedInfo>
+			<ds:SignatureValue>d3Lpc6hcSB7bwCzMrO3wfZrNiGk5gZ8rKRKOQENDP2q+p3+LkDmSBt6zzyxn33MCSJt+dPHpF14YMAK/N3PnWwSSUp0j5kzOc9Ka5NdianE0NgYnU0qjhFJbThAQz7hRowS4J49hS/6MuSQ0Z7nBBCeDgeD6PYRApKMvlOtkBGPJaLT2mRy/gnQ+CC6udUdJyvSgb9n43lvxdaaZWrDK3Wga98YlkcRHLrmPAAM8KxYWnkopio6YINU4D5mZjsEsnUkH41WgcwgmS2xzP3ICnNc3WH9NHrVKp9at2DBwrYDIses6FXgYq+iUWK2191jWpIC3qVAB0cOilmRXwtEH7g==</ds:SignatureValue>
+			<ds:KeyInfo>
+				<ds:X509Data>
+					<ds:X509Certificate>MIIDEjCCAfqgAwIBAgIVAMECQ1tjghafm5OxWDh9hwZfxthWMA0GCSqGSIb3DQEBCwUAMBYxFDAS
+BgNVBAMMC3NhbWx0ZXN0LmlkMB4XDTE4MDgyNDIxMTQwOVoXDTM4MDgyNDIxMTQwOVowFjEUMBIG
+A1UEAwwLc2FtbHRlc3QuaWQwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC0Z4QX1NFK
+s71ufbQwoQoW7qkNAJRIANGA4iM0ThYghul3pC+FwrGv37aTxWXfA1UG9njKbbDreiDAZKngCgyj
+xj0uJ4lArgkr4AOEjj5zXA81uGHARfUBctvQcsZpBIxDOvUUImAl+3NqLgMGF2fktxMG7kX3GEVN
+c1klbN3dfYsaw5dUrw25DheL9np7G/+28GwHPvLb4aptOiONbCaVvh9UMHEA9F7c0zfF/cL5fOpd
+Va54wTI0u12CsFKt78h6lEGG5jUs/qX9clZncJM7EFkN3imPPy+0HC8nspXiH/MZW8o2cqWRkrw3
+MzBZW3Ojk5nQj40V6NUbjb7kfejzAgMBAAGjVzBVMB0GA1UdDgQWBBQT6Y9J3Tw/hOGc8PNV7JEE
+4k2ZNTA0BgNVHREELTArggtzYW1sdGVzdC5pZIYcaHR0cHM6Ly9zYW1sdGVzdC5pZC9zYW1sL2lk
+cDANBgkqhkiG9w0BAQsFAAOCAQEASk3guKfTkVhEaIVvxEPNR2w3vWt3fwmwJCccW98XXLWgNbu3
+YaMb2RSn7Th4p3h+mfyk2don6au7Uyzc1Jd39RNv80TG5iQoxfCgphy1FYmmdaSfO8wvDtHTTNiL
+ArAxOYtzfYbzb5QrNNH/gQEN8RJaEf/g/1GTw9x/103dSMK0RXtl+fRs2nblD1JJKSQ3AdhxK/we
+P3aUPtLxVVJ9wMOQOfcy02l+hHMb6uAjsPOpOVKqi3M8XmcUZOpx4swtgGdeoSpeRyrtMvRwdcci
+NBp9UZome44qZAYH1iqrpmmjsfI9pJItsgWu3kXPjhSfj1AJGR1l9JGvJrHki1iHTA==</ds:X509Certificate>
+				</ds:X509Data>
+			</ds:KeyInfo>
+		</ds:Signature>
+		<saml2p:Status>
+			<saml2p:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
+		</saml2p:Status>
+		<saml2:Assertion ID="_35ea90b711d6f385345f0dbdd7d0ed5b" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
+			xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">
+			<saml2:Issuer>https://samltest.id/saml/idp</saml2:Issuer>
+			<!-- intentionally missing subject -->
+			<saml2:Conditions NotBefore="2023-08-25T14:32:53.680Z" NotOnOrAfter="2023-08-25T14:37:53.680Z">
+				<saml2:AudienceRestriction>
+					<saml2:Audience>http://saml.julz/example</saml2:Audience>
+				</saml2:AudienceRestriction>
+			</saml2:Conditions>
+			<saml2:AuthnStatement AuthnInstant="2023-08-25T14:31:56.064Z" SessionIndex="_f72a63ee3782b47c89f60e81adde0ab0">
+				<saml2:SubjectLocality Address="104.28.39.34"/>
+				<saml2:AuthnContext>
+					<saml2:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml2:AuthnContextClassRef>
+				</saml2:AuthnContext>
+			</saml2:AuthnStatement>
+			<saml2:AttributeStatement>
+				<saml2:Attribute FriendlyName="eduPersonEntitlement" Name="urn:oid:1.3.6.1.4.1.5923.1.1.1.7" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>Ambassador</saml2:AttributeValue>
+					<saml2:AttributeValue>None</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute Name="urn:oasis:names:tc:SAML:attribute:subject-id" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue
+						xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xsd:string">msmith@samltest.id
+					</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="uid" Name="urn:oid:0.9.2342.19200300.100.1.1" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>morty</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="telephoneNumber" Name="urn:oid:2.5.4.20" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>+1-555-555-5505</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="role" Name="https://samltest.id/attributes/role" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue
+						xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xsd:string">janitor@samltest.id
+					</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="mail" Name="urn:oid:0.9.2342.19200300.100.1.3" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>msmith@samltest.id</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="sn" Name="urn:oid:2.5.4.4" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>Smith</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="displayName" Name="urn:oid:2.16.840.1.113730.3.1.241" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>Morty Smith</saml2:AttributeValue>
+				</saml2:Attribute>
+				<saml2:Attribute FriendlyName="givenName" Name="urn:oid:2.5.4.42" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
+					<saml2:AttributeValue>Mortimer</saml2:AttributeValue>
+				</saml2:Attribute>
+			</saml2:AttributeStatement>
+		</saml2:Assertion>
+</saml2p:Response>
+`
+
+const testRespInvalidAssertionMissingAttributeStmt = `
+<?xml version="1.0" encoding="UTF-8"?>
+<saml2p:Response Destination="http://localhost:8000/saml/acs" ID="_8849c2ee532fcdb781f2a1776eac3741" InResponseTo="bc5a5baa-94e0-58a8-872c-e51491d2b3ee" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
+	xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol"
+	xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+	<saml2:Issuer
+		xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">https://samltest.id/saml/idp</saml2:Issuer>
+	<ds:Signature
+		xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+		<ds:SignedInfo>
+			<ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+			<ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+			<ds:Reference URI="#_8849c2ee532fcdb781f2a1776eac3741">
+				<ds:Transforms>
+					<ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+					<ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#">
+						<ec:InclusiveNamespaces PrefixList="xsd"
+							xmlns:ec="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+						</ds:Transform>
+					</ds:Transforms>
+					<ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+					<ds:DigestValue>RV485uKGJZmNA1o56gxxk+VZkvxMqtlHZA2iHH8ZU1Q=</ds:DigestValue>
+				</ds:Reference>
+			</ds:SignedInfo>
+			<ds:SignatureValue>d3Lpc6hcSB7bwCzMrO3wfZrNiGk5gZ8rKRKOQENDP2q+p3+LkDmSBt6zzyxn33MCSJt+dPHpF14YMAK/N3PnWwSSUp0j5kzOc9Ka5NdianE0NgYnU0qjhFJbThAQz7hRowS4J49hS/6MuSQ0Z7nBBCeDgeD6PYRApKMvlOtkBGPJaLT2mRy/gnQ+CC6udUdJyvSgb9n43lvxdaaZWrDK3Wga98YlkcRHLrmPAAM8KxYWnkopio6YINU4D5mZjsEsnUkH41WgcwgmS2xzP3ICnNc3WH9NHrVKp9at2DBwrYDIses6FXgYq+iUWK2191jWpIC3qVAB0cOilmRXwtEH7g==</ds:SignatureValue>
+			<ds:KeyInfo>
+				<ds:X509Data>
+					<ds:X509Certificate>MIIDEjCCAfqgAwIBAgIVAMECQ1tjghafm5OxWDh9hwZfxthWMA0GCSqGSIb3DQEBCwUAMBYxFDAS
+BgNVBAMMC3NhbWx0ZXN0LmlkMB4XDTE4MDgyNDIxMTQwOVoXDTM4MDgyNDIxMTQwOVowFjEUMBIG
+A1UEAwwLc2FtbHRlc3QuaWQwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC0Z4QX1NFK
+s71ufbQwoQoW7qkNAJRIANGA4iM0ThYghul3pC+FwrGv37aTxWXfA1UG9njKbbDreiDAZKngCgyj
+xj0uJ4lArgkr4AOEjj5zXA81uGHARfUBctvQcsZpBIxDOvUUImAl+3NqLgMGF2fktxMG7kX3GEVN
+c1klbN3dfYsaw5dUrw25DheL9np7G/+28GwHPvLb4aptOiONbCaVvh9UMHEA9F7c0zfF/cL5fOpd
+Va54wTI0u12CsFKt78h6lEGG5jUs/qX9clZncJM7EFkN3imPPy+0HC8nspXiH/MZW8o2cqWRkrw3
+MzBZW3Ojk5nQj40V6NUbjb7kfejzAgMBAAGjVzBVMB0GA1UdDgQWBBQT6Y9J3Tw/hOGc8PNV7JEE
+4k2ZNTA0BgNVHREELTArggtzYW1sdGVzdC5pZIYcaHR0cHM6Ly9zYW1sdGVzdC5pZC9zYW1sL2lk
+cDANBgkqhkiG9w0BAQsFAAOCAQEASk3guKfTkVhEaIVvxEPNR2w3vWt3fwmwJCccW98XXLWgNbu3
+YaMb2RSn7Th4p3h+mfyk2don6au7Uyzc1Jd39RNv80TG5iQoxfCgphy1FYmmdaSfO8wvDtHTTNiL
+ArAxOYtzfYbzb5QrNNH/gQEN8RJaEf/g/1GTw9x/103dSMK0RXtl+fRs2nblD1JJKSQ3AdhxK/we
+P3aUPtLxVVJ9wMOQOfcy02l+hHMb6uAjsPOpOVKqi3M8XmcUZOpx4swtgGdeoSpeRyrtMvRwdcci
+NBp9UZome44qZAYH1iqrpmmjsfI9pJItsgWu3kXPjhSfj1AJGR1l9JGvJrHki1iHTA==</ds:X509Certificate>
+				</ds:X509Data>
+			</ds:KeyInfo>
+		</ds:Signature>
+		<saml2p:Status>
+			<saml2p:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
+		</saml2p:Status>
+		<saml2:Assertion ID="_35ea90b711d6f385345f0dbdd7d0ed5b" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
+			xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">
+			<saml2:Issuer>https://samltest.id/saml/idp</saml2:Issuer>
+			<saml2:Subject>
+				<saml2:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" NameQualifier="https://samltest.id/saml/idp" SPNameQualifier="http://saml.julz/example"
+					xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">msmith@samltest.id
+				</saml2:NameID>
+				<saml2:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
+					<saml2:SubjectConfirmationData Address="104.28.39.34" InResponseTo="bc5a5baa-94e0-58a8-872c-e51491d2b3ee" NotOnOrAfter="2023-08-25T14:37:53.693Z" Recipient="http://localhost:8000/saml/acs"/>
+				</saml2:SubjectConfirmation>
+			</saml2:Subject>
+			<saml2:Conditions NotBefore="2023-08-25T14:32:53.680Z" NotOnOrAfter="2023-08-25T14:37:53.680Z">
+				<saml2:AudienceRestriction>
+					<! -- audience is intentionally invalid -->. 
+					<saml2:Audience>http://saml.julz/example</saml2:Audience>
+				</saml2:AudienceRestriction>
+			</saml2:Conditions>
+			<saml2:AuthnStatement AuthnInstant="2023-08-25T14:31:56.064Z" SessionIndex="_f72a63ee3782b47c89f60e81adde0ab0">
+				<saml2:SubjectLocality Address="104.28.39.34"/>
+				<saml2:AuthnContext>
+					<saml2:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml2:AuthnContextClassRef>
+				</saml2:AuthnContext>
+			</saml2:AuthnStatement>
+			<!-- intentionally missing attribute stmt -->
+			</saml2:Assertion>
+	</saml2p:Response>`
