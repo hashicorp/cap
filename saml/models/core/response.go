@@ -20,6 +20,16 @@ func (r *Response) Assertions() []Assertion {
 	return assertions
 }
 
+// Issuer returns the issuer of the Response if it exists.
+// Otherwise, it returns an empty string.
+func (r *Response) Issuer() string {
+	if r.Response.Issuer == nil {
+		return ""
+	}
+
+	return r.Response.Issuer.Value
+}
+
 // Assertion is a SAML Assertion element.
 // See 2.3.3 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
 type Assertion struct {
@@ -30,6 +40,16 @@ type Assertion struct {
 // See 2.7.3.1 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
 type Attribute struct {
 	types.Attribute
+}
+
+// Issuer returns the issuer of the Assertion if it exists.
+// Otherwise, it returns an empty string.
+func (a *Assertion) Issuer() string {
+	if a.Assertion.Issuer == nil {
+		return ""
+	}
+
+	return a.Assertion.Issuer.Value
 }
 
 // SubjectNameID returns the value of the NameID element if it exists in
