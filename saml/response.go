@@ -148,7 +148,7 @@ func (sp *ServiceProvider) ParseResponse(
 		}
 	}
 
-	return (*core.Response)(response), nil
+	return &core.Response{Response: *response}, nil
 }
 
 func (sp *ServiceProvider) internalParser(
