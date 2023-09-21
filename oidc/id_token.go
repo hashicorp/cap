@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package oidc
 
 import (
@@ -8,7 +11,7 @@ import (
 	"fmt"
 	"hash"
 
-	"gopkg.in/square/go-jose.v2"
+	"github.com/go-jose/go-jose/v3"
 )
 
 // IDToken is an oidc id_token.

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package ldap
 
 import (
@@ -5,11 +8,38 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"strings"
 
+	"github.com/go-ldap/ldap/v3"
 	"github.com/hashicorp/go-secure-stdlib/tlsutil"
 )
 
+var derefAliasMap = map[string]int{
+	"never":     ldap.NeverDerefAliases,
+	"finding":   ldap.DerefFindingBaseObj,
+	"searching": ldap.DerefInSearching,
+	"always":    ldap.DerefAlways,
+}
+
+func validateDerefAlias(deref string) (string, error) {
+	const op = "ldap.validateDerefAlias"
+	lowerDeref := strings.ToLower(deref)
+	_, found := derefAliasMap[lowerDeref]
+	switch {
+	case found:
+		return lowerDeref, nil
+	case deref == "":
+		return DefaultDerefAliases, nil
+	default:
+		return "", fmt.Errorf("%s: invalid dereference_aliases %q: %w", op, deref, ErrInvalidParameter)
+	}
+}
+
 const (
+	// DefaultTimeout is the timeout value used for both dialing and requests to
+	// the LDAP server
+	DefaultTimeout = 60
+
 	// DefaultURL for the ClientConfig.URLs
 	DefaultURL = "ldaps://127.0.0.1:686"
 
@@ -28,7 +58,18 @@ const (
 	DefaultTLSMinVersion = "tls12"
 
 	// DefaultTLSMaxVersion for the ClientConfig.TLSMaxVersion
-	DefaultTLSMaxVersion = "tls12"
+	DefaultTLSMaxVersion = "tls13"
+
+	// DefaultOpenLDAPUserPasswordAttribute defines the attribute name for the
+	// openLDAP default password attribute which will always be excluded
+	DefaultOpenLDAPUserPasswordAttribute = "userPassword"
+
+	// DefaultADUserPasswordAttribute defines the attribute name for the
+	// AD default password attribute which will always be excluded
+	DefaultADUserPasswordAttribute = "unicodePwd"
+
+	// DefaultDerefAliases defines the default for dereferencing aliases
+	DefaultDerefAliases = "never"
 )
 
 type ClientConfig struct {
@@ -60,7 +101,7 @@ type ClientConfig struct {
 	GroupFilter string `json:"groupfilter"`
 
 	// GroupAttr is the attribute which identifies group members in entries
-	// returned from GroupFilter queries.  Examples: for groupfilter queries
+	// returned from GroupFilter queries.  Examples: for groupattr queries
 	// returning group objects, use: cn. For queries returning user objects,
 	// use: memberOf.
 	// Default: cn
@@ -85,9 +126,9 @@ type ClientConfig struct {
 	// either the cn in ActiveDirectory or uid in openLDAP  (default: cn)
 	UserAttr string `json:"userattr"`
 
-	// Certificate to use verify the identity of the directory service and is a
-	// PEM encoded x509 (optional)
-	Certificate string `json:"certificate"`
+	// Certificates to use verify the identity of the directory service and is a
+	// set of PEM encoded x509 (optional)
+	Certificates []string `json:"certificates"`
 
 	// ClientTLSCert is the client certificate used with the ClientTLSKey to
 	// authenticate the client to the directory service.  It must be PEM encoded
@@ -137,9 +178,44 @@ type ClientConfig struct {
 	// security groups including nested ones.",
 	UseTokenGroups bool `json:"use_token_groups"`
 
-	// RequestTimeout in seconds, for the connection when making requests
-	// against the server before returning back an error.
+	// RequestTimeout in seconds is used when dialing to establish the
+	// connection and when making requests against the server via a connection
+	// before returning back an error. If not set, then the DefaultTimeout is
+	// used.
 	RequestTimeout int `json:"request_timeout"`
+
+	// IncludeUserAttributes optionally specifies that the authenticating user's
+	// DN and attributes be included an authentication AuthResult.
+	//
+	// Note: the default password attribute for both openLDAP (userPassword) and
+	// AD (unicodePwd) will always be excluded.
+	IncludeUserAttributes bool
+
+	// ExcludedUserAttributes optionally defines a set of user attributes to be
+	// excluded when an authenticating user's attributes are included in an
+	// AuthResult (see: Config.IncludeUserAttributes or the WithUserAttributes()
+	// option).
+	//
+	// Note: the default password attribute for both openLDAP (userPassword) and
+	// AD (unicodePwd) will always be excluded.
+	ExcludedUserAttributes []string
+
+	// IncludeUserGroups optionally specifies that the authenticating user's
+	// group membership be included an authentication AuthResult.
+	IncludeUserGroups bool
+
+	// MaximumPageSize optionally specifies a maximum ldap search result size to
+	// use when retrieving the authenticated user's group memberships. This can
+	// be used to avoid reaching the LDAP server's max result size.
+	MaximumPageSize int `json:"max_page_size"`
+
+	// DerefAliases will control how aliases are dereferenced when
+	// performing the search. Possible values are: never, finding, searching,
+	// and always. If unset, a default of "never" is used. When set to
+	// "finding", it will only dereference aliases during name resolution of the
+	// base. When set to "searching", it will dereference aliases after name
+	// resolution.
+	DerefAliases string `json:"dereference_aliases"`
 
 	// DeprecatedVaultPre111GroupCNBehavior: if true, group searching reverts to
 	// the pre 1.1.1 Vault behavior.
@@ -168,9 +244,11 @@ func (c *ClientConfig) validate() error {
 	if tlsMaxVersion < tlsMinVersion {
 		return fmt.Errorf("%s: 'tls_max_version' must be greater than or equal to 'tls_min_version': %w", op, ErrInvalidParameter)
 	}
-	if c.Certificate != "" {
-		if err := validateCertificate([]byte(c.Certificate)); err != nil {
-			return fmt.Errorf("%s: failed to parse server tls cert: %w", op, err)
+	if c.Certificates != nil {
+		for _, cert := range c.Certificates {
+			if err := validateCertificate([]byte(cert)); err != nil {
+				return fmt.Errorf("%s: failed to parse server tls cert: %w", op, err)
+			}
 		}
 	}
 	if (c.ClientTLSCert != "" && c.ClientTLSKey == "") ||
@@ -181,6 +259,11 @@ func (c *ClientConfig) validate() error {
 		if _, err := tls.X509KeyPair([]byte(c.ClientTLSCert), []byte(c.ClientTLSKey)); err != nil {
 			return fmt.Errorf("%s: failed to parse client X509 key pair: %w", op, err)
 		}
+	}
+	var err error
+	c.DerefAliases, err = validateDerefAlias(c.DerefAliases)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
 	}
 	return nil
 }

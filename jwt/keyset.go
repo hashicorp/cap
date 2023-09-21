@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package jwt
 
 import (
@@ -17,9 +20,9 @@ import (
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/hashicorp/go-cleanhttp"
 	"golang.org/x/oauth2"
-	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 // KeySet represents a set of keys that can be used to verify the signatures of JWTs.

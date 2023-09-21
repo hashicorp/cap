@@ -2,53 +2,55 @@ name: Go
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
-
   build:
     name: Build
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        go: ["1.20", "1.19", "1.18"]
+        platform: [ubuntu-latest] # can not run in windows OS
+    runs-on: ${{ matrix.platform }}
+
     steps:
+      - name: Set up Go 1.x
+        uses: actions/setup-go@4d34df0c2316fe8122ab82dc22947d607c0c91f9 # v4.0.0
+        with:
+          go-version: ${{ matrix.go }}
 
-    - name: Set up Go 1.x
-      uses: actions/setup-go@v2
-      with:
-        go-version: ^1.13
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
 
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@v2
+      - name: go mod package cache
+        uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8 # v3.3.1
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ matrix.go }}-${{ hashFiles('tests/go.mod') }}
 
-    - name: Get dependencies
-      run: |
-        go get -v -t -d ./...
-        if [ -f Gopkg.toml ]; then
-            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-            dep ensure
-        fi
+      - name: Build
+        run: |
+          set -e
+          exit_status=
+          for f in $(find . -name go.mod)
+          do
+            pushd $(dirname $f) > /dev/null
+            go build ./... || exit_status=$?
+            popd > /dev/null
+          done
+          exit $status
 
-    - name: Build
-      run: |
-        set -e
-        exit_status=
-        for f in $(find . -name go.mod)
-        do
-          pushd $(dirname $f) > /dev/null
-          go build ./... || exit_status=$?
-          popd > /dev/null
-        done
-        exit $status
-
-    - name: Test
-      run: |
-        set -e
-        exit_status=
-        for f in $(find . -name go.mod)
-        do
-          pushd $(dirname $f) > /dev/null
-          go test -test.v ./... || exit_status=$?
-          popd > /dev/null
-        done
-        exit $exit_status
+      - name: Test
+        run: |
+          set -e
+          exit_status=
+          for f in $(find . -name go.mod)
+          do
+            pushd $(dirname $f) > /dev/null
+            go test -test.v ./... || exit_status=$?
+            popd > /dev/null
+          done
+          exit $exit_status

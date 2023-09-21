@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package oidc
 
 import (
@@ -29,11 +32,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/cap/oidc/internal/strutils"
+	"github.com/go-jose/go-jose/v3"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/square/go-jose.v2"
+
+	"github.com/hashicorp/cap/oidc/internal/strutils"
 )
 
 var (

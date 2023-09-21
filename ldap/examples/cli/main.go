@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package main
 
 import (
@@ -27,11 +30,11 @@ func main() {
 		td := startTestDirectory()
 		defer func() { td.Stop() }()
 		clientConfig = ldap.ClientConfig{
-			URLs:        []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
-			Certificate: td.Cert(),
-			DiscoverDN:  true,
-			UserDN:      testdirectory.DefaultUserDN,
-			GroupDN:     testdirectory.DefaultGroupDN,
+			URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+			Certificates: []string{td.Cert()},
+			DiscoverDN:   true,
+			UserDN:       testdirectory.DefaultUserDN,
+			GroupDN:      testdirectory.DefaultGroupDN,
 		}
 	} else {
 		configFile, err := os.Open(*cfgFilename)

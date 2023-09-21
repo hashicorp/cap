@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package ldap_test
 
 import (
@@ -44,29 +47,40 @@ func TestClient_Authenticate(t *testing.T) {
 			testdirectory.WithDefaults(t, &testdirectory.Defaults{UPNDomain: "example.com"}),
 			testdirectory.WithMembersOf(t, "admin"))...,
 	)
+	// add some attributes that we always want to filter out of an AuthResult,
+	// so if we ever start seeing tests fail because of them; we know that we've
+	// messed up the default filtering
+	for _, u := range users {
+		u.Attributes = append(u.Attributes,
+			gldap.NewEntryAttribute(ldap.DefaultADUserPasswordAttribute, []string{"password"}),
+			gldap.NewEntryAttribute(ldap.DefaultOpenLDAPUserPasswordAttribute, []string{"password"}),
+		)
+	}
 	td.SetUsers(users...)
 	td.SetGroups(groups...)
 	td.SetTokenGroups(tokenGroups)
 	tests := []struct {
-		name            string
-		username        string
-		password        string
-		clientConfig    *ldap.ClientConfig
-		opts            []ldap.Option
-		wantGroups      []string
-		wantErr         bool
-		wantErrIs       error
-		wantErrContains string
+		name               string
+		username           string
+		password           string
+		clientConfig       *ldap.ClientConfig
+		opts               []ldap.Option
+		wantGroups         []string
+		wantUserAttributes map[string][]string
+		wantUserDN         string
+		wantErr            bool
+		wantErrIs          error
+		wantErrContains    string
 	}{
 		{
 			name:     "missing-username",
 			password: "password",
 			clientConfig: &ldap.ClientConfig{
-				URLs:        []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
-				Certificate: td.Cert(),
-				DiscoverDN:  true,
-				UserDN:      testdirectory.DefaultUserDN,
-				GroupDN:     testdirectory.DefaultGroupDN,
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
+				DiscoverDN:   true,
+				UserDN:       testdirectory.DefaultUserDN,
+				GroupDN:      testdirectory.DefaultGroupDN,
 			},
 			wantErr:         true,
 			wantErrIs:       ldap.ErrInvalidParameter,
@@ -76,11 +90,11 @@ func TestClient_Authenticate(t *testing.T) {
 			name:     "missing-password",
 			username: "alice",
 			clientConfig: &ldap.ClientConfig{
-				URLs:        []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
-				Certificate: td.Cert(),
-				DiscoverDN:  true,
-				UserDN:      testdirectory.DefaultUserDN,
-				GroupDN:     testdirectory.DefaultGroupDN,
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
+				DiscoverDN:   true,
+				UserDN:       testdirectory.DefaultUserDN,
+				GroupDN:      testdirectory.DefaultGroupDN,
 			},
 			wantErr:         true,
 			wantErrIs:       ldap.ErrInvalidParameter,
@@ -91,11 +105,11 @@ func TestClient_Authenticate(t *testing.T) {
 			username: "alice",
 			password: "password",
 			clientConfig: &ldap.ClientConfig{
-				URLs:        []string{fmt.Sprintf("ldaps://127.0.0.1:%d", 65535)},
-				Certificate: td.Cert(),
-				DiscoverDN:  true,
-				UserDN:      testdirectory.DefaultUserDN,
-				GroupDN:     testdirectory.DefaultGroupDN,
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", 65535)},
+				Certificates: []string{td.Cert()},
+				DiscoverDN:   true,
+				UserDN:       testdirectory.DefaultUserDN,
+				GroupDN:      testdirectory.DefaultGroupDN,
 			},
 			wantErr:         true,
 			wantErrContains: "failed to connect",
@@ -105,11 +119,11 @@ func TestClient_Authenticate(t *testing.T) {
 			username: "invalid-name",
 			password: "password",
 			clientConfig: &ldap.ClientConfig{
-				URLs:        []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
-				Certificate: td.Cert(),
-				DiscoverDN:  true,
-				UserDN:      testdirectory.DefaultUserDN,
-				GroupDN:     testdirectory.DefaultGroupDN,
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
+				DiscoverDN:   true,
+				UserDN:       testdirectory.DefaultUserDN,
+				GroupDN:      testdirectory.DefaultGroupDN,
 			},
 			wantErr:         true,
 			wantErrContains: "discovery of user bind DN failed",
@@ -119,13 +133,103 @@ func TestClient_Authenticate(t *testing.T) {
 			username: "alice",
 			password: "password",
 			clientConfig: &ldap.ClientConfig{
-				URLs:        []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
-				Certificate: td.Cert(),
-				DiscoverDN:  true,
-				UserDN:      testdirectory.DefaultUserDN,
-				GroupDN:     testdirectory.DefaultGroupDN,
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
+				DiscoverDN:   true,
+				UserDN:       testdirectory.DefaultUserDN,
+				GroupDN:      testdirectory.DefaultGroupDN,
 			},
 			opts:       []ldap.Option{ldap.WithGroups()},
+			wantGroups: []string{groups[0].DN},
+		},
+		{
+			name:     "success-with-user-attributes",
+			username: "alice",
+			password: "password",
+			clientConfig: &ldap.ClientConfig{
+				URLs:                   []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates:           []string{td.Cert()},
+				DiscoverDN:             true,
+				UserDN:                 testdirectory.DefaultUserDN,
+				GroupDN:                testdirectory.DefaultGroupDN,
+				ExcludedUserAttributes: []string{"password", "memberof"},
+			},
+			opts: []ldap.Option{ldap.WithUserAttributes()},
+			wantUserAttributes: map[string][]string{
+				"email":       {"alice@example.com"},
+				"name":        {"alice"},
+				"tokenGroups": {"\x01\x00\x00\x00\x00\x00\x00\x01"},
+			},
+			wantUserDN: "cn=alice,ou=people,dc=example,dc=org",
+		},
+		{
+			name:     "success-include-user-attributes",
+			username: "alice",
+			password: "password",
+			clientConfig: &ldap.ClientConfig{
+				URLs:                   []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates:           []string{td.Cert()},
+				DiscoverDN:             true,
+				UserDN:                 testdirectory.DefaultUserDN,
+				GroupDN:                testdirectory.DefaultGroupDN,
+				ExcludedUserAttributes: []string{"password", "memberof"},
+				IncludeUserAttributes:  true,
+			},
+			wantUserAttributes: map[string][]string{
+				"email":       {"alice@example.com"},
+				"name":        {"alice"},
+				"tokenGroups": {"\x01\x00\x00\x00\x00\x00\x00\x01"},
+			},
+			wantUserDN: "cn=alice,ou=people,dc=example,dc=org",
+		},
+		{
+			name:     "success-include-user-groups",
+			username: "alice",
+			password: "password",
+			clientConfig: &ldap.ClientConfig{
+				URLs:              []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates:      []string{td.Cert()},
+				DiscoverDN:        true,
+				UserDN:            testdirectory.DefaultUserDN,
+				GroupDN:           testdirectory.DefaultGroupDN,
+				IncludeUserGroups: true,
+			},
+			wantGroups: []string{groups[0].DN},
+		},
+		{
+			name:     "success-include-user-groups-but-no-groups",
+			username: "bob",
+			password: "password",
+			clientConfig: &ldap.ClientConfig{
+				URLs:              []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates:      []string{td.Cert()},
+				DiscoverDN:        true,
+				UserDN:            testdirectory.DefaultUserDN,
+				GroupDN:           testdirectory.DefaultGroupDN,
+				IncludeUserGroups: true,
+			},
+			wantGroups: []string{},
+		},
+		{
+			name:     "success-with-groups-and-user-attributes",
+			username: "alice",
+			password: "password",
+			clientConfig: &ldap.ClientConfig{
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
+				DiscoverDN:   true,
+				UserDN:       testdirectory.DefaultUserDN,
+				GroupDN:      testdirectory.DefaultGroupDN,
+			},
+			opts: []ldap.Option{ldap.WithGroups(), ldap.WithUserAttributes()},
+			wantUserAttributes: map[string][]string{
+				"email":       {"alice@example.com"},
+				"memberOf":    {"admin"},
+				"name":        {"alice"},
+				"password":    {"password"},
+				"tokenGroups": {"\x01\x00\x00\x00\x00\x00\x00\x01"},
+			},
+			wantUserDN: "cn=alice,ou=people,dc=example,dc=org",
 			wantGroups: []string{groups[0].DN},
 		},
 		{
@@ -133,12 +237,12 @@ func TestClient_Authenticate(t *testing.T) {
 			username: "alice",
 			password: "password",
 			clientConfig: &ldap.ClientConfig{
-				URLs:        []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
-				Certificate: td.Cert(),
-				DiscoverDN:  true,
-				UserDN:      testdirectory.DefaultUserDN,
-				GroupDN:     testdirectory.DefaultGroupDN,
-				UserFilter:  "({{.UserAttr}}={{.Username}})",
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
+				DiscoverDN:   true,
+				UserDN:       testdirectory.DefaultUserDN,
+				GroupDN:      testdirectory.DefaultGroupDN,
+				UserFilter:   "({{.UserAttr}}={{.Username}})",
 			},
 			opts:       []ldap.Option{ldap.WithGroups()},
 			wantGroups: []string{groups[0].DN},
@@ -148,12 +252,12 @@ func TestClient_Authenticate(t *testing.T) {
 			username: "alice",
 			password: "password",
 			clientConfig: &ldap.ClientConfig{
-				URLs:        []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
-				Certificate: td.Cert(),
-				DiscoverDN:  true,
-				UserDN:      testdirectory.DefaultUserDN,
-				GroupDN:     testdirectory.DefaultGroupDN,
-				UserFilter:  "({{.BadFilter}}={{.Username}})",
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
+				DiscoverDN:   true,
+				UserDN:       testdirectory.DefaultUserDN,
+				GroupDN:      testdirectory.DefaultGroupDN,
+				UserFilter:   "({{.BadFilter}}={{.Username}})",
 			},
 			opts:            []ldap.Option{ldap.WithGroups()},
 			wantGroups:      []string{groups[0].DN},
@@ -166,7 +270,7 @@ func TestClient_Authenticate(t *testing.T) {
 			password: "password",
 			clientConfig: &ldap.ClientConfig{
 				URLs:           []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
-				Certificate:    td.Cert(),
+				Certificates:   []string{td.Cert()},
 				DiscoverDN:     true,
 				UserDN:         testdirectory.DefaultUserDN,
 				GroupDN:        testdirectory.DefaultGroupDN,
@@ -180,12 +284,12 @@ func TestClient_Authenticate(t *testing.T) {
 			username: "eve",
 			password: "password",
 			clientConfig: &ldap.ClientConfig{
-				URLs:        []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
-				Certificate: td.Cert(),
-				DiscoverDN:  true,
-				UserDN:      testdirectory.DefaultUserDN,
-				GroupDN:     testdirectory.DefaultGroupDN,
-				UPNDomain:   "example.com",
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
+				DiscoverDN:   true,
+				UserDN:       testdirectory.DefaultUserDN,
+				GroupDN:      testdirectory.DefaultGroupDN,
+				UPNDomain:    "example.com",
 			},
 			opts:       []ldap.Option{ldap.WithGroups()},
 			wantGroups: []string{groups[0].DN},
@@ -196,26 +300,34 @@ func TestClient_Authenticate(t *testing.T) {
 			password: "password",
 			clientConfig: &ldap.ClientConfig{
 				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
-				Certificate:  td.Cert(),
+				Certificates: []string{td.Cert()},
 				DiscoverDN:   true,
 				UserDN:       testdirectory.DefaultUserDN,
 				GroupDN:      testdirectory.DefaultGroupDN,
 				BindDN:       fmt.Sprintf("%s=%s,%s", testdirectory.DefaultUserAttr, "bob", testdirectory.DefaultUserDN),
 				BindPassword: "password",
 			},
-			opts:       []ldap.Option{ldap.WithGroups()},
+			opts:       []ldap.Option{ldap.WithGroups(), ldap.WithUserAttributes()},
 			wantGroups: []string{groups[0].DN},
+			wantUserAttributes: map[string][]string{
+				"email":       {"alice@example.com"},
+				"memberOf":    {"admin"},
+				"name":        {"alice"},
+				"password":    {"password"},
+				"tokenGroups": {"\x01\x00\x00\x00\x00\x00\x00\x01"},
+			},
+			wantUserDN: "cn=alice,ou=people,dc=example,dc=org",
 		},
 		{
 			name:     "failed-bind-aka-authentication",
 			username: "alice",
 			password: "invalid-password",
 			clientConfig: &ldap.ClientConfig{
-				URLs:        []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
-				Certificate: td.Cert(),
-				DiscoverDN:  true,
-				UserDN:      testdirectory.DefaultUserDN,
-				GroupDN:     testdirectory.DefaultGroupDN,
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
+				DiscoverDN:   true,
+				UserDN:       testdirectory.DefaultUserDN,
+				GroupDN:      testdirectory.DefaultGroupDN,
 			},
 			opts:            []ldap.Option{ldap.WithGroups()},
 			wantGroups:      []string{groups[0].DN},
@@ -228,7 +340,7 @@ func TestClient_Authenticate(t *testing.T) {
 			password: "password",
 			clientConfig: &ldap.ClientConfig{
 				URLs:                 []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
-				Certificate:          td.Cert(),
+				Certificates:         []string{td.Cert()},
 				DiscoverDN:           true,
 				UserDN:               testdirectory.DefaultUserDN,
 				GroupDN:              testdirectory.DefaultGroupDN,
@@ -261,6 +373,8 @@ func TestClient_Authenticate(t *testing.T) {
 			}
 			require.NoError(err)
 			require.NotNil(authResult)
+			assert.Equal(tc.wantUserAttributes, authResult.UserAttributes)
+			assert.Equal(tc.wantUserDN, authResult.UserDN)
 			assert.Equal(tc.wantGroups, authResult.Groups)
 		})
 	}
@@ -268,7 +382,7 @@ func TestClient_Authenticate(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
 		client, err := ldap.NewClient(testCtx, &ldap.ClientConfig{
 			URLs:                    []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
-			Certificate:             td.Cert(),
+			Certificates:            []string{td.Cert()},
 			AllowEmptyPasswordBinds: true,
 			DiscoverDN:              true,
 			UserDN:                  testdirectory.DefaultUserDN,
@@ -292,7 +406,7 @@ func TestClient_Authenticate(t *testing.T) {
 		td2.SetTokenGroups(tokenGroups)
 		client, err := ldap.NewClient(testCtx, &ldap.ClientConfig{
 			URLs:                 []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td2.Port())},
-			Certificate:          td2.Cert(),
+			Certificates:         []string{td2.Cert()},
 			DiscoverDN:           true,
 			UserDN:               testdirectory.DefaultUserDN,
 			GroupDN:              testdirectory.DefaultGroupDN,

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package ldap
 
 import (
@@ -13,6 +16,72 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestClient_renderUserSearchFilter(t *testing.T) {
+	t.Parallel()
+	// just ensure that rendered filters are properly escaped
+	testCtx := context.Background()
+	tests := []struct {
+		name        string
+		conf        *ClientConfig
+		userName    string
+		want        string
+		errContains string
+	}{
+		{
+			name:     "valid-default",
+			userName: "alice",
+			conf: &ClientConfig{
+				URLs: []string{"localhost"},
+			},
+			want: "(cn=alice)",
+		},
+		{
+			name:     "escaped-malicious-filter",
+			userName: "foo@example.com)((((((((((((((((((((((((((((((((((((((userPrincipalName=foo",
+			conf: &ClientConfig{
+				URLs:       []string{"localhost"},
+				UPNDomain:  "example.com",
+				UserFilter: "(&({{.UserAttr}}={{.Username}})({{.UserAttr}}=admin@example.com))",
+			},
+			want: "(&(userPrincipalName=foo@example.com\\29\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28\\28userPrincipalName=foo@example.com)(userPrincipalName=admin@example.com))",
+		},
+		{
+			name:     "bad-filter-unclosed-action",
+			userName: "alice",
+			conf: &ClientConfig{
+				URLs:       []string{"localhost"},
+				UserFilter: "hello{{range",
+			},
+			errContains: "search failed due to template compilation error",
+		},
+		{
+			name: "missing-username",
+			conf: &ClientConfig{
+				URLs: []string{"localhost"},
+			},
+			errContains: "missing username",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert, require := assert.New(t), require.New(t)
+			c, err := NewClient(testCtx, tc.conf)
+			require.NoError(err)
+
+			f, err := c.renderUserSearchFilter(tc.userName)
+			if tc.errContains != "" {
+				require.Error(err)
+				assert.ErrorContains(err, tc.errContains)
+				return
+			}
+			require.NoError(err)
+			assert.NotEmpty(f)
+			assert.Equal(tc.want, f)
+		})
+	}
+
+}
+
 func TestClient_NewClient(t *testing.T) {
 	t.Parallel()
 	testCtx := context.Background()
@@ -24,6 +93,7 @@ func TestClient_NewClient(t *testing.T) {
 	tests := []struct {
 		name            string
 		conf            *ClientConfig
+		want            *Client
 		wantErr         bool
 		wantErrIs       error
 		wantErrContains string
@@ -62,6 +132,23 @@ func TestClient_NewClient(t *testing.T) {
 			wantErrContains: "invalid 'tls_min_version' in config",
 		},
 		{
+			name: "valid-tls-max",
+			conf: &ClientConfig{
+				TLSMaxVersion: "tls13",
+			},
+			want: &Client{
+				conf: &ClientConfig{
+					URLs:          []string{"ldaps://127.0.0.1:686"},
+					DerefAliases:  "never",
+					GroupFilter:   "(|(memberUid={{.Username}})(member={{.UserDN}})(uniqueMember={{.UserDN}}))",
+					GroupAttr:     "cn",
+					UserAttr:      "cn",
+					TLSMinVersion: "tls12",
+					TLSMaxVersion: "tls13",
+				},
+			},
+		},
+		{
 			name: "invalid-tls-max",
 			conf: &ClientConfig{
 				TLSMaxVersion: "invalid-tls-version",
@@ -83,7 +170,7 @@ func TestClient_NewClient(t *testing.T) {
 		{
 			name: "invalid-cert",
 			conf: &ClientConfig{
-				Certificate: "invalid-cert",
+				Certificates: []string{"invalid-cert"},
 			},
 			wantErr:         true,
 			wantErrIs:       ErrInvalidParameter,
@@ -104,13 +191,70 @@ func TestClient_NewClient(t *testing.T) {
 				URLs:          []string{"localhost"},
 				TLSMinVersion: "tls12",
 				TLSMaxVersion: "tls13",
-				Certificate:   td.Cert(),
+				Certificates:  []string{td.Cert()},
 				ClientTLSKey:  td.ClientKey(),
 				ClientTLSCert: td.ClientCert(),
 			},
+			want: &Client{
+				conf: &ClientConfig{
+					URLs:          []string{"localhost"},
+					DerefAliases:  "never",
+					GroupFilter:   "(|(memberUid={{.Username}})(member={{.UserDN}})(uniqueMember={{.UserDN}}))",
+					GroupAttr:     "cn",
+					UserAttr:      "cn",
+					TLSMinVersion: "tls12",
+					TLSMaxVersion: "tls13",
+					Certificates:  []string{td.Cert()},
+					ClientTLSKey:  td.ClientKey(),
+					ClientTLSCert: td.ClientCert(),
+				},
+			},
+		},
+		{
+			name: "invalid-deref-aliases",
+			conf: &ClientConfig{
+				URLs:         []string{"localhost"},
+				DerefAliases: "invalid",
+			},
+			wantErr:         true,
+			wantErrContains: `invalid dereference_aliases "invalid"`,
+		},
+		{
+			name: "default-deref-aliases",
+			conf: &ClientConfig{
+				URLs: []string{"localhost"},
+			},
+			want: &Client{
+				conf: &ClientConfig{
+					URLs:          []string{"localhost"},
+					DerefAliases:  "never",
+					GroupFilter:   "(|(memberUid={{.Username}})(member={{.UserDN}})(uniqueMember={{.UserDN}}))",
+					GroupAttr:     "cn",
+					UserAttr:      "cn",
+					TLSMinVersion: "tls12",
+					TLSMaxVersion: "tls13",
+				},
+			},
+		},
+		{
+			name: "valid-deref-aliases",
+			conf: &ClientConfig{
+				URLs:         []string{"localhost"},
+				DerefAliases: "always",
+			},
+			want: &Client{
+				conf: &ClientConfig{
+					URLs:          []string{"localhost"},
+					DerefAliases:  "always",
+					GroupFilter:   "(|(memberUid={{.Username}})(member={{.UserDN}})(uniqueMember={{.UserDN}}))",
+					GroupAttr:     "cn",
+					UserAttr:      "cn",
+					TLSMinVersion: "tls12",
+					TLSMaxVersion: "tls13",
+				},
+			},
 		},
 	}
-
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
@@ -134,8 +278,9 @@ func TestClient_NewClient(t *testing.T) {
 				assert.Equal(DefaultGroupFilter, c.conf.GroupFilter)
 				assert.Equal(DefaultTLSMinVersion, c.conf.TLSMinVersion)
 				assert.Equal(DefaultTLSMaxVersion, c.conf.TLSMaxVersion)
-			} else {
-
+			}
+			if tc.want != nil {
+				assert.Equal(tc.want, c)
 			}
 		})
 	}
@@ -199,6 +344,26 @@ func TestClient_connect(t *testing.T) {
 			wantErrContains: "invalid LDAP scheme in url",
 		},
 		{
+			name: "error-ldap-timeout",
+			conf: &ClientConfig{
+				RequestTimeout: 1,
+				// invalid-port on ldap (non-tls) scheme
+				URLs: []string{fmt.Sprintf("ldap://ldap.forumsys.com:%d", freePort(t))},
+			},
+			wantErr:         true,
+			wantErrContains: "i/o timeout",
+		},
+		{
+			name: "error-ldaps-timeout",
+			conf: &ClientConfig{
+				// invalid-port on ldaps (tls) scheme
+				RequestTimeout: 1,
+				URLs:           []string{fmt.Sprintf("ldaps://ldap.forumsys.com:%d", freePort(t))},
+			},
+			wantErr:         true,
+			wantErrContains: "i/o timeout",
+		},
+		{
 			name: "error-connecting",
 			conf: &ClientConfig{
 				// leading space
@@ -210,14 +375,14 @@ func TestClient_connect(t *testing.T) {
 		{
 			name: "tls",
 			conf: &ClientConfig{
-				Certificate: tdTLS.Cert(),
-				URLs:        []string{fmt.Sprintf("ldaps://localhost:%d", tdTLS.Port())},
+				Certificates: []string{tdTLS.Cert()},
+				URLs:         []string{fmt.Sprintf("ldaps://localhost:%d", tdTLS.Port())},
 			},
 		},
 		{
 			name: "tls-with-all-opts",
 			conf: &ClientConfig{
-				Certificate:    tdTLS.Cert(),
+				Certificates:   []string{tdTLS.Cert()},
 				URLs:           []string{fmt.Sprintf("ldaps://localhost:%d", tdTLS.Port())},
 				RequestTimeout: 2,
 			},
@@ -228,16 +393,16 @@ func TestClient_connect(t *testing.T) {
 		{
 			name: "non-tls",
 			conf: &ClientConfig{
-				Certificate: tdTLS.Cert(),
-				URLs:        []string{fmt.Sprintf("ldap://localhost:%d", tdNonTLS.Port())},
+				Certificates: []string{tdTLS.Cert()},
+				URLs:         []string{fmt.Sprintf("ldap://localhost:%d", tdNonTLS.Port())},
 			},
 		},
 		{
 			name: "start-tls",
 			conf: &ClientConfig{
-				Certificate: tdNonTLS.Cert(),
-				URLs:        []string{fmt.Sprintf("ldap://localhost:%d", tdNonTLS.Port())},
-				StartTLS:    true,
+				Certificates: []string{tdNonTLS.Cert()},
+				URLs:         []string{fmt.Sprintf("ldap://localhost:%d", tdNonTLS.Port())},
+				StartTLS:     true,
 			},
 		},
 	}
@@ -276,9 +441,8 @@ func TestClient_connect(t *testing.T) {
 			Name:  "test-logger",
 			Level: hclog.Error,
 		})
-		ln, err := net.Listen("tcp", ":"+"389")
-		ln.Close()
-		if err == nil {
+		if ln, err := net.Listen("tcp", ":"+"389"); err == nil {
+			ln.Close()
 			_ = testdirectory.Start(t, testdirectory.WithNoTLS(t), testdirectory.WithLogger(t, logger), testdirectory.WithPort(t, 389))
 			c, err := NewClient(testCtx, &ClientConfig{
 				URLs: []string{"ldap://127.0.0.1"},
@@ -287,6 +451,8 @@ func TestClient_connect(t *testing.T) {
 			err = c.connect(testCtx)
 			defer func() { c.Close(testCtx) }()
 			assert.NoError(err)
+		} else {
+			t.Logf("warning: failed to listen on port 389, err=%s", err)
 		}
 	})
 }
@@ -361,4 +527,16 @@ MIICUTCCAfugAwIBAgIBADANBgkqhkiG9w0BAQQFADBXMQswCQYDVQQGEwJDTjEL
 			require.NoError(err)
 		})
 	}
+}
+
+func freePort(t *testing.T) int {
+	t.Helper()
+	require := require.New(t)
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	require.NoError(err)
+
+	l, err := net.ListenTCP("tcp", addr)
+	require.NoError(err)
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port
 }

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package oidc
 
 import (
@@ -41,6 +44,17 @@ func TestNewProvider(t *testing.T) {
 		{
 			name:   "valid",
 			config: testNewConfig(t, clientID, clientSecret, redirect, tp),
+		},
+		{
+			name: "valid-WithProviderConfig",
+			config: testNewConfig(t, clientID, clientSecret, redirect, tp,
+				WithProviderConfig(&ProviderConfig{
+					AuthURL:     fmt.Sprintf("%s/authorize", tp.Addr()),
+					TokenURL:    fmt.Sprintf("%s/token", tp.Addr()),
+					JWKSURL:     fmt.Sprintf("%s/.well-known/jwks.json", tp.Addr()),
+					UserInfoURL: fmt.Sprintf("%s/userinfo", tp.Addr()),
+				}),
+			),
 		},
 		{
 			name:      "nil-config",
@@ -430,6 +444,27 @@ func TestProvider_AuthURL(t *testing.T) {
 			require.Equalf(tt.wantURL, gotURL, "Provider.AuthURL() = %v, want %v", gotURL, tt.wantURL)
 		})
 	}
+	t.Run("WithProviderConfig", func(t *testing.T) {
+		require := require.New(t)
+		p := testNewProvider(t, clientID, clientSecret, redirect, tp,
+			WithProviderConfig(&ProviderConfig{
+				AuthURL:     fmt.Sprintf("%s/authorize", tp.Addr()),
+				TokenURL:    fmt.Sprintf("%s/token", tp.Addr()),
+				JWKSURL:     fmt.Sprintf("%s/.well-known/jwks.json", tp.Addr()),
+				UserInfoURL: fmt.Sprintf("%s/userinfo", tp.Addr()),
+			}))
+		gotURL, err := p.AuthURL(ctx, validRequest)
+		require.NoError(err)
+		wantURL := fmt.Sprintf(
+			"%s/authorize?client_id=%s&nonce=%s&redirect_uri=%s&response_type=code&scope=openid&state=%s",
+			tp.Addr(),
+			clientID,
+			validRequest.Nonce(),
+			redirectEncoded,
+			validRequest.State(),
+		)
+		require.Equalf(wantURL, gotURL, "Provider.AuthURL() = %v, want %v", gotURL, wantURL)
+	})
 }
 
 func TestProvider_Exchange(t *testing.T) {
@@ -611,10 +646,38 @@ func TestProvider_Exchange(t *testing.T) {
 		tp.SetOmitIDTokens(false)
 		tp.SetExpectedAuthCode("valid-code")
 		tp.SetExpectedExpiry(-1 * time.Minute)
+		t.Cleanup(func() { tp.SetExpectedExpiry(1 * time.Minute) })
 		gotTk, err := p.Exchange(ctx, validRequest, validRequest.State(), "valid-code")
 		require.Error(err)
 		assert.Truef(errors.Is(err, ErrExpiredToken), "wanted \"%s\" but got \"%s\"", ErrExpiredToken, err)
 		assert.Empty(gotTk)
+	})
+	t.Run("WithProviderConfig", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+
+		p := testNewProvider(t, clientID, clientSecret, redirect, tp,
+			WithProviderConfig(&ProviderConfig{
+				AuthURL:     fmt.Sprintf("%s/authorize", tp.Addr()),
+				TokenURL:    fmt.Sprintf("%s/token", tp.Addr()),
+				JWKSURL:     fmt.Sprintf("%s/.well-known/jwks.json", tp.Addr()),
+				UserInfoURL: fmt.Sprintf("%s/userinfo", tp.Addr()),
+			}))
+		const authCode = "test-code"
+		tp.SetExpectedAuthCode(authCode)
+
+		validRequest, err := NewRequest(10*time.Second, redirect)
+		require.NoError(err)
+
+		// default to the request's nonce...
+		tp.SetExpectedAuthNonce(validRequest.Nonce())
+
+		gotTk, err := p.Exchange(ctx, validRequest, validRequest.State(), authCode)
+		require.NoError(err)
+		require.NotEmptyf(gotTk, "Provider.Exchange() = %v, wanted not nil", gotTk)
+		assert.NotEmptyf(gotTk.IDToken(), "gotTk.IDToken() = %v, wanted not empty", gotTk.IDToken())
+		assert.NotEmptyf(gotTk.AccessToken(), "gotTk.AccessToken() = %v, wanted not empty", gotTk.AccessToken())
+		assert.Truef(gotTk.Valid(), "gotTk.Valid() = %v, wanted true", gotTk.Valid())
+		assert.Truef(!gotTk.IsExpired(), "gotTk.Expired() = %v, wanted false", gotTk.IsExpired())
 	})
 }
 

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package oidc
 
 import (
@@ -204,19 +207,20 @@ type Req struct {
 var _ Request = (*Req)(nil)
 
 // NewRequest creates a new Request (*Req).
-//  Supports the options:
-//   * WithState
-//   * WithNonce
-//   * WithNow
-//   * WithAudiences
-//   * WithScopes
-//   * WithImplicit
-//   * WithPKCE
-//   * WithMaxAge
-//   * WithPrompts
-//   * WithDisplay
-//   * WithUILocales
-//   * WithClaims
+//
+//	Supports the options:
+//	 * WithState
+//	 * WithNonce
+//	 * WithNow
+//	 * WithAudiences
+//	 * WithScopes
+//	 * WithImplicit
+//	 * WithPKCE
+//	 * WithMaxAge
+//	 * WithPrompts
+//	 * WithDisplay
+//	 * WithUILocales
+//	 * WithClaims
 func NewRequest(expireIn time.Duration, redirectURL string, opt ...Option) (*Req, error) {
 	const op = "oidc.NewRequest"
 	opts := getReqOpts(opt...)
@@ -271,7 +275,7 @@ func NewRequest(expireIn time.Duration, redirectURL string, opt ...Option) (*Req
 	}
 	r.expiration = r.now().Add(expireIn)
 	if opts.withMaxAge != nil {
-		opts.withMaxAge.authAfter = r.now().Add(time.Duration(-opts.withMaxAge.seconds) * time.Second)
+		opts.withMaxAge.authAfter = r.now().Add(-1 * time.Duration(opts.withMaxAge.seconds) * time.Second)
 		r.withMaxAge = opts.withMaxAge
 	}
 	return r, nil
@@ -627,7 +631,6 @@ func WithACRValues(values ...string) Option {
 // Neither a max or min length is enforced when you use the WithState option.
 //
 // Option is valid for: Request
-//
 func WithState(s string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*reqOptions); ok {
@@ -660,7 +663,6 @@ func WithState(s string) Option {
 // Neither a max or min length is enforced when you use the WithNonce option.
 //
 // Option is valid for: Request
-//
 func WithNonce(n string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*reqOptions); ok {

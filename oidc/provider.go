@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package oidc
 
 import (
@@ -23,16 +26,17 @@ import (
 )
 
 // Provider provides integration with an OIDC provider.
-//  It's primary capabilities include:
-//   * Kicking off a user authentication via either the authorization code flow
-//     (with optional PKCE) or implicit flow via the URL from p.AuthURL(...)
 //
-//   * The authorization code flow (with optional PKCE) by exchanging an auth
-//     code for tokens in p.Exchange(...)
+//	It's primary capabilities include:
+//	 * Kicking off a user authentication via either the authorization code flow
+//	   (with optional PKCE) or implicit flow via the URL from p.AuthURL(...)
 //
-//   * Verifying an id_token issued by a provider with p.VerifyIDToken(...)
+//	 * The authorization code flow (with optional PKCE) by exchanging an auth
+//	   code for tokens in p.Exchange(...)
 //
-//   * Retrieving a user's OAuth claims with p.UserInfo(...)
+//	 * Verifying an id_token issued by a provider with p.VerifyIDToken(...)
+//
+//	 * Retrieving a user's OAuth claims with p.UserInfo(...)
 type Provider struct {
 	config   *Config
 	provider *oidc.Provider
@@ -82,15 +86,32 @@ func NewProvider(c *Config) (*Provider, error) {
 		return nil, fmt.Errorf("%s: unable to create http client: %w", op, err)
 	}
 
-	provider, err := oidc.NewProvider(oidcCtx, c.Issuer) // makes http req to issuer for discovery
-	if err != nil {
-		p.Done() // release the backgroundCtxCancel resources
-		// we don't know what's causing the problem, so we won't classify the
-		// error with a Kind
-		return nil, fmt.Errorf("%s: unable to create provider: %w", op, err)
-	}
-	p.provider = provider
+	switch {
+	case c.ProviderConfig != nil:
+		convertedAlgs := make([]string, len(c.SupportedSigningAlgs))
+		for _, alg := range c.SupportedSigningAlgs {
+			convertedAlgs = append(convertedAlgs, string(alg))
+		}
+		cfg := oidc.ProviderConfig{
+			IssuerURL:   c.Issuer,
+			AuthURL:     c.ProviderConfig.AuthURL,
+			JWKSURL:     c.ProviderConfig.JWKSURL,
+			TokenURL:    c.ProviderConfig.TokenURL,
+			UserInfoURL: c.ProviderConfig.UserInfoURL,
+			Algorithms:  convertedAlgs,
+		}
+		p.provider = cfg.NewProvider(oidcCtx)
 
+	default:
+		provider, err := oidc.NewProvider(oidcCtx, c.Issuer) // makes http req to issuer for discovery
+		if err != nil {
+			p.Done() // release the backgroundCtxCancel resources
+			// we don't know what's causing the problem, so we won't classify the
+			// error with a Kind
+			return nil, fmt.Errorf("%s: unable to create provider: %w", op, err)
+		}
+		p.provider = provider
+	}
 	return p, nil
 }
 
@@ -324,11 +345,11 @@ func (p *Provider) Exchange(ctx context.Context, oidcRequest Request, authorizat
 // responses are not).  The WithAudiences option is supported to specify
 // optional audiences to verify when the aud claim is present in the response.
 //
-//  It verifies:
-//   * sub (sub) is required and must match
-//   * issuer (iss) - if the iss claim is included in returned claims
-//   * audiences (aud) - if the aud claim is included in returned claims and
-//     WithAudiences option is provided.
+//	It verifies:
+//	 * sub (sub) is required and must match
+//	 * issuer (iss) - if the iss claim is included in returned claims
+//	 * audiences (aud) - if the aud claim is included in returned claims and
+//	   WithAudiences option is provided.
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse
 func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource, validSubject string, claims interface{}, opt ...Option) error {
@@ -419,23 +440,24 @@ func getUserInfoOpts(opt ...Option) userInfoOptions {
 }
 
 // VerifyIDToken will verify the inbound IDToken and return its claims.
-//  It verifies:
-//   * signature (including if a supported signing algorithm was used)
-//   * issuer (iss)
-//   * expiration (exp)
-//   * issued at (iat) (with a leeway of 1 min)
-//   * not before (nbf) (with a leeway of 1 min)
-//   * nonce (nonce)
-//   * audience (aud) contains all audiences required from the provider's config
-//   * when there are multiple audiences (aud), then one of them must equal
-//     the client_id
-//   * when present, the authorized party (azp) must equal the client id
-//   * when there are multiple audiences (aud), then the authorized party (azp)
-//     must equal the client id
-//   * when there is a single audience (aud) and it is not equal to the client
-//     id, then the authorized party (azp) must equal the client id
-//   * when max_age was requested, the auth_time claim is verified (with a leeway
-//     of 1 min)
+//
+//	It verifies:
+//	 * signature (including if a supported signing algorithm was used)
+//	 * issuer (iss)
+//	 * expiration (exp)
+//	 * issued at (iat) (with a leeway of 1 min)
+//	 * not before (nbf) (with a leeway of 1 min)
+//	 * nonce (nonce)
+//	 * audience (aud) contains all audiences required from the provider's config
+//	 * when there are multiple audiences (aud), then one of them must equal
+//	   the client_id
+//	 * when present, the authorized party (azp) must equal the client id
+//	 * when there are multiple audiences (aud), then the authorized party (azp)
+//	   must equal the client id
+//	 * when there is a single audience (aud) and it is not equal to the client
+//	   id, then the authorized party (azp) must equal the client id
+//	 * when max_age was requested, the auth_time claim is verified (with a leeway
+//	   of 1 min)
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
 func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, oidcRequest Request, opt ...Option) (map[string]interface{}, error) {
@@ -534,7 +556,7 @@ func (p *Provider) VerifyIDToken(ctx context.Context, t IDToken, oidcRequest Req
 		}
 		authTime := time.Unix(int64(atClaim), 0)
 		if !authTime.Add(leeway).After(authAfter) {
-			return nil, fmt.Errorf("%s: auth_time (%s) is beyond max age (%d): %w", op, authTime, secs, ErrExpiredAuthTime)
+			return nil, fmt.Errorf("%s: auth_time (%s) is beyond max age (%d / %s): %w", op, authTime, secs, authAfter, ErrExpiredAuthTime)
 		}
 	}
 

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package oidc
 
 import (
@@ -50,11 +53,12 @@ func TestNewConfig(t *testing.T) {
 		opt                 []Option
 	}
 	tests := []struct {
-		name      string
-		args      args
-		want      *Config
-		wantErr   bool
-		wantIsErr error
+		name            string
+		args            args
+		want            *Config
+		wantErr         bool
+		wantIsErr       error
+		wantErrContains string
 	}{
 		{
 			name: "valid-with-all-valid-opts",
@@ -69,6 +73,12 @@ func TestNewConfig(t *testing.T) {
 					WithScopes("email", "profile"),
 					WithProviderCA(testCaPem),
 					WithNow(testNow),
+					WithProviderConfig(&ProviderConfig{
+						AuthURL:     "https://auth-endpoint",
+						JWKSURL:     "https://jwks-endpoint",
+						TokenURL:    "https://token-endpoint",
+						UserInfoURL: "https://userinfo-endpoint",
+					}),
 				},
 			},
 			want: &Config{
@@ -85,7 +95,89 @@ func TestNewConfig(t *testing.T) {
 					"http://redirect_url_two",
 					"http://redirect_url_three",
 				},
+				ProviderConfig: &ProviderConfig{
+					AuthURL:     "https://auth-endpoint",
+					JWKSURL:     "https://jwks-endpoint",
+					TokenURL:    "https://token-endpoint",
+					UserInfoURL: "https://userinfo-endpoint",
+				},
 			},
+		},
+		{
+			name: "missing-provider-config-auth-url",
+			args: args{
+				issuer:       "http://your_issuer/",
+				clientID:     "your_client_id",
+				clientSecret: "your_client_secret",
+				supported:    []Alg{RS512},
+				opt: []Option{
+					WithProviderConfig(&ProviderConfig{
+						JWKSURL:     "https://jwks-endpoint",
+						TokenURL:    "https://token-endpoint",
+						UserInfoURL: "https://userinfo-endpoint",
+					}),
+				},
+			},
+			wantErr:         true,
+			wantIsErr:       ErrInvalidParameter,
+			wantErrContains: "missing AuthURL",
+		},
+		{
+			name: "missing-provider-config-jwks-url",
+			args: args{
+				issuer:       "http://your_issuer/",
+				clientID:     "your_client_id",
+				clientSecret: "your_client_secret",
+				supported:    []Alg{RS512},
+				opt: []Option{
+					WithProviderConfig(&ProviderConfig{
+						AuthURL:     "https://auth-endpoint",
+						TokenURL:    "https://token-endpoint",
+						UserInfoURL: "https://userinfo-endpoint",
+					}),
+				},
+			},
+			wantErr:         true,
+			wantIsErr:       ErrInvalidParameter,
+			wantErrContains: "missing JWKSURL",
+		},
+		{
+			name: "missing-provider-config-token-url",
+			args: args{
+				issuer:       "http://your_issuer/",
+				clientID:     "your_client_id",
+				clientSecret: "your_client_secret",
+				supported:    []Alg{RS512},
+				opt: []Option{
+					WithProviderConfig(&ProviderConfig{
+						AuthURL:     "https://auth-endpoint",
+						JWKSURL:     "https://jwks-endpoint",
+						UserInfoURL: "https://userinfo-endpoint",
+					}),
+				},
+			},
+			wantErr:         true,
+			wantIsErr:       ErrInvalidParameter,
+			wantErrContains: "missing TokenURL",
+		},
+		{
+			name: "missing-provider-config-userinfo-url",
+			args: args{
+				issuer:       "http://your_issuer/",
+				clientID:     "your_client_id",
+				clientSecret: "your_client_secret",
+				supported:    []Alg{RS512},
+				opt: []Option{
+					WithProviderConfig(&ProviderConfig{
+						AuthURL:  "https://auth-endpoint",
+						JWKSURL:  "https://jwks-endpoint",
+						TokenURL: "https://token-endpoint",
+					}),
+				},
+			},
+			wantErr:         true,
+			wantIsErr:       ErrInvalidParameter,
+			wantErrContains: "missing UserInfoURL",
 		},
 		{
 			name: "valid-empty-redirect",
@@ -210,6 +302,9 @@ func TestNewConfig(t *testing.T) {
 			if tt.wantErr {
 				require.Error(err)
 				assert.Truef(errors.Is(err, tt.wantIsErr), "wanted \"%s\" but got \"%s\"", tt.wantIsErr, err)
+				if tt.wantErrContains != "" {
+					assert.Contains(err.Error(), tt.wantErrContains)
+				}
 				return
 			}
 			require.NoError(err)
@@ -228,7 +323,7 @@ func TestNewConfig(t *testing.T) {
 }
 
 func TestConfig_Validate(t *testing.T) {
-	// Validate testing is covered by TestNewConfig() but we do have just more
+	// Validate testing is covered by TestNewConfig() but we do have just one
 	// more test to add here.
 	t.Parallel()
 	t.Run("nil-config", func(t *testing.T) {
@@ -353,6 +448,12 @@ func TestConfig_Hash(t *testing.T) {
 				WithAudiences("alice.com", "bob.com"),
 				WithProviderCA(pem),
 				WithNow(time.Now),
+				WithProviderConfig(&ProviderConfig{
+					AuthURL:     "https://auth-endpoint",
+					JWKSURL:     "https://jwks-endpoint",
+					TokenURL:    "https://token-endpoint",
+					UserInfoURL: "https://userinfo-endpoint",
+				}),
 			),
 			c2: newCfg(
 				"https://www.alice.com",
@@ -363,6 +464,12 @@ func TestConfig_Hash(t *testing.T) {
 				WithAudiences("bob.com", "alice.com"),
 				WithProviderCA(pem),
 				WithNow(time.Now),
+				WithProviderConfig(&ProviderConfig{
+					AuthURL:     "https://auth-endpoint",
+					JWKSURL:     "https://jwks-endpoint",
+					TokenURL:    "https://token-endpoint",
+					UserInfoURL: "https://userinfo-endpoint",
+				}),
 			),
 			wantEqual: true,
 		},
@@ -579,6 +686,150 @@ func TestConfig_Hash(t *testing.T) {
 				WithProviderCA(pem),
 				WithNow(func() time.Time {
 					return time.Now().Add(-1 * time.Minute)
+				}),
+			),
+			wantEqual: false,
+		},
+		{
+			name: "diff-provider-config-auth-url",
+			c1: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+				WithProviderConfig(&ProviderConfig{
+					AuthURL:     "https://diff-auth-endpoint",
+					JWKSURL:     "https://jwks-endpoint",
+					TokenURL:    "https://token-endpoint",
+					UserInfoURL: "https://userinfo-endpoint",
+				}),
+			),
+			c2: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+				WithProviderConfig(&ProviderConfig{
+					AuthURL:     "https://auth-endpoint",
+					JWKSURL:     "https://jwks-endpoint",
+					TokenURL:    "https://token-endpoint",
+					UserInfoURL: "https://userinfo-endpoint",
+				}),
+			),
+			wantEqual: false,
+		},
+		{
+			name: "diff-provider-config-jwks-url",
+			c1: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+				WithProviderConfig(&ProviderConfig{
+					AuthURL:     "https://auth-endpoint",
+					JWKSURL:     "https://diff-jwks-endpoint",
+					TokenURL:    "https://token-endpoint",
+					UserInfoURL: "https://userinfo-endpoint",
+				}),
+			),
+			c2: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+				WithProviderConfig(&ProviderConfig{
+					AuthURL:     "https://auth-endpoint",
+					JWKSURL:     "https://jwks-endpoint",
+					TokenURL:    "https://token-endpoint",
+					UserInfoURL: "https://userinfo-endpoint",
+				}),
+			),
+			wantEqual: false,
+		},
+		{
+			name: "diff-provider-config-token-url",
+			c1: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+				WithProviderConfig(&ProviderConfig{
+					AuthURL:     "https://auth-endpoint",
+					JWKSURL:     "https://jwks-endpoint",
+					TokenURL:    "https://diff-token-endpoint",
+					UserInfoURL: "https://userinfo-endpoint",
+				}),
+			),
+			c2: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+				WithProviderConfig(&ProviderConfig{
+					AuthURL:     "https://auth-endpoint",
+					JWKSURL:     "https://jwks-endpoint",
+					TokenURL:    "https://token-endpoint",
+					UserInfoURL: "https://userinfo-endpoint",
+				}),
+			),
+			wantEqual: false,
+		},
+		{
+			name: "diff-provider-config-userinfo-url",
+			c1: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+				WithProviderConfig(&ProviderConfig{
+					AuthURL:     "https://auth-endpoint",
+					JWKSURL:     "https://jwks-endpoint",
+					TokenURL:    "https://token-endpoint",
+					UserInfoURL: "https://diff-userinfo-endpoint",
+				}),
+			),
+			c2: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+				WithProviderConfig(&ProviderConfig{
+					AuthURL:     "https://auth-endpoint",
+					JWKSURL:     "https://jwks-endpoint",
+					TokenURL:    "https://token-endpoint",
+					UserInfoURL: "https://userinfo-endpoint",
 				}),
 			),
 			wantEqual: false,

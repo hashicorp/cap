@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 /*
 Package jwt provides signature verification and claims set validation for JSON Web Tokens (JWT)
 of the JSON Web Signature (JWS) form.

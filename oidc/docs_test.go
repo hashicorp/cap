@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package oidc_test
 
 import (
@@ -92,7 +95,32 @@ func ExampleNewConfig() {
 	fmt.Println(pc)
 
 	// Output:
-	// &{your_client_id [REDACTED: client secret] [openid] http://your_issuer/ [RS256] [http://your_redirect_url/callback] []  <nil>}
+	// &{your_client_id [REDACTED: client secret] [openid] http://your_issuer/ [RS256] [http://your_redirect_url/callback] []  <nil> <nil>}
+}
+
+func ExampleWithProviderConfig() {
+	// Create a new Config
+	pc, err := oidc.NewConfig(
+		"https://your_issuer/",
+		"your_client_id",
+		"your_client_secret",
+		[]oidc.Alg{oidc.RS256},
+		[]string{"https://your_redirect_url/callback"},
+		oidc.WithProviderConfig(&oidc.ProviderConfig{
+			AuthURL:     "https://your_issuer/authorize",
+			TokenURL:    "https://your_issuer/token",
+			JWKSURL:     "https://your_issuer/.well-known/jwks.json",
+			UserInfoURL: "https://your_issuer/userinfo",
+		}),
+	)
+	if err != nil {
+		// handle error
+	}
+	val, _ := json.Marshal(pc)
+	fmt.Println(string(val))
+
+	// Output:
+	// {"ClientID":"your_client_id","ClientSecret":"[REDACTED: client secret]","Scopes":["openid"],"Issuer":"https://your_issuer/","SupportedSigningAlgs":["RS256"],"AllowedRedirectURLs":["https://your_redirect_url/callback"],"Audiences":null,"ProviderCA":"","ProviderConfig":{"AuthURL":"https://your_issuer/authorize","TokenURL":"https://your_issuer/token","UserInfoURL":"https://your_issuer/userinfo","JWKSURL":"https://your_issuer/.well-known/jwks.json"}}
 }
 
 func ExampleNewProvider() {

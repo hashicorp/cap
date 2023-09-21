@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package ldap
 
 // Option defines a common functional options type which can be used in a
@@ -5,14 +8,15 @@ package ldap
 type Option func(interface{})
 
 type configOptions struct {
-	withURLs          []string
-	withInsecureTLS   bool
-	withTLSMinVersion string
-	withTLSMaxVersion string
-	withCertificate   string
-	withClientTLSCert string
-	withClientTLSKey  string
-	withGroups        bool
+	withURLs           []string
+	withInsecureTLS    bool
+	withTLSMinVersion  string
+	withTLSMaxVersion  string
+	withCertificates   []string
+	withClientTLSCert  string
+	withClientTLSKey   string
+	withGroups         bool
+	withUserAttributes bool
 }
 
 func configDefaults() configOptions {
@@ -58,6 +62,19 @@ func WithGroups() Option {
 	}
 }
 
+// WithUserAttributes requests that authenticating user's DN and attributes be
+// included in the response. Note: the default password attribute for both
+// openLDAP (userPassword) and AD (unicodePwd) will always be excluded.  To
+// exclude additional attributes see: Config.ExcludedUserAttributes.
+func WithUserAttributes() Option {
+	return func(o interface{}) {
+		switch v := o.(type) {
+		case *configOptions:
+			v.withUserAttributes = true
+		}
+	}
+}
+
 func withTLSMinVersion(version string) Option {
 	return func(o interface{}) {
 		switch v := o.(type) {
@@ -85,11 +102,11 @@ func withInsecureTLS(withInsecure bool) Option {
 	}
 }
 
-func withCertificate(cert string) Option {
+func withCertificates(cert ...string) Option {
 	return func(o interface{}) {
 		switch v := o.(type) {
 		case *configOptions:
-			v.withCertificate = cert
+			v.withCertificates = cert
 		}
 	}
 }
