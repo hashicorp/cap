@@ -152,7 +152,7 @@ type ConfirmationMethod string
 const (
 	// ConfirmationMethodHolderOfKey indicates that the key holder itself can confirm
 	// itself as the subject. If this method is given, the SubjectConfirmationData MUST
-	// contain one or more KeyInfo elements, where KeyInfo indentifies a cryptographic key.
+	// contain one or more KeyInfo elements, where KeyInfo identifies a cryptographic key.
 	//
 	// See 3.1 http://docs.oasis-open.org/security/saml/v2.0/saml-profiles-2.0-os.pdf
 	ConfirmationMethodHolderOfKey ConfirmationMethod = "urn:oasis:names:tc:SAML:2.0:cm:holder-of-key"
