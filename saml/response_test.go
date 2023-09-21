@@ -192,9 +192,9 @@ func TestServiceProvider_ParseResponse(t *testing.T) {
 			assert.Equal(testRequestId, got.InResponseTo)
 			assert.Equal("http://localhost:8000/saml/acs", got.Destination)
 			assert.Equal("urn:oasis:names:tc:SAML:2.0:status:Success", got.Status.StatusCode.Value)
-			assert.Equal(metadataURL, got.Issuer.Value)
-			assert.Equal("msmith@samltest.id", got.Assertions[0].Subject.NameID.Value)
-			assert.Equal("_35ea90b711d6f385345f0dbdd7d0ed5b", got.Assertions[0].ID)
+			assert.Equal(metadataURL, got.Issuer())
+			assert.Equal("msmith@samltest.id", got.Assertions()[0].Subject.NameID.Value)
+			assert.Equal("_35ea90b711d6f385345f0dbdd7d0ed5b", got.Assertions()[0].ID)
 		})
 	}
 }
