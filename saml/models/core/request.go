@@ -46,10 +46,11 @@ type AuthnRequest struct {
 type Subject struct {
 	XMLName xml.Name `xml:"urn:oasis:names:tc:SAML:2.0:assertion Subject"`
 
-	BaseID              *BaseID
-	NameID              *NameID
-	EncryptionID        string
 	SubjectConfirmation []*SubjectConfirmation
+
+	BaseID      *BaseID      // optional
+	NameID      *NameID      // optional
+	EncryptedID *EncryptedID // optional
 }
 
 // See 2.4.1.1 http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
