@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <form method="POST" action="{{.Destination}}" id="SAMLRequestForm">
+    <input type="hidden" name="SAMLRequest" value="{{.SAMLRequest}}"/>
+    <input type="hidden" name="RelayState" value="{{.RelayState}}"/>
+    <input id="SubmitSAMLRequest" type="submit"/>
+  </form>
+  <script>document.getElementById('SubmitSAMLRequest').style.visibility="hidden";document.getElementById('SAMLRequestForm').submit();</script>
+</body>
+</html>
