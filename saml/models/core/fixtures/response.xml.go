@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package fixtures
 
 var ResponseXML = `<?xml version="1.0" encoding="UTF-8"?>
