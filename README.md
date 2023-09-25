@@ -222,6 +222,8 @@ if result.Success {
 
 ### [`saml package`](./saml)
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/hashicorp/cap/saml.svg)](https://pkg.go.dev/github.com/hashicorp/cap/saml)
+
 A package for writing clients that integrate with SAML Providers.
 
 The SAML library orients mainly on the implementation profile for
