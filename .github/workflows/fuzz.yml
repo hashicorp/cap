@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
         # commit hash == v1.2.0
-      - uses: jidicula/go-fuzz-action@4f24eed45b25214f31a9fe035ca68ea2c88c6a13 # TSCCR: no entry for action: "jidicula/go-fuzz-action"
+      - uses: jidicula/go-fuzz-action@4f24eed45b25214f31a9fe035ca68ea2c88c6a13 # v1.2.0
         with:
           fuzz-time: 30s
           fuzz-regexp: Fuzz_EscapeValue
