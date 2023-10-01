@@ -179,7 +179,7 @@ func (ks *staticKeySet) VerifySignature(_ context.Context, token string) (map[st
 // data must be of PEM-encoded x509 certificate or PKIX public key forms. It returns
 // an *rsa.PublicKey or *ecdsa.PublicKey.
 func ParsePublicKeyPEM(data []byte) (crypto.PublicKey, error) {
-	block, data := pem.Decode(data)
+	block, _ := pem.Decode(data)
 	if block != nil {
 		var rawKey interface{}
 		var err error
