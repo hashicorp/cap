@@ -35,7 +35,7 @@ func Test_EscapeValue(t *testing.T) {
 
 // Fuzz_EscapeValue is only focused on finding panics
 func Fuzz_EscapeValue(f *testing.F) {
-	for tc, _ := range testcases {
+	for tc := range testcases {
 		f.Add(tc)
 	}
 	f.Fuzz(func(t *testing.T, s string) {

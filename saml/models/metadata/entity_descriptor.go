@@ -152,20 +152,17 @@ type AuthnAuthorityDescriptor struct {
 	NameIDFormats             []core.NameIDFormat
 }
 
-type PDPDescriptor struct {
-}
+type PDPDescriptor struct{}
 
 // AttributeAuthorityDescriptor is a compatibiity requirement
 // for supporting legacy or other SPs that rely on queries for
 // attributes.
-type AttributeAuthorityDescriptor struct {
-}
+type AttributeAuthorityDescriptor struct{}
 
 // AffiliationDescriptor represents a group of other
-// entitites, such as related service providers that
+// entities, such as related service providers that
 // share a persistent NameID.
-type AffiliationDescriptor struct {
-}
+type AffiliationDescriptor struct{}
 
 // X509Data contains one ore more identifiers of keys or X509 certifactes.
 // See https://www.w3.org/TR/xmldsig-core1/#sec-X509Data

@@ -5,7 +5,6 @@
 oidc is a package for writing clients that integrate with OIDC Providers using
 OIDC flows.
 
-
 Primary types provided by the package:
 
 * Request: represents one OIDC authentication flow for a user.  It contains the
@@ -26,13 +25,13 @@ signing algorithms, additional scopes requested, etc)
 capabilities like: generating an auth URL, exchanging codes for tokens,
 verifying tokens, making user info requests, etc.
 
-The oidc.callback package
+# The oidc.callback package
 
 The callback package includes handlers (http.HandlerFunc) which can be used
 for the callback leg an OIDC flow. Callback handlers for both the authorization
 code flow (with optional PKCE) and the implicit flow are provided.
 
-Example apps
+# Example apps
 
 Complete concise example solutions:
 
@@ -41,6 +40,5 @@ https://github.com/hashicorp/cap/tree/main/oidc/examples/cli/
 
 * OIDC authentication SPA:
 https://github.com/hashicorp/cap/tree/main/oidc/examples/spa/
-
 */
 package oidc

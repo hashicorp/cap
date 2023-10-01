@@ -108,7 +108,6 @@ func TestRequest_IsExpired(t *testing.T) {
 		require.NoError(err)
 		assert.True(oidcRequest.IsExpired())
 	})
-
 }
 
 func Test_WithImplicit(t *testing.T) {

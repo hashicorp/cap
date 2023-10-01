@@ -79,7 +79,6 @@ func TestClient_renderUserSearchFilter(t *testing.T) {
 			assert.Equal(tc.want, f)
 		})
 	}
-
 }
 
 func TestClient_NewClient(t *testing.T) {

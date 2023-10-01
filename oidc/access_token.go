@@ -5,7 +5,7 @@ package oidc
 
 import "encoding/json"
 
-//  AccessToken is an oauth access_token.
+// AccessToken is an oauth access_token.
 type AccessToken string
 
 // RedactedAccessToken is the redacted string or json for an oauth access_token.

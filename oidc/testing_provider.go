@@ -56,88 +56,91 @@ var (
 // Once you've started a TestProvider http server with StartTestProvider(...),
 // the following test endpoints are supported:
 //
-//    * GET /.well-known/openid-configuration    OIDC Discovery
+//   - GET /.well-known/openid-configuration    OIDC Discovery
 //
-//    * GET or POST  /authorize                  OIDC authorization supporting both
-//                                               the authorization code flow (with
-//                                               optional PKCE) and the implicit
-//                                               flow with form_post.
+//   - GET or POST  /authorize                  OIDC authorization supporting both
+//     the authorization code flow (with
+//     optional PKCE) and the implicit
+//     flow with form_post.
 //
-//    * POST /token                              OIDC token
+//   - POST /token                              OIDC token
 //
-//    * GET /userinfo                            OAuth UserInfo
+//   - GET /userinfo                            OAuth UserInfo
 //
-//    * GET /.well-known/jwks.json               JWKs used to verify issued JWT tokens
+//   - GET /.well-known/jwks.json               JWKs used to verify issued JWT tokens
 //
-//  Making requests to these endpoints are facilitated by
-//    * TestProvider.HTTPClient which returns an http.Client for making requests.
-//    * TestProvider.CACert which the pem-encoded CA certificate used by the HTTPS server.
+//     Making requests to these endpoints are facilitated by
+//
+//   - TestProvider.HTTPClient which returns an http.Client for making requests.
+//
+//   - TestProvider.CACert which the pem-encoded CA certificate used by the HTTPS server.
 //
 // Runtime Configuration:
-//  * Issuer: Addr() returns the the current base URL for the test provider's
-//  running webserver, which can be used as an OIDC Issuer for discovery and
-//  is also used for the iss claim when issuing JWTs.
 //
-//  * Relying Party ClientID/ClientSecret: SetClientCreds(...) updates the
-//  creds and they are empty by default.
+//   - Issuer: Addr() returns the the current base URL for the test provider's
+//     running web server, which can be used as an OIDC Issuer for discovery and
+//     is also used for the iss claim when issuing JWTs.
 //
-//  * Now: SetNowFunc(...) updates the provider's "now" function and time.Now
-//  is the default.
+//   - Relying Party ClientID/ClientSecret: SetClientCreds(...) updates the
+//     creds and they are empty by default.
 //
-//  * Subject: SetExpectedSubject(sub string) configures the expected subject for
-//    any JWTs issued by the provider (the default is "alice@example.com")
+//   - Now: SetNowFunc(...) updates the provider's "now" function and time.Now
+//     is the default.
 //
-//  * Subject Passwords: SetSubjectInfo(...) configures a subject/password
-//    dictionary. If configured, then an interactive Login form is presented by
-//    the /authorize endpoint and the TestProvider becomes an interactive test
-//    provider using the provided subject/password dictionary.
+//   - Subject: SetExpectedSubject(sub string) configures the expected subject for
+//     any JWTs issued by the provider (the default is "alice@example.com")
 //
-//  * Expiry: SetExpectedExpiry(exp time.Duration) updates the expiry and
-//    now + 5 * time.Second is the default.
+//   - Subject Passwords: SetSubjectInfo(...) configures a subject/password
+//     dictionary. If configured, then an interactive Login form is presented by
+//     the /authorize endpoint and the TestProvider becomes an interactive test
+//     provider using the provided subject/password dictionary.
 //
-//  * Signing keys: SetSigningKeys(...) updates the keys and a ECDSA P-256 pair
-//  of priv/pub keys are the default with a signing algorithm of ES256
+//   - Expiry: SetExpectedExpiry(exp time.Duration) updates the expiry and
+//     now + 5 * time.Second is the default.
 //
-//  * Authorization Code: SetExpectedAuthCode(...) updates the auth code
-//  required by the /authorize endpoint and the code is empty by default.
+//   - Signing keys: SetSigningKeys(...) updates the keys and a ECDSA P-256 pair
+//     of priv/pub keys are the default with a signing algorithm of ES256
 //
-//  * Authorization Nonce: SetExpectedAuthNonce(...) updates the nonce required
-//  by the /authorize endpont and the nonce is empty by default.
+//   - Authorization Code: SetExpectedAuthCode(...) updates the auth code
+//     required by the /authorize endpoint and the code is empty by default.
 //
-//  * Allowed RedirectURIs: SetAllowedRedirectURIs(...) updates the allowed
-//  redirect URIs and "https://example.com" is the default.
+//   - Authorization Nonce: SetExpectedAuthNonce(...) updates the nonce required
+//     by the /authorize endpoint and the nonce is empty by default.
 //
-//  * Custom Claims: SetCustomClaims(...) updates custom claims added to JWTs issued
-//  and the custom claims are empty by default.
+//   - Allowed RedirectURIs: SetAllowedRedirectURIs(...) updates the allowed
+//     redirect URIs and "https://example.com" is the default.
 //
-//  * Audiences: SetCustomAudience(...) updates the audience claim of JWTs issued
-//  and the ClientID is the default.
+//   - Custom Claims: SetCustomClaims(...) updates custom claims added to JWTs issued
+//     and the custom claims are empty by default.
 //
-//  * Authentication Time (auth_time): SetOmitAuthTimeClaim(...) allows you to
-//  turn off/on the inclusion of an auth_time claim in issued JWTs and the claim
-//  is included by default.
+//   - Audiences: SetCustomAudience(...) updates the audience claim of JWTs issued
+//     and the ClientID is the default.
 //
-//  * Issuing id_tokens: SetOmitIDTokens(...) allows you to turn off/on the issuing of
-//  id_tokens from the /token endpoint.  id_tokens are issued by default.
+//   - Authentication Time (auth_time): SetOmitAuthTimeClaim(...) allows you to
+//     turn off/on the inclusion of an auth_time claim in issued JWTs and the claim
+//     is included by default.
 //
-//  * Issuing access_tokens: SetOmitAccessTokens(...) allows you to turn off/on
-//  the issuing of access_tokens from the /token endpoint. access_tokens are issued
-//  by default.
+//   - Issuing id_tokens: SetOmitIDTokens(...) allows you to turn off/on the issuing of
+//     id_tokens from the /token endpoint.  id_tokens are issued by default.
 //
-//  * Authorization State: SetExpectedState sets the value for the state parameter
-//  returned from the /authorized endpoint
+//   - Issuing access_tokens: SetOmitAccessTokens(...) allows you to turn off/on
+//     the issuing of access_tokens from the /token endpoint. access_tokens are issued
+//     by default.
 //
-//  * Token Responses: SetDisableToken disables the /token endpoint, causing
-//  it to return a 401 http status.
+//   - Authorization State: SetExpectedState sets the value for the state parameter
+//     returned from the /authorized endpoint
 //
-//  * Implicit Flow Responses: SetDisableImplicit disables implicit flow responses,
-//  causing them to return a 401 http status.
+//   - Token Responses: SetDisableToken disables the /token endpoint, causing
+//     it to return a 401 http status.
 //
-//  * PKCE verifier: SetPKCEVerifier(oidc.CodeVerifier) sets the PKCE code_verifier
-//  and PKCEVerifier() returns the current verifier.
+//   - Implicit Flow Responses: SetDisableImplicit disables implicit flow responses,
+//     causing them to return a 401 http status.
 //
-//  * UserInfo: SetUserInfoReply sets the UserInfo endpoint response and
-//  UserInfoReply() returns the current response.
+//   - PKCE verifier: SetPKCEVerifier(oidc.CodeVerifier) sets the PKCE code_verifier
+//     and PKCEVerifier() returns the current verifier.
+//
+//   - UserInfo: SetUserInfoReply sets the UserInfo endpoint response and
+//     UserInfoReply() returns the current response.
 type TestProvider struct {
 	httpServer *httptest.Server
 	caCert     string
@@ -351,7 +354,6 @@ func getTestProviderOpts(t TestingT, opt ...Option) testProviderOptions {
 }
 
 // withTestSubject provides the option to provide a subject
-//
 func withTestSubject(s string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*testProviderOptions); ok {
@@ -361,7 +363,6 @@ func withTestSubject(s string) Option {
 }
 
 // withTestNonce provides the option to provide a nonce
-//
 func withTestNonce(n string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*testProviderOptions); ok {

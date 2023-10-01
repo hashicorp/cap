@@ -221,7 +221,7 @@ func Test_ServiceProvider_FetchMetadata_Cache(t *testing.T) {
 			if tt.expectErrorOnRefresh {
 				r.Error(err)
 				return
-			} 
+			}
 			r.NoError(err)
 			r.NotNil(got2)
 
