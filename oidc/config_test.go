@@ -852,7 +852,6 @@ func TestConfig_Hash(t *testing.T) {
 			default:
 				assert.NotEqual(got1, got2)
 			}
-
 		})
 	}
 }

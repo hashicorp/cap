@@ -295,7 +295,7 @@ func (p *Provider) Exchange(ctx context.Context, oidcRequest Request, authorizat
 	}
 	// Add the "openid" scope, which is a required scope for oidc flows
 	scopes = append([]string{oidc.ScopeOpenID}, scopes...)
-	var oauth2Config = oauth2.Config{
+	oauth2Config := oauth2.Config{
 		ClientID:     p.config.ClientID,
 		ClientSecret: string(p.config.ClientSecret),
 		RedirectURL:  oidcRequest.RedirectURL(),
@@ -664,7 +664,6 @@ func (p *Provider) HTTPClientContext(ctx context.Context) (context.Context, erro
 	c, err := p.HTTPClient()
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
-
 	}
 	// simple to implement as a wrapper for the coreos package
 	return oidc.ClientContext(ctx, c), nil

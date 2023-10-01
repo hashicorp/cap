@@ -269,7 +269,6 @@ func TestServiceProvider_ParseResponseCustomACS(t *testing.T) {
 			require.ErrorContains(t, err, c.err)
 		})
 	}
-
 }
 
 // From https://www.samltool.com/generic_sso_res.php

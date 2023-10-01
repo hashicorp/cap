@@ -28,7 +28,6 @@ import (
 // KeySet represents a set of keys that can be used to verify the signatures of JWTs.
 // A KeySet is expected to be backed by a set of local or remote keys.
 type KeySet interface {
-
 	// VerifySignature parses the given JWT, verifies its signature, and returns the claims in its payload.
 	// The given JWT must be of the JWS compact serialization form.
 	VerifySignature(ctx context.Context, token string) (claims map[string]interface{}, err error)

@@ -31,7 +31,7 @@ func IsWSL() (bool, error) {
 	isDocker := strings.Contains(strings.ToLower(string(cgroupData)), "/docker/")
 	isLxc := strings.Contains(strings.ToLower(string(cgroupData)), "/lxc/")
 	isMsLinux := strings.Contains(strings.ToLower(string(procData)), "microsoft")
-	
+
 	return isMsLinux && !(isDocker || isLxc), nil
 }
 

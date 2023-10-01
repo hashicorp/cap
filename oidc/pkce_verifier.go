@@ -26,7 +26,6 @@ const (
 //
 // See: https://tools.ietf.org/html/rfc7636#section-4.1
 type CodeVerifier interface {
-
 	// Verifier returns the code verifier (see:
 	// https://tools.ietf.org/html/rfc7636#section-4.1)
 	Verifier() string

@@ -33,7 +33,6 @@ func Test_WithNow(t *testing.T) {
 		testOpts := tokenDefaults()
 		testOpts.withNowFunc = testNow
 		testAssertEqualFunc(t, opts.withNowFunc, testNow, "now = %p,want %p", opts.withNowFunc, testNow)
-
 	})
 	t.Run("reqOptions", func(t *testing.T) {
 		opts := getReqOpts(WithNow(testNow))

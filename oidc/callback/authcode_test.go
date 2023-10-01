@@ -182,7 +182,6 @@ func Test_AuthCodeResponses(t *testing.T) {
 				return
 			}
 			assert.Equal("login successful", string(contents))
-
 		})
 	}
 }

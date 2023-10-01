@@ -25,7 +25,6 @@ func newRequestCache() *requestCache {
 	return &requestCache{
 		c: map[string]extendedRequest{},
 	}
-
 }
 
 // Read implements the callback.StateReader interface and will delete the state
@@ -63,7 +62,6 @@ func (rc *requestCache) SetToken(id string, t oidc.Token) error {
 		return nil
 	}
 	return fmt.Errorf("%s: %s not found", op, id)
-
 }
 
 func (rc *requestCache) Delete(id string) {
