@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/jonboulle/clockwork"
 
@@ -201,7 +202,7 @@ func (sp *ServiceProvider) CreateAuthnRequest(
 		ar.AssertionConsumerServiceURL = opts.assertionConsumerServiceURL
 	}
 
-	ar.IssueInstant = opts.clock.Now().UTC()
+	ar.IssueInstant = opts.clock.Now().Truncate(time.Microsecond).UTC()
 	ar.Destination = destination
 
 	ar.Issuer = &core.Issuer{}
