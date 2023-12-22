@@ -2,7 +2,21 @@
 
 Canonical reference for changes, improvements, and bugfixes for cap.
 
-## Next
+## 0.4.1
+
+### Bug fixes
+
+* SAML
+  * Truncate issue instant to microseconds to support Microsoft Entra ID enterprise applications (https://github.com/hashicorp/cap/pull/126)
+
+## 0.4.0
+
+### Features
+
+* SAML 
+  * Adds support for SAML authentication (https://github.com/hashicorp/cap/pull/99).
+
+### Improvements
 
 * LDAP
   * Add worker pool for LDAP token group lookups ([**PR**](https://github.com/hashicorp/cap/pull/98))
