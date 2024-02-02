@@ -18,8 +18,10 @@ import (
 	"github.com/hashicorp/cap/oidc"
 )
 
-var priv *rsa.PrivateKey
-var priv2 *rsa.PrivateKey
+var (
+	priv  *rsa.PrivateKey
+	priv2 *rsa.PrivateKey
+)
 
 func init() {
 	// Generate a key to sign JWTs with throughout most test cases.
