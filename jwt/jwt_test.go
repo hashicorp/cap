@@ -572,7 +572,7 @@ func TestValidator_Validate_Invalid_JWT(t *testing.T) {
 
 func TestNewValidator(t *testing.T) {
 	type args struct {
-		keySet func() KeySet
+		keySets func() []KeySet
 	}
 	tests := []struct {
 		name    string
@@ -582,27 +582,41 @@ func TestNewValidator(t *testing.T) {
 		{
 			name: "new validator with keySet",
 			args: args{
-				keySet: func() KeySet {
+				keySets: func() []KeySet {
 					ks, err := NewJSONWebKeySet(context.Background(),
 						"https://issuer.com/"+wellKnownJWKS, "")
 					require.NoError(t, err)
-					return ks
+					return []KeySet{ks}
 				},
 			},
 		},
 		{
 			name: "new validator with nil keySet",
 			args: args{
-				keySet: func() KeySet {
+				keySets: func() []KeySet {
 					return nil
 				},
 			},
 			wantErr: true,
 		},
+		{
+			name: "new validator with multiple keySets",
+			args: args{
+				keySets: func() []KeySet {
+					ks, err := NewJSONWebKeySet(context.Background(),
+						"https://issuer.com/"+wellKnownJWKS, "")
+					require.NoError(t, err)
+
+					ks2, err := NewJSONWebKeySet(context.Background(),
+						"https://issuer2.com/"+wellKnownJWKS, "")
+					return []KeySet{ks, ks2}
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewValidator(tt.args.keySet())
+			got, err := NewValidator(tt.args.keySets()...)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -613,8 +627,9 @@ func TestNewValidator(t *testing.T) {
 	}
 }
 
-// TestMultiValidator_Validate_Valid_JWT tests cases where a JWT is expected to be valid.
-func TestMultiValidator_Validate_Valid_JWT(t *testing.T) {
+// TestValidator_MultipleKeySets_Validate_Valid_JWT tests cases where a JWT is expected to be valid where the
+// validator is initialized with multiple KeySets.
+func TestValidator_MultipleKeySets_Validate_Valid_JWT(t *testing.T) {
 	tp := oidc.StartTestProvider(t, oidc.WithTestPort(8181))
 	tp2 := oidc.StartTestProvider(t, oidc.WithTestPort(8182))
 
@@ -1088,11 +1103,11 @@ func TestMultiValidator_Validate_Valid_JWT(t *testing.T) {
 			token := tt.args.token(tt.args.claims)
 
 			// Create the validator with the KeySet
-			validator, err := NewMultiValidator([]KeySet{keySet1, keySet2})
+			v, err := NewValidator(keySet1, keySet2)
 			require.NoError(t, err)
 
 			// Validate the JWT claims against expected values
-			got, err := validator.Validate(ctx, token, tt.args.expected)
+			got, err := v.Validate(ctx, token, tt.args.expected)
 
 			// Expect to get back the same claims that were serialized in the JWT
 			require.NoError(t, err)
@@ -1102,7 +1117,7 @@ func TestMultiValidator_Validate_Valid_JWT(t *testing.T) {
 	}
 }
 
-func TestMultiValidator_NoExpIatNbf(t *testing.T) {
+func TestValidator_MultipleKeySets_NoExpIatNbf(t *testing.T) {
 	tp := oidc.StartTestProvider(t, oidc.WithTestPort(8181))
 	tp2 := oidc.StartTestProvider(t, oidc.WithTestPort(8182))
 
@@ -1164,11 +1179,11 @@ func TestMultiValidator_NoExpIatNbf(t *testing.T) {
 			token := tt.args.token(tt.args.claims)
 
 			// Create the validator with the KeySet
-			validator, err := NewMultiValidator([]KeySet{keySet1, keySet2})
+			v, err := NewValidator(keySet1, keySet2)
 			require.NoError(t, err)
 
 			// Validate the JWT claims against expected values
-			got, err := validator.ValidateAllowMissingIatNbfExp(ctx, token, tt.args.expected)
+			got, err := v.ValidateAllowMissingIatNbfExp(ctx, token, tt.args.expected)
 
 			// Expect to get back the same claims that were serialized in the JWT
 			require.NoError(t, err)
@@ -1178,8 +1193,9 @@ func TestMultiValidator_NoExpIatNbf(t *testing.T) {
 	}
 }
 
-// TestValidator_Validate_Valid_JWT tests cases where a JWT is expected to be invalid.
-func TestMultiValidator_Validate_Invalid_JWT(t *testing.T) {
+// TestValidator_MultipleKeySets_Validate_Invalid_JWT tests cases where a JWT is expected to be invalid where the
+// validator is initialized with multiple KeySets.
+func TestValidator_MultipleKeySets_Validate_Invalid_JWT(t *testing.T) {
 	tp := oidc.StartTestProvider(t, oidc.WithTestPort(8181))
 	tp2 := oidc.StartTestProvider(t, oidc.WithTestPort(8182))
 
@@ -1543,78 +1559,15 @@ func TestMultiValidator_Validate_Invalid_JWT(t *testing.T) {
 			token := tt.args.token(tt.args.claims)
 
 			// Create the validator with the KeySet
-			validator, err := NewMultiValidator([]KeySet{keySet1, keySet2})
+			v, err := NewValidator(keySet1, keySet2)
 			require.NoError(t, err)
 
 			// Validate the JWT claims against expected values
-			got, err := validator.Validate(ctx, token, tt.args.expected)
+			got, err := v.Validate(ctx, token, tt.args.expected)
 
 			// Expect an error and nil claims
 			require.Error(t, err)
 			require.Nil(t, got)
-		})
-	}
-}
-
-func TestNewMultiValidator(t *testing.T) {
-	type args struct {
-		keySets func() []KeySet
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "new multiValidator with single keySet",
-			args: args{
-				keySets: func() []KeySet {
-					ks, err := NewJSONWebKeySet(context.Background(),
-						"https://issuer.com/"+wellKnownJWKS, "")
-					require.NoError(t, err)
-					return []KeySet{ks}
-				},
-			},
-		},
-		{
-			name: "new multiValidator with multiple keySets",
-			args: args{
-				keySets: func() []KeySet {
-					kSets := make([]KeySet, 0, 2)
-					ks, err := NewJSONWebKeySet(context.Background(),
-						"https://issuer.com/"+wellKnownJWKS, "")
-					require.NoError(t, err)
-
-					kSets = append(kSets, ks)
-					ks, err = NewJSONWebKeySet(context.Background(),
-						"https://issuer2.com/"+wellKnownJWKS, "")
-					require.NoError(t, err)
-
-					kSets = append(kSets, ks)
-
-					return kSets
-				},
-			},
-		},
-		{
-			name: "new multiValidator with no keySets",
-			args: args{
-				keySets: func() []KeySet {
-					return nil
-				},
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewMultiValidator(tt.args.keySets())
-			if tt.wantErr {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			require.NotNil(t, got)
 		})
 	}
 }
