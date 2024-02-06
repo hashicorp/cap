@@ -2,6 +2,13 @@
 
 Canonical reference for changes, improvements, and bugfixes for cap.
 
+## 0.5.0
+
+### Improvements
+
+* JWT
+  * Adds ability to specify more than one `KeySet` used for token validation (https://github.com/hashicorp/cap/pull/128)
+
 ## 0.4.1
 
 ### Bug fixes
