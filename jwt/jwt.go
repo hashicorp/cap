@@ -19,19 +19,27 @@ import (
 const DefaultLeewaySeconds = 150
 
 // Validator validates JSON Web Tokens (JWT) by providing signature
-// verification and claims set validation.
+// verification and claims set validation. Validator can contain either
+// a single or multiple KeySets and will attempt to verify the JWT by iterating
+// through the configured KeySets.
 type Validator struct {
-	keySet KeySet
+	keySets []KeySet
 }
 
 // NewValidator returns a Validator that uses the given KeySet to verify JWT signatures.
-func NewValidator(keySet KeySet) (*Validator, error) {
-	if keySet == nil {
-		return nil, errors.New("keySet must not be nil")
+func NewValidator(keySets ...KeySet) (*Validator, error) {
+	if len(keySets) <= 0 {
+		return nil, errors.New("must provide at least one key set")
+	}
+
+	for _, keySet := range keySets {
+		if keySet == nil {
+			return nil, errors.New("keySet must not be nil")
+		}
 	}
 
 	return &Validator{
-		keySet: keySet,
+		keySets: keySets,
 	}, nil
 }
 
@@ -116,9 +124,21 @@ func (v *Validator) ValidateAllowMissingIatNbfExp(ctx context.Context, token str
 }
 
 func (v *Validator) validateAll(ctx context.Context, token string, expected Expected, allowMissingIatExpNbf bool) (map[string]interface{}, error) {
-	// First, verify the signature to ensure subsequent validation is against verified claims
-	allClaims, err := v.keySet.VerifySignature(ctx, token)
-	if err != nil {
+	var allClaims map[string]interface{}
+	var err error
+
+	// Ensure that the token is signed by at least one of the given key sets
+	var tokenVerified bool
+	for _, keySet := range v.keySets {
+		// First, verify the signature to ensure subsequent validation is against verified claims
+		allClaims, err = keySet.VerifySignature(ctx, token)
+		if err == nil {
+			tokenVerified = true
+			break
+		}
+	}
+
+	if !tokenVerified {
 		return nil, fmt.Errorf("error verifying token signature: %w", err)
 	}
 
