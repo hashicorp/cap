@@ -19,7 +19,9 @@ import (
 const DefaultLeewaySeconds = 150
 
 // Validator validates JSON Web Tokens (JWT) by providing signature
-// verification and claims set validation.
+// verification and claims set validation. Validator can contain either
+// a single or multiple KeySets and will attempt to verify the JWT by iterating
+// through the configured KeySets.
 type Validator struct {
 	keySets []KeySet
 }

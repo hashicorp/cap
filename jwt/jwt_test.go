@@ -615,6 +615,18 @@ func TestNewValidator(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "new validator with nil keySet in keySets",
+			args: args{
+				keySets: func() []KeySet {
+					ks, err := NewJSONWebKeySet(context.Background(),
+						"https://issuer.com/"+wellKnownJWKS, "")
+					require.NoError(t, err)
+					return []KeySet{ks, nil}
+				},
+			},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
