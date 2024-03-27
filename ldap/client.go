@@ -215,7 +215,7 @@ type Attribute struct {
 // the WithGroups option is specified, it will also return the user's groups
 // from the directory.
 //
-// Supported options: WithUserAttributes, WithGroups, WithDialer, WithURLs
+// Supported options: WithUserAttributes, WithGroups, WithDialer, WithURLs, WithLowerUserAttributeKeys
 func (c *Client) Authenticate(ctx context.Context, username, password string, opt ...Option) (*AuthResult, error) {
 	const op = "ldap.(Client).Authenticate"
 	if username == "" {
