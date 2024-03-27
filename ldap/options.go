@@ -77,7 +77,7 @@ func WithUserAttributes() Option {
 }
 
 // WithLowerUserAttributeKeys returns a User Attribute map where the keys
-// are all cast to lower case. This is neccessary for some clients, such as Vault,
+// are all cast to lower case. This is necessary for some clients, such as Vault,
 // where user configured user attribute key names have always been stored lower case.
 func WithLowerUserAttributeKeys() Option {
 	return func(o interface{}) {
