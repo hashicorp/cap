@@ -433,25 +433,25 @@ func TestClient_connect(t *testing.T) {
 	// this test won't run if there's already a service listening on port 389,
 	// but on most systems and in CI it will run and it allows us to test
 	// connecting to a URL without a port
-	t.Run("389", func(t *testing.T) {
+	t.Run("3389", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
 		testCtx := context.Background()
 		logger := hclog.New(&hclog.LoggerOptions{
 			Name:  "test-logger",
 			Level: hclog.Error,
 		})
-		if ln, err := net.Listen("tcp", ":"+"389"); err == nil {
+		if ln, err := net.Listen("tcp", ":"+"3389"); err == nil {
 			ln.Close()
-			_ = testdirectory.Start(t, testdirectory.WithNoTLS(t), testdirectory.WithLogger(t, logger), testdirectory.WithPort(t, 389))
+			_ = testdirectory.Start(t, testdirectory.WithNoTLS(t), testdirectory.WithLogger(t, logger), testdirectory.WithPort(t, 3389))
 			c, err := NewClient(testCtx, &ClientConfig{
-				URLs: []string{"ldap://127.0.0.1"},
+				URLs: []string{"ldap://127.0.0.1:3389"},
 			})
 			require.NoError(err)
 			err = c.connect(testCtx)
 			defer func() { c.Close(testCtx) }()
 			assert.NoError(err)
 		} else {
-			t.Logf("warning: failed to listen on port 389, err=%s", err)
+			t.Logf("warning: failed to listen on port 3389, err=%s", err)
 		}
 	})
 }
