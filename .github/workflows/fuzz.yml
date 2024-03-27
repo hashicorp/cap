@@ -1,3 +1,26 @@
+# This is based on https://github.com/jidicula/go-fuzz-action/blob/main/action.yml
+# whose license has been reproduced here.
+# MIT License
+
+# Copyright (c) 2022 Johanan Idicula
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 name: Go fuzz test
 on:
   push:
@@ -9,8 +32,28 @@ jobs:
     name: Fuzz escapeValue(...) test
     runs-on: ubuntu-latest
     steps:
-        # commit hash == v1.2.0
-      - uses: jidicula/go-fuzz-action@4f24eed45b25214f31a9fe035ca68ea2c88c6a13 # v1.2.0
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - name: Determine Go version
+        id: get-go-version
+        # We use .go-version as our source of truth for current Go
+        # version, because "goenv" can react to it automatically.
+        run: |
+          echo "Building with Go $(cat .go-version)"
+          echo "go-version=$(cat .go-version)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
-          fuzz-time: 30s
-          fuzz-regexp: Fuzz_EscapeValue
+          go-version: "${{ steps.get-go-version.outputs.go-version }}"
+      - shell: bash
+        run: cd ldap; go test -fuzz=Fuzz_EscapeValue -fuzztime=30s
+      - name: Upload fuzz failure seed corpus as run artifact
+        if: failure()
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: fuzz-corpus
+          path: ./ldap/testdata/fuzz
+      - name: Output message
+        if: failure()
+        shell: bash
+        run: |
+          echo -e "Fuzz test failed on commit ${{ env.SHA }}. To troubleshoot locally, use the [GitHub CLI](https://cli.github.com) to download the seed corpus with\n\ngh run download ${{ github.run_id }} -n fuzz-corpus\n"
+  
