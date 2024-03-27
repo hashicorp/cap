@@ -273,7 +273,11 @@ func (c *Client) Authenticate(ctx context.Context, username, password string, op
 			return nil, fmt.Errorf("%s: failed to get user attributes: %w", op, err)
 		}
 		for _, a := range attrs {
-			userAttrs[strings.ToLower(a.Name)] = a.Vals
+			name := a.Name
+			if c.conf.LowerUserAttributeKeys || opts.withLowerUserAttributeKeys {
+				name = strings.ToLower(a.Name)
+			}
+			userAttrs[name] = a.Vals
 		}
 	}
 	if !opts.withGroups && !c.conf.IncludeUserGroups {
