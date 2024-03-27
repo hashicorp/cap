@@ -200,6 +200,11 @@ type ClientConfig struct {
 	// AD (unicodePwd) will always be excluded.
 	ExcludedUserAttributes []string
 
+	// LowerUserAttributeKeys optionally specifies that the authenticating user's
+	// DN and attributes be included in AuthResult use lowercase key names rather
+	// than the default camel case.
+	LowerUserAttributeKeys bool
+
 	// IncludeUserGroups optionally specifies that the authenticating user's
 	// group membership be included an authentication AuthResult.
 	IncludeUserGroups bool

@@ -215,7 +215,7 @@ type Attribute struct {
 // the WithGroups option is specified, it will also return the user's groups
 // from the directory.
 //
-// Supported options: WithUserAttributes, WithGroups, WithDialer, WithURLs
+// Supported options: WithUserAttributes, WithGroups, WithDialer, WithURLs, WithLowerUserAttributeKeys
 func (c *Client) Authenticate(ctx context.Context, username, password string, opt ...Option) (*AuthResult, error) {
 	const op = "ldap.(Client).Authenticate"
 	if username == "" {
@@ -273,7 +273,11 @@ func (c *Client) Authenticate(ctx context.Context, username, password string, op
 			return nil, fmt.Errorf("%s: failed to get user attributes: %w", op, err)
 		}
 		for _, a := range attrs {
-			userAttrs[a.Name] = a.Vals
+			name := a.Name
+			if c.conf.LowerUserAttributeKeys || opts.withLowerUserAttributeKeys {
+				name = strings.ToLower(a.Name)
+			}
+			userAttrs[name] = a.Vals
 		}
 	}
 	if !opts.withGroups && !c.conf.IncludeUserGroups {
