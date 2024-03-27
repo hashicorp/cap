@@ -588,7 +588,7 @@ func (p *Provider) convertError(e error) error {
 	switch {
 	case strings.Contains(e.Error(), "id token issued by a different provider"):
 		return fmt.Errorf("%s: %w", e.Error(), ErrInvalidIssuer)
-	case strings.Contains(e.Error(), "signed with unsupported algorithm"):
+	case strings.Contains(e.Error(), "signed with unsupported algorithm"), strings.Contains(e.Error(), "unexpected signature algorithm"):
 		return fmt.Errorf("%s: %w", e.Error(), ErrUnsupportedAlg)
 	case strings.Contains(e.Error(), "before the nbf (not before) time"):
 		return fmt.Errorf("%s: %w", e.Error(), ErrInvalidNotBefore)
