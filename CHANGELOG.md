@@ -2,6 +2,12 @@
 
 Canonical reference for changes, improvements, and bugfixes for cap.
 
+## 0.6.0
+
+* Add case insensitive user attribute keys configs for LDAP by @jasonodonnell in https://github.com/hashicorp/cap/pull/132
+* chore (oidc, jwt, ldap): update deps by @jimlambrt in https://github.com/hashicorp/cap/pull/133
+* Add empty anonymous group search configs by @jasonodonnell in https://github.com/hashicorp/cap/pull/134
+
 ## 0.5.0
 
 ### Improvements
