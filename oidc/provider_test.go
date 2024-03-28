@@ -619,7 +619,7 @@ func TestProvider_Exchange(t *testing.T) {
 		tp.SetExpectedAuthCode(code)
 		gotTk, err := p.Exchange(ctx, validRequest, validRequest.State(), "bad-code")
 		require.Error(err)
-		assert.Truef(strings.Contains(err.Error(), "401 Unauthorized"), "wanted strings.Contains \"%s\" but got \"%s\"", "401 Unauthorized", err)
+		assert.Truef(strings.Contains(err.Error(), `unable to exchange auth code with provider: oauth2: "invalid_grant" "unexpected auth code"`), "wanted strings.Contains \"%s\" but got \"%s\"", "401 Unauthorized", err)
 		assert.Empty(gotTk)
 	})
 	t.Run("omit-id-token", func(t *testing.T) {

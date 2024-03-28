@@ -231,7 +231,7 @@ func Test_ImplicitResponses(t *testing.T) {
 		var errResp AuthenErrorResponse
 		require.NoError(json.Unmarshal(contents, &errResp))
 		assert.Equal("internal-callback-error", errResp.Error)
-		assert.Contains(errResp.Description, "id token signed with unsupported algorithm")
+		assert.Contains(errResp.Description, "unsupported signing algorithm")
 	})
 	t.Run("not-implicit-flow", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
