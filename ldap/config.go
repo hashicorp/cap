@@ -87,6 +87,10 @@ type ClientConfig struct {
 	// for the initial connection test).
 	AnonymousGroupSearch bool `json:"anonymous_group_search"`
 
+	// AllowEmptyAnonymousGroupSearches: if true it removes the userDN from
+	// unauthenticated group searches (optional).
+	AllowEmptyAnonymousGroupSearch bool `json:"allow_empty_anonymous_group_search"`
+
 	// GroupDN is the distinguished name to use as base when searching for group
 	// membership (eg: ou=Groups,dc=example,dc=org)
 	GroupDN string `json:"groupdn"`
