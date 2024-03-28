@@ -215,7 +215,8 @@ type Attribute struct {
 // the WithGroups option is specified, it will also return the user's groups
 // from the directory.
 //
-// Supported options: WithUserAttributes, WithGroups, WithDialer, WithURLs, WithLowerUserAttributeKeys
+// Supported options: WithUserAttributes, WithGroups, WithDialer, WithURLs,
+// WithLowerUserAttributeKeys, WithEmptyAnonymousGroupSearch
 func (c *Client) Authenticate(ctx context.Context, username, password string, opt ...Option) (*AuthResult, error) {
 	const op = "ldap.(Client).Authenticate"
 	if username == "" {
@@ -289,7 +290,14 @@ func (c *Client) Authenticate(ctx context.Context, username, password string, op
 	}
 
 	if c.conf.AnonymousGroupSearch {
-		if err := c.conn.UnauthenticatedBind(userDN); err != nil {
+		// Some LDAP servers will reject anonymous group searches if userDN is
+		// included in the query.
+		dn := userDN
+		if c.conf.AllowEmptyAnonymousGroupSearch || opts.withEmptyAnonymousGroupSearch {
+			dn = ""
+		}
+
+		if err := c.conn.UnauthenticatedBind(dn); err != nil {
 			return nil, fmt.Errorf("%s: group search anonymous bind failed: %w", op, err)
 		}
 	}

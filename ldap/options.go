@@ -8,16 +8,17 @@ package ldap
 type Option func(interface{})
 
 type configOptions struct {
-	withURLs                   []string
-	withInsecureTLS            bool
-	withTLSMinVersion          string
-	withTLSMaxVersion          string
-	withCertificates           []string
-	withClientTLSCert          string
-	withClientTLSKey           string
-	withGroups                 bool
-	withUserAttributes         bool
-	withLowerUserAttributeKeys bool
+	withURLs                      []string
+	withInsecureTLS               bool
+	withTLSMinVersion             string
+	withTLSMaxVersion             string
+	withCertificates              []string
+	withClientTLSCert             string
+	withClientTLSKey              string
+	withGroups                    bool
+	withUserAttributes            bool
+	withLowerUserAttributeKeys    bool
+	withEmptyAnonymousGroupSearch bool
 }
 
 func configDefaults() configOptions {
@@ -84,6 +85,16 @@ func WithLowerUserAttributeKeys() Option {
 		switch v := o.(type) {
 		case *configOptions:
 			v.withLowerUserAttributeKeys = true
+		}
+	}
+}
+
+// WithEmptyAnonymousGroupSearch removes userDN from anonymous group searches.
+func WithEmptyAnonymousGroupSearch() Option {
+	return func(o interface{}) {
+		switch v := o.(type) {
+		case *configOptions:
+			v.withEmptyAnonymousGroupSearch = true
 		}
 	}
 }
