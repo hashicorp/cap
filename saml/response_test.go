@@ -288,7 +288,7 @@ const responseUnsigned = `
     </saml:Subject>
     <saml:Conditions NotBefore="2014-07-17T01:01:18Z" NotOnOrAfter="2024-01-18T06:21:48Z">
       <saml:AudienceRestriction>
-        <saml:Audience>http://test.me/entity</saml:Audience>
+        <saml:Audience>http://hashicorp-cap.test</saml:Audience>
       </saml:AudienceRestriction>
     </saml:Conditions>
     <saml:AuthnStatement AuthnInstant="2014-07-17T01:01:48Z" SessionNotOnOrAfter="2024-07-17T09:01:48Z" SessionIndex="_be9967abd904ddcae3c0eb4189adbe3f71e327cf93">
@@ -313,11 +313,11 @@ const responseUnsigned = `
 
 const testRespNoAssertions = `
 <?xml version="1.0" encoding="UTF-8"?>
-<saml2p:Response Destination="http://localhost:8000/saml/acs" ID="_8849c2ee532fcdb781f2a1776eac3741" InResponseTo="bc5a5baa-94e0-58a8-872c-e51491d2b3ee" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
+<saml2p:Response Destination="http://hashicorp-cap.test/saml/acs" ID="_8849c2ee532fcdb781f2a1776eac3741" InResponseTo="bc5a5baa-94e0-58a8-872c-e51491d2b3ee" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
 	xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol"
 	xmlns:xsd="http://www.w3.org/2001/XMLSchema">
 	<saml2:Issuer
-		xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">https://samltest.id/saml/idp</saml2:Issuer>
+  xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">http://test.idp</saml2:Issuer>
 	<ds:Signature
 		xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
 		<ds:SignedInfo>
@@ -363,11 +363,11 @@ NBp9UZome44qZAYH1iqrpmmjsfI9pJItsgWu3kXPjhSfj1AJGR1l9JGvJrHki1iHTA==</ds:X509Cer
 
 const testRespInvalidAssertionAudience = `
 <?xml version="1.0" encoding="UTF-8"?>
-<saml2p:Response Destination="http://localhost:8000/saml/acs" ID="_8849c2ee532fcdb781f2a1776eac3741" InResponseTo="bc5a5baa-94e0-58a8-872c-e51491d2b3ee" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
+<saml2p:Response Destination="http://hashicorp-cap.test/saml/acs" ID="_8849c2ee532fcdb781f2a1776eac3741" InResponseTo="test-request-id" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
 	xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol"
 	xmlns:xsd="http://www.w3.org/2001/XMLSchema">
 	<saml2:Issuer
-		xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">https://samltest.id/saml/idp</saml2:Issuer>
+  xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">http://test.idp</saml2:Issuer>
 	<ds:Signature
 		xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
 		<ds:SignedInfo>
@@ -410,13 +410,13 @@ NBp9UZome44qZAYH1iqrpmmjsfI9pJItsgWu3kXPjhSfj1AJGR1l9JGvJrHki1iHTA==</ds:X509Cer
 		</saml2p:Status>
 		<saml2:Assertion ID="_35ea90b711d6f385345f0dbdd7d0ed5b" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
 			xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">
-			<saml2:Issuer>https://samltest.id/saml/idp</saml2:Issuer>
+  <saml2:Issuer>http://test.idp</saml2:Issuer>
 			<saml2:Subject>
 				<saml2:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" NameQualifier="https://samltest.id/saml/idp" SPNameQualifier="http://saml.julz/example"
 					xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">msmith@samltest.id
 				</saml2:NameID>
 				<saml2:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
-					<saml2:SubjectConfirmationData Address="104.28.39.34" InResponseTo="bc5a5baa-94e0-58a8-872c-e51491d2b3ee" NotOnOrAfter="2023-08-25T14:37:53.693Z" Recipient="http://localhost:8000/saml/acs"/>
+					<saml2:SubjectConfirmationData Address="104.28.39.34" InResponseTo="test-request-id" NotOnOrAfter="2023-08-25T14:37:53.693Z" Recipient="http://hashicorp-cap.test/saml/acs"/>
 				</saml2:SubjectConfirmation>
 			</saml2:Subject>
 			<saml2:Conditions NotBefore="2023-08-25T14:32:53.680Z" NotOnOrAfter="2023-08-25T14:37:53.680Z">
@@ -470,11 +470,11 @@ NBp9UZome44qZAYH1iqrpmmjsfI9pJItsgWu3kXPjhSfj1AJGR1l9JGvJrHki1iHTA==</ds:X509Cer
 
 const testRespInvalidAssertionMissingNotBefore = `
 <?xml version="1.0" encoding="UTF-8"?>
-<saml2p:Response Destination="http://localhost:8000/saml/acs" ID="_8849c2ee532fcdb781f2a1776eac3741" InResponseTo="bc5a5baa-94e0-58a8-872c-e51491d2b3ee" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
+<saml2p:Response Destination="http://hashicorp-cap.test/saml/acs" ID="_8849c2ee532fcdb781f2a1776eac3741" InResponseTo="test-request-id" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
 	xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol"
 	xmlns:xsd="http://www.w3.org/2001/XMLSchema">
 	<saml2:Issuer
-		xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">https://samltest.id/saml/idp</saml2:Issuer>
+  xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">http://test.idp</saml2:Issuer>
 	<ds:Signature
 		xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
 		<ds:SignedInfo>
@@ -517,19 +517,19 @@ NBp9UZome44qZAYH1iqrpmmjsfI9pJItsgWu3kXPjhSfj1AJGR1l9JGvJrHki1iHTA==</ds:X509Cer
 		</saml2p:Status>
 		<saml2:Assertion ID="_35ea90b711d6f385345f0dbdd7d0ed5b" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
 			xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">
-			<saml2:Issuer>https://samltest.id/saml/idp</saml2:Issuer>
+  <saml2:Issuer>http://test.idp</saml2:Issuer>
 			<saml2:Subject>
 				<saml2:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" NameQualifier="https://samltest.id/saml/idp" SPNameQualifier="http://saml.julz/example"
 					xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">msmith@samltest.id
 				</saml2:NameID>
 				<saml2:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
-					<saml2:SubjectConfirmationData Address="104.28.39.34" InResponseTo="bc5a5baa-94e0-58a8-872c-e51491d2b3ee" NotOnOrAfter="2023-08-25T14:37:53.693Z" Recipient="http://localhost:8000/saml/acs"/>
+					<saml2:SubjectConfirmationData Address="104.28.39.34" InResponseTo="test-request-id" NotOnOrAfter="2023-08-25T14:37:53.693Z" Recipient="http://hashicorp-cap.test/saml/acs"/>
 				</saml2:SubjectConfirmation>
 			</saml2:Subject>
 			<!-- intentionally missing NotBefore -->
 			<saml2:Conditions NotOnOrAfter="2023-08-25T14:37:53.680Z">
 				<saml2:AudienceRestriction>
-					<saml2:Audience>http://saml.julz/example</saml2:Audience>
+           <saml2:Audience>http://hashicorp-cap.test</saml2:Audience>
 				</saml2:AudienceRestriction>
 			</saml2:Conditions>
 			<saml2:AuthnStatement AuthnInstant="2023-08-25T14:31:56.064Z" SessionIndex="_f72a63ee3782b47c89f60e81adde0ab0">
@@ -578,11 +578,11 @@ NBp9UZome44qZAYH1iqrpmmjsfI9pJItsgWu3kXPjhSfj1AJGR1l9JGvJrHki1iHTA==</ds:X509Cer
 
 const testRespInvalidAssertionMissingSubject = `
 <?xml version="1.0" encoding="UTF-8"?>
-<saml2p:Response Destination="http://localhost:8000/saml/acs" ID="_8849c2ee532fcdb781f2a1776eac3741" InResponseTo="bc5a5baa-94e0-58a8-872c-e51491d2b3ee" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
+<saml2p:Response Destination="http://hashicorp-cap.test/saml/acs" ID="_8849c2ee532fcdb781f2a1776eac3741" InResponseTo="test-request-id" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
 	xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol"
 	xmlns:xsd="http://www.w3.org/2001/XMLSchema">
 	<saml2:Issuer
-		xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">https://samltest.id/saml/idp</saml2:Issuer>
+  xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">http://test.idp</saml2:Issuer>
 	<ds:Signature
 		xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
 		<ds:SignedInfo>
@@ -625,11 +625,11 @@ NBp9UZome44qZAYH1iqrpmmjsfI9pJItsgWu3kXPjhSfj1AJGR1l9JGvJrHki1iHTA==</ds:X509Cer
 		</saml2p:Status>
 		<saml2:Assertion ID="_35ea90b711d6f385345f0dbdd7d0ed5b" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
 			xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">
-			<saml2:Issuer>https://samltest.id/saml/idp</saml2:Issuer>
+  <saml2:Issuer>http://test.idp</saml2:Issuer>
 			<!-- intentionally missing subject -->
 			<saml2:Conditions NotBefore="2023-08-25T14:32:53.680Z" NotOnOrAfter="2023-08-25T14:37:53.680Z">
 				<saml2:AudienceRestriction>
-					<saml2:Audience>http://saml.julz/example</saml2:Audience>
+            <saml2:Audience>http://hashicorp-cap.test</saml2:Audience>
 				</saml2:AudienceRestriction>
 			</saml2:Conditions>
 			<saml2:AuthnStatement AuthnInstant="2023-08-25T14:31:56.064Z" SessionIndex="_f72a63ee3782b47c89f60e81adde0ab0">
@@ -678,11 +678,11 @@ NBp9UZome44qZAYH1iqrpmmjsfI9pJItsgWu3kXPjhSfj1AJGR1l9JGvJrHki1iHTA==</ds:X509Cer
 
 const testRespInvalidAssertionMissingAttributeStmt = `
 <?xml version="1.0" encoding="UTF-8"?>
-<saml2p:Response Destination="http://localhost:8000/saml/acs" ID="_8849c2ee532fcdb781f2a1776eac3741" InResponseTo="bc5a5baa-94e0-58a8-872c-e51491d2b3ee" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
+<saml2p:Response Destination="http://hashicorp-cap.test/saml/acs" ID="_8849c2ee532fcdb781f2a1776eac3741" InResponseTo="test-request-id" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
 	xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol"
 	xmlns:xsd="http://www.w3.org/2001/XMLSchema">
 	<saml2:Issuer
-		xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">https://samltest.id/saml/idp</saml2:Issuer>
+  xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">http://test.idp</saml2:Issuer>
 	<ds:Signature
 		xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
 		<ds:SignedInfo>
@@ -725,19 +725,18 @@ NBp9UZome44qZAYH1iqrpmmjsfI9pJItsgWu3kXPjhSfj1AJGR1l9JGvJrHki1iHTA==</ds:X509Cer
 		</saml2p:Status>
 		<saml2:Assertion ID="_35ea90b711d6f385345f0dbdd7d0ed5b" IssueInstant="2023-08-25T14:32:53.680Z" Version="2.0"
 			xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">
-			<saml2:Issuer>https://samltest.id/saml/idp</saml2:Issuer>
+			<saml2:Issuer>http://test.idp</saml2:Issuer>
 			<saml2:Subject>
-				<saml2:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" NameQualifier="https://samltest.id/saml/idp" SPNameQualifier="http://saml.julz/example"
+  <saml2:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" NameQualifier="http://test.idp" SPNameQualifier="http://saml.julz/example"
 					xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">msmith@samltest.id
 				</saml2:NameID>
 				<saml2:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
-					<saml2:SubjectConfirmationData Address="104.28.39.34" InResponseTo="bc5a5baa-94e0-58a8-872c-e51491d2b3ee" NotOnOrAfter="2023-08-25T14:37:53.693Z" Recipient="http://localhost:8000/saml/acs"/>
+					<saml2:SubjectConfirmationData Address="104.28.39.34" InResponseTo="test-request-id" NotOnOrAfter="2023-08-25T14:37:53.693Z" Recipient="http://hashicorp-cap.test/saml/acs"/>
 				</saml2:SubjectConfirmation>
 			</saml2:Subject>
 			<saml2:Conditions NotBefore="2023-08-25T14:32:53.680Z" NotOnOrAfter="2023-08-25T14:37:53.680Z">
 				<saml2:AudienceRestriction>
-					<! -- audience is intentionally invalid -->. 
-					<saml2:Audience>http://saml.julz/example</saml2:Audience>
+					<saml2:Audience>http://hashicorp-cap.test</saml2:Audience>
 				</saml2:AudienceRestriction>
 			</saml2:Conditions>
 			<saml2:AuthnStatement AuthnInstant="2023-08-25T14:31:56.064Z" SessionIndex="_f72a63ee3782b47c89f60e81adde0ab0">
