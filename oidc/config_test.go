@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
@@ -44,6 +45,8 @@ func TestNewConfig(t *testing.T) {
 		return time.Now().Add(-1 * time.Minute)
 	}
 
+	testRt := newTestRoundTripper(t)
+
 	type args struct {
 		issuer              string
 		clientID            string
@@ -61,7 +64,7 @@ func TestNewConfig(t *testing.T) {
 		wantErrContains string
 	}{
 		{
-			name: "valid-with-all-valid-opts",
+			name: "valid-with-all-valid-opts-except-with-round-tripper",
 			args: args{
 				issuer:              "http://your_issuer/",
 				clientID:            "your_client_id",
@@ -89,6 +92,49 @@ func TestNewConfig(t *testing.T) {
 				Audiences:            []string{"your_aud1", "your_aud2"},
 				Scopes:               []string{oidc.ScopeOpenID, "email", "profile"},
 				ProviderCA:           testCaPem,
+				NowFunc:              testNow,
+				AllowedRedirectURLs: []string{
+					"http://your_redirect_url",
+					"http://redirect_url_two",
+					"http://redirect_url_three",
+				},
+				ProviderConfig: &ProviderConfig{
+					AuthURL:     "https://auth-endpoint",
+					JWKSURL:     "https://jwks-endpoint",
+					TokenURL:    "https://token-endpoint",
+					UserInfoURL: "https://userinfo-endpoint",
+				},
+			},
+		},
+		{
+			name: "with-round-tripper",
+			args: args{
+				issuer:              "http://your_issuer/",
+				clientID:            "your_client_id",
+				clientSecret:        "your_client_secret",
+				supported:           []Alg{RS512},
+				allowedRedirectURLs: []string{"http://your_redirect_url", "http://redirect_url_two", "http://redirect_url_three"},
+				opt: []Option{
+					WithAudiences("your_aud1", "your_aud2"),
+					WithScopes("email", "profile"),
+					WithRoundTripper(testRt),
+					WithNow(testNow),
+					WithProviderConfig(&ProviderConfig{
+						AuthURL:     "https://auth-endpoint",
+						JWKSURL:     "https://jwks-endpoint",
+						TokenURL:    "https://token-endpoint",
+						UserInfoURL: "https://userinfo-endpoint",
+					}),
+				},
+			},
+			want: &Config{
+				Issuer:               "http://your_issuer/",
+				ClientID:             "your_client_id",
+				ClientSecret:         "your_client_secret",
+				SupportedSigningAlgs: []Alg{RS512},
+				Audiences:            []string{"your_aud1", "your_aud2"},
+				Scopes:               []string{oidc.ScopeOpenID, "email", "profile"},
+				RoundTripper:         testRt,
 				NowFunc:              testNow,
 				AllowedRedirectURLs: []string{
 					"http://your_redirect_url",
@@ -283,6 +329,22 @@ func TestNewConfig(t *testing.T) {
 			wantIsErr: ErrInvalidCACert,
 		},
 		{
+			name: "invalid-both-cert-and-round-tripper",
+			args: args{
+				issuer:              "http://your_issuer/",
+				clientID:            "your_client_id",
+				clientSecret:        "your_client_secret",
+				supported:           []Alg{RS512},
+				allowedRedirectURLs: []string{"http://your_redirect_url"},
+				opt: []Option{
+					WithProviderCA(testCaPem),
+					WithRoundTripper(testRt),
+				},
+			},
+			wantErr:   true,
+			wantIsErr: ErrInvalidParameter,
+		},
+		{
 			name: "invalid-alg",
 			args: args{
 				issuer:              "http://your_issuer/",
@@ -430,6 +492,7 @@ func TestConfig_Hash(t *testing.T) {
 		require.NoError(t, err)
 		return c
 	}
+	testRt := newTestRoundTripper(t)
 	tests := []struct {
 		name      string
 		c1        *Config
@@ -463,6 +526,42 @@ func TestConfig_Hash(t *testing.T) {
 				WithScopes("profile", "email"),
 				WithAudiences("bob.com", "alice.com"),
 				WithProviderCA(pem),
+				WithNow(time.Now),
+				WithProviderConfig(&ProviderConfig{
+					AuthURL:     "https://auth-endpoint",
+					JWKSURL:     "https://jwks-endpoint",
+					TokenURL:    "https://token-endpoint",
+					UserInfoURL: "https://userinfo-endpoint",
+				}),
+			),
+			wantEqual: true,
+		},
+		{
+			name: "equal-with-round-tripper",
+			c1: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback", "www.bob.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithRoundTripper(testRt),
+				WithNow(time.Now),
+				WithProviderConfig(&ProviderConfig{
+					AuthURL:     "https://auth-endpoint",
+					JWKSURL:     "https://jwks-endpoint",
+					TokenURL:    "https://token-endpoint",
+					UserInfoURL: "https://userinfo-endpoint",
+				}),
+			),
+			c2: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.bob.com/callback", "www.alice.com/callback"},
+				WithScopes("profile", "email"),
+				WithAudiences("bob.com", "alice.com"),
+				WithRoundTripper(testRt),
 				WithNow(time.Now),
 				WithProviderConfig(&ProviderConfig{
 					AuthURL:     "https://auth-endpoint",
@@ -651,6 +750,29 @@ func TestConfig_Hash(t *testing.T) {
 				WithScopes("email", "profile"),
 				WithAudiences("alice.com", "bob.com"),
 				WithProviderCA(pem),
+				WithNow(time.Now),
+			),
+			c2: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithNow(time.Now),
+			),
+			wantEqual: false,
+		},
+		{
+			name: "diff-round-trippers",
+			c1: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithRoundTripper(newTestRoundTripper(t)),
 				WithNow(time.Now),
 			),
 			c2: newCfg(
@@ -854,4 +976,21 @@ func TestConfig_Hash(t *testing.T) {
 			}
 		})
 	}
+}
+
+type testRoundTripper struct {
+	transport http.RoundTripper
+	called    int
+}
+
+func newTestRoundTripper(t *testing.T) *testRoundTripper {
+	t.Helper()
+	return &testRoundTripper{
+		transport: http.DefaultTransport,
+	}
+}
+
+func (rt *testRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	rt.called++
+	return rt.transport.RoundTrip(req)
 }
