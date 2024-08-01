@@ -714,6 +714,31 @@ func TestHTTPClient(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, c.Transport, p.client.Transport)
 	})
+	t.Run("check-transport-with-round-tripper", func(t *testing.T) {
+		testRt := newTestRoundTripper(t)
+		p := &Provider{
+			config: &Config{
+				RoundTripper: testRt,
+			},
+		}
+		c, err := p.HTTPClient()
+		require.NoError(t, err)
+		assert.Equal(t, c.Transport, p.client.Transport)
+	})
+	t.Run("err-both-ca-and-round-trippe", func(t *testing.T) {
+		_, testCaPem := TestGenerateCA(t, []string{"localhost"})
+
+		p := &Provider{
+			config: &Config{
+				ProviderCA:   testCaPem,
+				RoundTripper: newTestRoundTripper(t),
+			},
+		}
+		_, err := p.HTTPClient()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrInvalidParameter)
+		assert.ErrorContains(t, err, "you cannot specify config for both a ProviderCA and RoundTripper")
+	})
 }
 
 func TestProvider_UserInfo(t *testing.T) {

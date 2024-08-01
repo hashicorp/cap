@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"hash"
 	"hash/fnv"
+	"net/http"
 	"net/url"
 	"reflect"
 	"runtime"
@@ -89,8 +90,14 @@ type Config struct {
 
 	// ProviderCA is an optional CA certs (PEM encoded) to use when sending
 	// requests to the provider. If you have a list of *x509.Certificates, then
-	// see EncodeCertificates(...) to PEM encode them.
+	// see EncodeCertificates(...) to PEM encode them. Note: specifying both
+	// ProviderCA and RoundTripper is an error.
 	ProviderCA string
+
+	// RoundTripper is an optional http.RoundTripper to use when sending requests
+	// to the provider. Note: specifying both ProviderCA and RoundTripper is an
+	// error.
+	RoundTripper http.RoundTripper
 
 	// NowFunc is a time func that returns the current time.
 	NowFunc func() time.Time `json:"-"`
@@ -118,6 +125,7 @@ func NewConfig(issuer string, clientID string, clientSecret ClientSecret, suppor
 		SupportedSigningAlgs: supported,
 		Scopes:               opts.withScopes,
 		ProviderCA:           opts.withProviderCA,
+		RoundTripper:         opts.withRoundTripper,
 		Audiences:            opts.withAudiences,
 		NowFunc:              opts.withNowFunc,
 		AllowedRedirectURLs:  allowedRedirectURLs,
@@ -167,6 +175,16 @@ func (c *Config) Hash() (uint64, error) {
 	args = append(args, scopes...)
 	args = append(args, audiences...)
 	args = append(args, redirects...)
+
+	if c.RoundTripper != nil {
+		v := reflect.ValueOf(c.RoundTripper)
+		switch {
+		case v.CanAddr():
+			args = append(args, v.Addr().String())
+		default:
+			args = append(args, v.String())
+		}
+	}
 
 	if c.ProviderConfig != nil {
 		args = append(
@@ -269,6 +287,9 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("%s: %w", op, ErrInvalidCACert)
 		}
 	}
+	if c.ProviderCA != "" && c.RoundTripper != nil {
+		return fmt.Errorf("%s: you cannot specify both a ProviderCA and RoundTripper: %w", op, ErrInvalidParameter)
+	}
 
 	if c.ProviderConfig != nil {
 		switch {
@@ -300,6 +321,7 @@ type configOptions struct {
 	withProviderCA     string
 	withNowFunc        func() time.Time
 	withProviderConfig *ProviderConfig
+	withRoundTripper   http.RoundTripper
 }
 
 // configDefaults is a handy way to get the defaults at runtime and
@@ -319,16 +341,30 @@ func getConfigOpts(opt ...Option) configOptions {
 }
 
 // WithProviderCA provides optional CA certs (PEM encoded) for the provider's
-// config.  These certs will can be used when making http requests to the
+// config.  These certs will be used when making http requests to the
 // provider.
 //
 // Valid for: Config
 //
 // See EncodeCertificates(...) to PEM encode a number of certs.
+//
+// Note: specifying both WithProviderCA and WithRoundTripper is a error.
 func WithProviderCA(cert string) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*configOptions); ok {
 			o.withProviderCA = cert
+		}
+	}
+}
+
+// WithRoundTripper provides and optional RoundTripper for the provider's
+// config. This RoundTripper will be used when making http requests to the
+// provider. Note: specifying both WithProviderCA and WithRoundTripper is a
+// error.
+func WithRoundTripper(rt http.RoundTripper) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*configOptions); ok {
+			o.withRoundTripper = rt
 		}
 	}
 }
