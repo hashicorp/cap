@@ -111,7 +111,7 @@ func main() {
 		}
 		oidcPort := os.Getenv("OIDC_PORT")
 		if oidcPort == "" {
-			oidcPort, err = func() (string, error) {
+			oidcPort, err = func() (port string, retErr error) {
 				addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
 				if err != nil {
 					return "", err
@@ -121,13 +121,23 @@ func main() {
 				if err != nil {
 					return "", err
 				}
-				defer l.Close()
-				return strconv.Itoa(l.Addr().(*net.TCPAddr).Port), nil
+				defer func() {
+					if l != nil {
+						if err := l.Close(); err != nil {
+							retErr = err
+						}
+					}
+				}()
+				tcpAddr, ok := l.Addr().(*net.TCPAddr)
+				if !ok {
+					return "", fmt.Errorf("not a net.TCPAddr")
+				}
+				return strconv.Itoa(tcpAddr.Port), nil
 			}()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "env OIDC_PORT is empty and error finding a free port: %s", err.Error())
+				return
 			}
-			return
 		}
 
 		id, secret := "test-rp", "fido"
