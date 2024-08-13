@@ -1130,6 +1130,7 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	const (
 		openidConfiguration = "/.well-known/openid-configuration"
 		authorize           = "/authorize"
+		deviceAuthorize     = "/deviceauthorize"
 		token               = "/token"
 		userInfo            = "/userinfo"
 		wellKnownJwks       = "/.well-known/jwks.json"
@@ -1160,6 +1161,7 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		reply := struct {
 			Issuer                 string   `json:"issuer"`
 			AuthEndpoint           string   `json:"authorization_endpoint"`
+			DeviceAuthEndpoint     string   `json:"device_authorization_endpoint"`
 			TokenEndpoint          string   `json:"token_endpoint"`
 			JWKSURI                string   `json:"jwks_uri"`
 			UserinfoEndpoint       string   `json:"userinfo_endpoint,omitempty"`
@@ -1170,6 +1172,7 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}{
 			Issuer:                 p.Addr(),
 			AuthEndpoint:           p.Addr() + authorize,
+			DeviceAuthEndpoint:     p.Addr() + deviceAuthorize,
 			TokenEndpoint:          p.Addr() + token,
 			JWKSURI:                p.Addr() + wellKnownJwks,
 			UserinfoEndpoint:       p.Addr() + userInfo,

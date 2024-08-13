@@ -1731,3 +1731,15 @@ func TestProvider_DiscoveryInfo(t *testing.T) {
 		})
 	}
 }
+
+func TestProvider_Endpoint(t *testing.T) {
+	t.Parallel()
+	tp := StartTestProvider(t)
+	p := testNewProvider(t, "client-id", "client-secret", "redirect", tp)
+
+	endpoint := p.Endpoint()
+	assert := assert.New(t)
+	assert.NotEqual(endpoint.AuthURL, "")
+	assert.NotEqual(endpoint.DeviceAuthURL, "")
+	assert.NotEqual(endpoint.TokenURL, "")
+}

@@ -826,3 +826,9 @@ func unmarshalRespJSON(r *http.Response, body []byte, v interface{}) error {
 	}
 	return fmt.Errorf("%s: expected Content-Type = application/json, got %q and could not unmarshal it as JSON: %w", op, ct, err)
 }
+
+// Endpoint returns the oauth2 Endpoint information that the go-oidc
+// provider already knows about from its probe of the Discovery URL
+func (p *Provider) Endpoint() oauth2.Endpoint {
+        return p.provider.Endpoint()
+}
