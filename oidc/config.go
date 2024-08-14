@@ -301,6 +301,7 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("%s: missing TokenURL: %w", op, ErrInvalidParameter)
 		case c.ProviderConfig.UserInfoURL == "":
 			return fmt.Errorf("%s: missing UserInfoURL: %w", op, ErrInvalidParameter)
+			// DeviceAuthURL is optional
 		}
 	}
 	return nil
@@ -400,6 +401,7 @@ type ProviderConfig struct {
 
 	// TokenURL is the provider's OAuth2.0 token endpoint.
 	TokenURL string
+
 	// UserInfoURL is the provider's OpenID UserInfo endpoint.
 	//
 	// See: https://openid.net/specs/openid-connect-core-1_0.html#UserInfo
@@ -408,6 +410,9 @@ type ProviderConfig struct {
 	// JWKSURL is the provider's OpenID JWKS endpoint (where it publishes the
 	// pub keys.
 	JWKSURL string
+
+	// DeviceAuthURL is the provider's optional device authorization endpoint.
+	DeviceAuthURL string
 }
 
 // WithProviderConfig provides an optional ProviderConfig which supports
