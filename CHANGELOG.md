@@ -2,10 +2,22 @@
 
 Canonical reference for changes, improvements, and bugfixes for cap.
 
+## Next
+
+* feat (oidc): add WithVerifier ([PR #141](https://github.com/hashicorp/cap/pull/141))
+
+## 0.7.0
+
+* Add ability to the SAML test provider to create signed SAML responses by
+  @hcjulz ([PR: 135](https://github.com/hashicorp/cap/pull/135))
+* Bump golang.org/x/net from 0.22.0 to 0.23.0 by @dependabot ([PR #136](https://github.com/hashicorp/cap/pull/136))
+* feat (config): add support for a http.RoundTripper by @jimlambrt ([PR #137](https://github.com/hashicorp/cap/pull/137))
+* chore: update deps by @jimlambrt ([PR #138](https://github.com/hashicorp/cap/pull/138))
+
 ## 0.6.0
 
 * Add case insensitive user attribute keys configs for LDAP by @jasonodonnell in https://github.com/hashicorp/cap/pull/132
-* chore (oidc, jwt, ldap): update deps by @jimlambrt in https://github.com/hashicorp/cap/pull/133
+* chore (oidc, jwt, ldap): update deps by @jimlambrt in **https**://github.com/hashicorp/cap/pull/133
 * Add empty anonymous group search configs by @jasonodonnell in https://github.com/hashicorp/cap/pull/134
 
 ## 0.5.0
