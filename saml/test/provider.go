@@ -562,6 +562,8 @@ func (p *TestProvider) SamlResponse(t *testing.T, opts ...ResponseOption) string
 		signCtx := dsig.NewDefaultSigningContext(p.keystore)
 
 		// sign child object assertions
+		// note we will sign the `assertion` first and then only the parent `response`, because the `response`
+		// signature is based on the entire contents of `response` (including `assertion` signature)
 		if opt.signAssertionElem {
 			responseEl := doc.SelectElement("Response")
 			for _, assert := range responseEl.FindElements("Assertion") {
