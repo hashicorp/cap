@@ -84,7 +84,7 @@ func TestServiceProvider_ParseResponse(t *testing.T) {
 		{
 			name:            "error-invalid-signature",
 			sp:              testSp,
-			samlResp:        base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustResponseElemSigned()))),
+			samlResp:        base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustAssertionElemSigned()))),
 			opts:            []saml.Option{},
 			requestID:       testRequestId,
 			wantErrContains: "invalid signature",

@@ -110,7 +110,6 @@ func (sp *ServiceProvider) ParseResponse(
 
 	// This will validate the response and all assertions.
 	response, err := ip.ValidateEncodedResponse(samlResp)
-
 	switch {
 	case err != nil:
 		return nil, fmt.Errorf("%s: unable to validate encoded response: %w", op, err)
@@ -154,7 +153,7 @@ func (sp *ServiceProvider) ParseResponse(
 	}
 
 	if !opts.skipSignatureValidation {
-		// func ip.ValidateEncodedResponse(...) above only requires either response or all its assertions are signed,
+		// func ip.ValidateEncodedResponse(...) above only requires either `response or all its `assertions` are signed,
 		// but does not require both. Adding another check to validate that both of these are signed always.
 		if err := validateSignature(response, op); err != nil {
 			return nil, err
@@ -257,17 +256,17 @@ func parsePEMCertificate(cert []byte) (*x509.Certificate, error) {
 }
 
 func validateSignature(response *types.Response, op string) error {
-	// validate child attr assertions
+	// validate child object assertions
 	for _, assert := range response.Assertions {
 		if !assert.SignatureValidated {
 			// note: at one time func ip.ValidateEncodedResponse(...) above allows all signed or all unsigned
-			// assertions, and will give error if there are both. We are still looping on all assertions instead of
-			// retrieving value for one assertion, so we do not depend on dependency implementation.
+			// assertions, and will give error if there is a mix of both. We are still looping on all assertions
+			// instead of retrieving value for one assertion, so we do not depend on dependency implementation.
 			return fmt.Errorf("%s: %w", op, ErrInvalidSignature)
 		}
 	}
 
-	// validate root response attr
+	// validate root object response
 	if !response.SignatureValidated {
 		return fmt.Errorf("%s: %w", op, ErrInvalidSignature)
 	}

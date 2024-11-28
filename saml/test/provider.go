@@ -561,20 +561,20 @@ func (p *TestProvider) SamlResponse(t *testing.T, opts ...ResponseOption) string
 	if opt.signResponseElem || opt.signAssertionElem {
 		signCtx := dsig.NewDefaultSigningContext(p.keystore)
 
-		// sign child attr assertions
+		// sign child object assertions
 		if opt.signAssertionElem {
 			responseEl := doc.SelectElement("Response")
 			for _, assert := range responseEl.FindElements("Assertion") {
 				signedAssert, err := signCtx.SignEnveloped(assert)
 				r.NoError(err)
 
-				// replace signed assert element
+				// replace signed assert object
 				responseEl.RemoveChildAt(assert.Index())
 				responseEl.AddChild(signedAssert)
 			}
 		}
 
-		// sign root attr response
+		// sign root object response
 		if opt.signResponseElem {
 			signed, err := signCtx.SignEnveloped(doc.Root())
 			r.NoError(err)
