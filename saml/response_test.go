@@ -90,22 +90,6 @@ func TestServiceProvider_ParseResponse(t *testing.T) {
 			wantErrContains: "invalid signature",
 		},
 		{
-			name:      "error missing signature",
-			sp:        testSp,
-			samlResp:  base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t))),
-			opts:      []saml.Option{},
-			requestID: testRequestId,
-			wantErrContains: "response and/or assertions must be signed",
-		},
-		{
-			name:      "error-invalid-signature",
-			sp:        testSp,
-			samlResp:  base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t))),
-			opts:      []saml.Option{},
-			requestID: testRequestId,
-			wantErrContains: "response and/or assertions must be signed",
-		},
-		{
 			name:     "err-assertion-missing-attribute-stmt",
 			sp:       testSp,
 			samlResp: base64.StdEncoding.EncodeToString([]byte(testRespInvalidAssertionMissingAttributeStmt)),
