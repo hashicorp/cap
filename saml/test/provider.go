@@ -431,9 +431,9 @@ func (p *TestProvider) parseRequestPost(request string) *core.AuthnRequest {
 }
 
 type responseOptions struct {
-	signResponseElem bool
+	signResponseElem  bool
 	signAssertionElem bool
-	expired bool
+	expired           bool
 }
 
 type ResponseOption func(*responseOptions)
@@ -558,11 +558,11 @@ func (p *TestProvider) SamlResponse(t *testing.T, opts ...ResponseOption) string
 	err = doc.ReadFromBytes(resp)
 	r.NoError(err)
 
-	if opt.signResponseElem || opt.signAssertionElem  {
+	if opt.signResponseElem || opt.signAssertionElem {
 		signCtx := dsig.NewDefaultSigningContext(p.keystore)
 
 		// sign child attr assertions
-		if opt.signAssertionElem{
+		if opt.signAssertionElem {
 			responseEl := doc.SelectElement("Response")
 			for _, assert := range responseEl.FindElements("Assertion") {
 				signedAssert, err := signCtx.SignEnveloped(assert)
@@ -575,7 +575,7 @@ func (p *TestProvider) SamlResponse(t *testing.T, opts ...ResponseOption) string
 		}
 
 		// sign root attr response
-		if opt.signResponseElem{
+		if opt.signResponseElem {
 			signed, err := signCtx.SignEnveloped(doc.Root())
 			r.NoError(err)
 			doc.SetRoot(signed)

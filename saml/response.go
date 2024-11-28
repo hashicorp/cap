@@ -111,7 +111,6 @@ func (sp *ServiceProvider) ParseResponse(
 	// This will validate the response and all assertions.
 	response, err := ip.ValidateEncodedResponse(samlResp)
 
-
 	switch {
 	case err != nil:
 		return nil, fmt.Errorf("%s: unable to validate encoded response: %w", op, err)
@@ -257,11 +256,10 @@ func parsePEMCertificate(cert []byte) (*x509.Certificate, error) {
 	return x509.ParseCertificate(block.Bytes)
 }
 
-func validateSignature(response *types.Response, op string) (error) {
-
+func validateSignature(response *types.Response, op string) error {
 	// validate child attr assertions
 	for _, assert := range response.Assertions {
-		if !assert.SignatureValidated{
+		if !assert.SignatureValidated {
 			// note: at one time func ip.ValidateEncodedResponse(...) above allows all signed or all unsigned
 			// assertions, and will give error if there are both. We are still looping on all assertions instead of
 			// retrieving value for one assertion, so we do not depend on dependency implementation.
@@ -270,7 +268,7 @@ func validateSignature(response *types.Response, op string) (error) {
 	}
 
 	// validate root response attr
-	if !response.SignatureValidated{
+	if !response.SignatureValidated {
 		return fmt.Errorf("%s: %w", op, ErrInvalidSignature)
 	}
 	return nil
