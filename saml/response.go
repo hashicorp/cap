@@ -12,7 +12,6 @@ import (
 
 	"github.com/jonboulle/clockwork"
 	saml2 "github.com/russellhaering/gosaml2"
-	"github.com/russellhaering/gosaml2/types"
 	dsig "github.com/russellhaering/goxmldsig"
 
 	"github.com/hashicorp/cap/saml/models/core"
@@ -152,15 +151,16 @@ func (sp *ServiceProvider) ParseResponse(
 		}
 	}
 
+	samlResponse := core.Response{Response: *response}
 	if !opts.skipSignatureValidation {
 		// func ip.ValidateEncodedResponse(...) above only requires either `response or all its `assertions` are signed,
 		// but does not require both. Adding another check to validate that both of these are signed always.
-		if err := validateSignature(response, op); err != nil {
+		if err := validateSignature(&samlResponse, op); err != nil {
 			return nil, err
 		}
 	}
 
-	return &core.Response{Response: *response}, nil
+	return &samlResponse, nil
 }
 
 func (sp *ServiceProvider) internalParser(
@@ -255,9 +255,9 @@ func parsePEMCertificate(cert []byte) (*x509.Certificate, error) {
 	return x509.ParseCertificate(block.Bytes)
 }
 
-func validateSignature(response *types.Response, op string) error {
+func validateSignature(response *core.Response, op string) error {
 	// validate child object assertions
-	for _, assert := range response.Assertions {
+	for _, assert := range response.Assertions() {
 		if !assert.SignatureValidated {
 			// note: at one time func ip.ValidateEncodedResponse(...) above allows all signed or all unsigned
 			// assertions, and will give error if there is a mix of both. We are still looping on all assertions
