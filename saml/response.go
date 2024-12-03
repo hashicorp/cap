@@ -19,19 +19,21 @@ import (
 )
 
 type parseResponseOptions struct {
-	clock                            clockwork.Clock
-	skipRequestIDValidation          bool
-	skipAssertionConditionValidation bool
-	skipSignatureValidation          bool
-	assertionConsumerServiceURL      string
+	clock                                   clockwork.Clock
+	skipRequestIDValidation                 bool
+	skipAssertionConditionValidation        bool
+	skipSignatureValidation                 bool
+	assertionConsumerServiceURL             string
+	requireSignatureForResponseAndAssertion bool
 }
 
 func parseResponseOptionsDefault() parseResponseOptions {
 	return parseResponseOptions{
-		clock:                            clockwork.NewRealClock(),
-		skipRequestIDValidation:          false,
-		skipAssertionConditionValidation: false,
-		skipSignatureValidation:          false,
+		clock:                                   clockwork.NewRealClock(),
+		skipRequestIDValidation:                 false,
+		skipAssertionConditionValidation:        false,
+		skipSignatureValidation:                 false,
+		requireSignatureForResponseAndAssertion: false,
 	}
 }
 
@@ -73,6 +75,15 @@ func InsecureSkipSignatureValidation() Option {
 	}
 }
 
+// RequireSignatureForBothResponseAndAssertion enables validation of both the SAML Response and its assertions.
+func RequireSignatureForBothResponseAndAssertion() Option {
+	return func(o interface{}) {
+		if o, ok := o.(*parseResponseOptions); ok {
+			o.requireSignatureForResponseAndAssertion = true
+		}
+	}
+}
+
 // ParseResponse parses and validates a SAML Reponse.
 //
 // Options:
@@ -87,6 +98,8 @@ func (sp *ServiceProvider) ParseResponse(
 	opt ...Option,
 ) (*core.Response, error) {
 	const op = "saml.(ServiceProvider).ParseResponse"
+	opts := getParseResponseOptions(opt...)
+
 	switch {
 	case sp == nil:
 		return nil, fmt.Errorf("%s: missing service provider %w", op, ErrInternal)
@@ -94,8 +107,10 @@ func (sp *ServiceProvider) ParseResponse(
 		return nil, fmt.Errorf("%s: missing saml response: %w", op, ErrInvalidParameter)
 	case requestID == "":
 		return nil, fmt.Errorf("%s: missing request ID: %w", op, ErrInvalidParameter)
+	case opts.skipSignatureValidation && opts.requireSignatureForResponseAndAssertion:
+		return nil, fmt.Errorf("%s: option `skip signature validation` cannot be true with `require signature"+
+			" for response and assertion` : %w", op, ErrInvalidParameter)
 	}
-	opts := getParseResponseOptions(opt...)
 
 	// We use github.com/russellhaering/gosaml2 for SAMLResponse signature and condition validation.
 	ip, err := sp.internalParser(
@@ -152,9 +167,11 @@ func (sp *ServiceProvider) ParseResponse(
 	}
 
 	samlResponse := core.Response{Response: *response}
-	if !opts.skipSignatureValidation {
+	if opts.requireSignatureForResponseAndAssertion {
 		// func ip.ValidateEncodedResponse(...) above only requires either `response or all its `assertions` are signed,
-		// but does not require both. Adding another check to validate that both of these are signed always.
+		// but does not require both.
+		// If option requireSignatureForResponseAndAssertion is true, adding another check to validate that both of
+		// these are signed always.
 		if err := validateSignature(&samlResponse, op); err != nil {
 			return nil, err
 		}

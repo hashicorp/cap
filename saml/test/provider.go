@@ -451,7 +451,7 @@ func defaultResponseOptions() *responseOptions {
 	return &responseOptions{}
 }
 
-func WithCompleteResponseSigned() ResponseOption {
+func WithResponseAndAssertionSigned() ResponseOption {
 	return func(o *responseOptions) {
 		o.signResponseElem = true
 		o.signAssertionElem = true
