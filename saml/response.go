@@ -79,7 +79,8 @@ func InsecureSkipSignatureValidation() Option {
 	}
 }
 
-// ValidateResponseAndAssertionSignatures enables signature validation for both the SAML response and its assertions.
+// ValidateResponseAndAssertionSignatures enables signature validation to ensure both response and its assertions
+// are signed
 func ValidateResponseAndAssertionSignatures() Option {
 	return func(o interface{}) {
 		if o, ok := o.(*parseResponseOptions); ok {
@@ -88,7 +89,7 @@ func ValidateResponseAndAssertionSignatures() Option {
 	}
 }
 
-// ValidateResponseSignature enables signature validation for just the SAML response.
+// ValidateResponseSignature enables signature validation to ensure the response is at least signed
 func ValidateResponseSignature() Option {
 	return func(o interface{}) {
 		if o, ok := o.(*parseResponseOptions); ok {
@@ -97,7 +98,7 @@ func ValidateResponseSignature() Option {
 	}
 }
 
-// ValidateAssertionSignature enables signature validation for just the SAML assertion.
+// ValidateAssertionSignature enables signature validation to ensure the assertion is at least signed
 func ValidateAssertionSignature() Option {
 	return func(o interface{}) {
 		if o, ok := o.(*parseResponseOptions); ok {
@@ -191,8 +192,8 @@ func (sp *ServiceProvider) ParseResponse(
 	samlResponse := core.Response{Response: *response}
 	if callValidateSignature {
 		// func ip.ValidateEncodedResponse(...) above only requires either `response or all its `assertions` are signed,
-		// but does not require both. The validateSignature function will validate either response or assertion is signed
-		// or both depending on the parse response options given.
+		// but does not require both. The validateSignature function will validate either response or assertion
+		// or both is surely signed depending on the parse response options given.
 		if err := validateSignature(&samlResponse, op, opts); err != nil {
 			return nil, err
 		}
