@@ -5,6 +5,7 @@ Canonical reference for changes, improvements, and bugfixes for cap.
 ## Next
 
 * feat (oidc): add WithVerifier ([PR #141](https://github.com/hashicorp/cap/pull/141))
+* feat (ldap): add an option to enable sAMAccountname logins when upndomain is set ([PR #146](https://github.com/hashicorp/cap/pull/146))
 
 ## 0.7.0
 
