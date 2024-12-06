@@ -719,8 +719,13 @@ func (c *Client) getUserDN(bindDN, username string) (string, error) {
 	}
 	var userDN string
 	if c.conf.UPNDomain != "" {
-		// Find the distinguished name for the user if userPrincipalName used for login
-		filter := fmt.Sprintf("(userPrincipalName=%s@%s)", escapeValue(username), c.conf.UPNDomain)
+		// Find the distinguished name for the user if userPrincipalName used for login, or sAMAccountName if enabled.
+		var filter string
+		if c.conf.EnableSamaccountnameLogin {
+			filter = fmt.Sprintf("(|(userPrincipalName=%s@%s)(sAMAccountName=%s))", escapeValue(username), c.conf.UPNDomain, escapeValue(username))
+		} else {
+			filter = fmt.Sprintf("(userPrincipalName=%s@%s)", escapeValue(username), c.conf.UPNDomain)
+		}
 		result, err := c.conn.Search(&ldap.SearchRequest{
 			BaseDN:       c.conf.UserDN,
 			Scope:        ldap.ScopeWholeSubtree,

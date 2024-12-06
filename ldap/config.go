@@ -230,6 +230,9 @@ type ClientConfig struct {
 	// the pre 1.1.1 Vault behavior.
 	// see: https://www.vaultproject.io/docs/upgrading/upgrade-to-1.1.1
 	DeprecatedVaultPre111GroupCNBehavior *bool `json:"use_pre111_group_cn_behavior"`
+
+	// EnableSamaccountnameLogin enables login with sAMAccountName in addition to UserPrincipalName when upndomain is set.
+	EnableSamaccountnameLogin bool `json:"enable_samaccountname_login"`
 }
 
 func (c *ClientConfig) clone() (*ClientConfig, error) {
