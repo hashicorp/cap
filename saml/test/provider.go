@@ -458,13 +458,13 @@ func WithResponseAndAssertionSigned() ResponseOption {
 	}
 }
 
-func WithJustAssertionElemSigned() ResponseOption {
+func WithJustAssertionSigned() ResponseOption {
 	return func(o *responseOptions) {
 		o.signAssertionElem = true
 	}
 }
 
-func WithJustResponseElemSigned() ResponseOption {
+func WithJustResponseSigned() ResponseOption {
 	return func(o *responseOptions) {
 		o.signResponseElem = true
 	}

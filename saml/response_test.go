@@ -68,14 +68,14 @@ func TestServiceProvider_ParseResponse(t *testing.T) {
 		{
 			name:      "success - with just response signed",
 			sp:        testSp,
-			samlResp:  base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustResponseElemSigned()))),
+			samlResp:  base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustResponseSigned()))),
 			opts:      []saml.Option{},
 			requestID: testRequestId,
 		},
 		{
 			name:      "success - with just assertion signed",
 			sp:        testSp,
-			samlResp:  base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustAssertionElemSigned()))),
+			samlResp:  base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustAssertionSigned()))),
 			opts:      []saml.Option{},
 			requestID: testRequestId,
 		},
@@ -89,14 +89,14 @@ func TestServiceProvider_ParseResponse(t *testing.T) {
 		{
 			name:      "success - with option validate response signature and with only response signed",
 			sp:        testSp,
-			samlResp:  base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustResponseElemSigned()))),
+			samlResp:  base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustResponseSigned()))),
 			opts:      []saml.Option{saml.ValidateResponseSignature()},
 			requestID: testRequestId,
 		},
 		{
 			name:      "success - with option validate assertion signature and with only assertion signed",
 			sp:        testSp,
-			samlResp:  base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustAssertionElemSigned()))),
+			samlResp:  base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustAssertionSigned()))),
 			opts:      []saml.Option{saml.ValidateAssertionSignature()},
 			requestID: testRequestId,
 		},
@@ -111,7 +111,7 @@ func TestServiceProvider_ParseResponse(t *testing.T) {
 		{
 			name:            "error-invalid-signature - with option validate both signatures and with just response signed",
 			sp:              testSp,
-			samlResp:        base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustResponseElemSigned()))),
+			samlResp:        base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustResponseSigned()))),
 			opts:            []saml.Option{saml.ValidateResponseAndAssertionSignatures()},
 			requestID:       testRequestId,
 			wantErrContains: "invalid signature",
@@ -119,7 +119,7 @@ func TestServiceProvider_ParseResponse(t *testing.T) {
 		{
 			name:            "error-invalid-signature - with option validate both signatures and with just assertion signed",
 			sp:              testSp,
-			samlResp:        base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustAssertionElemSigned()))),
+			samlResp:        base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustAssertionSigned()))),
 			opts:            []saml.Option{saml.ValidateResponseAndAssertionSignatures()},
 			requestID:       testRequestId,
 			wantErrContains: "invalid signature",
@@ -127,7 +127,7 @@ func TestServiceProvider_ParseResponse(t *testing.T) {
 		{
 			name:            "error-invalid-signature - with option validate response signature and with just assertion signed",
 			sp:              testSp,
-			samlResp:        base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustAssertionElemSigned()))),
+			samlResp:        base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustAssertionSigned()))),
 			opts:            []saml.Option{saml.ValidateResponseSignature()},
 			requestID:       testRequestId,
 			wantErrContains: "invalid signature",
@@ -135,7 +135,7 @@ func TestServiceProvider_ParseResponse(t *testing.T) {
 		{
 			name:            "error-invalid-signature -with option validate assertion signature and with just response signed",
 			sp:              testSp,
-			samlResp:        base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustResponseElemSigned()))),
+			samlResp:        base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustResponseSigned()))),
 			opts:            []saml.Option{saml.ValidateAssertionSignature()},
 			requestID:       testRequestId,
 			wantErrContains: "invalid signature",
