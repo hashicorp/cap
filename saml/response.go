@@ -79,7 +79,7 @@ func InsecureSkipSignatureValidation() Option {
 	}
 }
 
-// ValidateResponseAndAssertionSignatures enables validation of both the SAML response and its assertions.
+// ValidateResponseAndAssertionSignatures enables signature validation for both the SAML response and its assertions.
 func ValidateResponseAndAssertionSignatures() Option {
 	return func(o interface{}) {
 		if o, ok := o.(*parseResponseOptions); ok {
@@ -88,7 +88,7 @@ func ValidateResponseAndAssertionSignatures() Option {
 	}
 }
 
-// ValidateAssertionSignature enables validation of just the SAML response.
+// ValidateResponseSignature enables signature validation for just the SAML response.
 func ValidateResponseSignature() Option {
 	return func(o interface{}) {
 		if o, ok := o.(*parseResponseOptions); ok {
@@ -97,7 +97,7 @@ func ValidateResponseSignature() Option {
 	}
 }
 
-// ValidateAssertionSignature enables validation of just the SAML assertion.
+// ValidateAssertionSignature enables signature validation for just the SAML assertion.
 func ValidateAssertionSignature() Option {
 	return func(o interface{}) {
 		if o, ok := o.(*parseResponseOptions); ok {
@@ -191,8 +191,8 @@ func (sp *ServiceProvider) ParseResponse(
 	samlResponse := core.Response{Response: *response}
 	if callValidateSignature {
 		// func ip.ValidateEncodedResponse(...) above only requires either `response or all its `assertions` are signed,
-		// but does not require both. The validateSignature function will validate either response or assertion is signeed
-		// or both depending on the the parse response options given.
+		// but does not require both. The validateSignature function will validate either response or assertion is signed
+		// or both depending on the parse response options given.
 		if err := validateSignature(&samlResponse, op, opts); err != nil {
 			return nil, err
 		}
@@ -299,7 +299,7 @@ func validateSignature(response *core.Response, op string, opts parseResponseOpt
 		if !assert.SignatureValidated {
 			// note: at one time func ip.ValidateEncodedResponse(...) above allows all signed or all unsigned
 			// assertions, and will give error if there is a mix of both. We are still looping on all assertions
-			// instead of retrieving value for one assertion, so we do not depend on dependency implementation.
+			// instead of retrieving signature for one assertion, so we do not depend on dependency implementation.
 			if opts.validateAssertionSignature || opts.validateResponseAndAssertionSignatures {
 				return fmt.Errorf("%s: %w", op, ErrInvalidSignature)
 			}
