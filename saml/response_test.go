@@ -109,6 +109,14 @@ func TestServiceProvider_ParseResponse(t *testing.T) {
 			wantErrContains: "response and/or assertions must be signed",
 		},
 		{
+			name:            "err-multiple-validate-signature-options",
+			sp:              testSp,
+			samlResp:        base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t))),
+			opts:            []saml.Option{saml.ValidateResponseAndAssertionSignatures(), saml.ValidateResponseSignature()},
+			requestID:       testRequestId,
+			wantErrContains: "only one validate signature option can be set",
+		},
+		{
 			name:            "error-invalid-signature - with option of validate both signatures & with only response signed",
 			sp:              testSp,
 			samlResp:        base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustResponseSigned()))),

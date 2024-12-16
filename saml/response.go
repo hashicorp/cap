@@ -133,6 +133,8 @@ func (sp *ServiceProvider) ParseResponse(
 		return nil, fmt.Errorf("%s: missing request ID: %w", op, ErrInvalidParameter)
 	case opts.skipSignatureValidation && callValidateSignature:
 		return nil, fmt.Errorf("%s: option `skip signature validation` cannot be true with any validate signature option : %w", op, ErrInvalidParameter)
+	case multipleSignatureOptionEnabled(opts.validateResponseAndAssertionSignatures, opts.validateResponseSignature, opts.validateAssertionSignature):
+		return nil, fmt.Errorf("%s: only one validate signature option can be set: %w", op, ErrInvalidParameter)
 	}
 
 	// We use github.com/russellhaering/gosaml2 for SAMLResponse signature and condition validation.
@@ -315,4 +317,11 @@ func validateSignature(response *core.Response, op string, opts parseResponseOpt
 	}
 
 	return nil
+}
+
+func multipleSignatureOptionEnabled(a bool, b bool, c bool) bool {
+	if (a && b) || (b && c) || (a && c) {
+		return true
+	}
+	return false
 }
