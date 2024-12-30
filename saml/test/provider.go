@@ -431,8 +431,9 @@ func (p *TestProvider) parseRequestPost(request string) *core.AuthnRequest {
 }
 
 type responseOptions struct {
-	sign    bool
-	expired bool
+	signResponseElem  bool
+	signAssertionElem bool
+	expired           bool
 }
 
 type ResponseOption func(*responseOptions)
@@ -450,9 +451,22 @@ func defaultResponseOptions() *responseOptions {
 	return &responseOptions{}
 }
 
-func WithResponseSigned() ResponseOption {
+func WithResponseAndAssertionSigned() ResponseOption {
 	return func(o *responseOptions) {
-		o.sign = true
+		o.signResponseElem = true
+		o.signAssertionElem = true
+	}
+}
+
+func WithJustAssertionSigned() ResponseOption {
+	return func(o *responseOptions) {
+		o.signAssertionElem = true
+	}
+}
+
+func WithJustResponseSigned() ResponseOption {
+	return func(o *responseOptions) {
+		o.signResponseElem = true
 	}
 }
 
@@ -544,13 +558,30 @@ func (p *TestProvider) SamlResponse(t *testing.T, opts ...ResponseOption) string
 	err = doc.ReadFromBytes(resp)
 	r.NoError(err)
 
-	if opt.sign {
+	if opt.signResponseElem || opt.signAssertionElem {
 		signCtx := dsig.NewDefaultSigningContext(p.keystore)
 
-		signed, err := signCtx.SignEnveloped(doc.Root())
-		r.NoError(err)
+		// sign child object assertions
+		// note we will sign the `assertion` first and then only the parent `response`, because the `response`
+		// signature is based on the entire contents of `response` (including `assertion` signature)
+		if opt.signAssertionElem {
+			responseEl := doc.SelectElement("Response")
+			for _, assert := range responseEl.FindElements("Assertion") {
+				signedAssert, err := signCtx.SignEnveloped(assert)
+				r.NoError(err)
 
-		doc.SetRoot(signed)
+				// replace signed assert object
+				responseEl.RemoveChildAt(assert.Index())
+				responseEl.AddChild(signedAssert)
+			}
+		}
+
+		// sign root object response
+		if opt.signResponseElem {
+			signed, err := signCtx.SignEnveloped(doc.Root())
+			r.NoError(err)
+			doc.SetRoot(signed)
+		}
 	}
 
 	result, err := doc.WriteToString()

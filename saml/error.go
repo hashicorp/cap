@@ -15,4 +15,5 @@ var (
 	ErrInvalidAudience      = errors.New("invalid audience")
 	ErrMissingSubject       = errors.New("subject missing")
 	ErrMissingAttributeStmt = errors.New("attribute statement missing")
+	ErrInvalidSignature     = errors.New("invalid signature")
 )
