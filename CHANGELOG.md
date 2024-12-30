@@ -6,6 +6,14 @@ Canonical reference for changes, improvements, and bugfixes for cap.
 
 * feat (oidc): add WithVerifier ([PR #141](https://github.com/hashicorp/cap/pull/141))
 * feat (ldap): add an option to enable sAMAccountname logins when upndomain is set ([PR #146](https://github.com/hashicorp/cap/pull/146))
+* feat (saml): enhancing signature validation in SAML Response ([PR #144](https://github.com/hashicorp/cap/pull/144))
+* chore: update dependencies in pkgs: cap, cap/ldap, cap/saml ([PR
+  #147](https://github.com/hashicorp/cap/pull/147), [PR
+  #148](https://github.com/hashicorp/cap/pull/148), [PR
+  #149](https://github.com/hashicorp/cap/pull/149))
+* chore: update CODEOWNERS ([PR
+  #142](https://github.com/hashicorp/cap/pull/142),[PR
+  #143](https://github.com/hashicorp/cap/pull/143) )
 
 ## 0.7.0
 
