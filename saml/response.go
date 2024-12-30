@@ -19,25 +19,23 @@ import (
 )
 
 type parseResponseOptions struct {
-	clock                                  clockwork.Clock
-	skipRequestIDValidation                bool
-	skipAssertionConditionValidation       bool
-	skipSignatureValidation                bool
-	assertionConsumerServiceURL            string
-	validateResponseAndAssertionSignatures bool
-	validateResponseSignature              bool
-	validateAssertionSignature             bool
+	clock                            clockwork.Clock
+	skipRequestIDValidation          bool
+	skipAssertionConditionValidation bool
+	skipSignatureValidation          bool
+	assertionConsumerServiceURL      string
+	validateResponseSignature        bool
+	validateAssertionSignature       bool
 }
 
 func parseResponseOptionsDefault() parseResponseOptions {
 	return parseResponseOptions{
-		clock:                                  clockwork.NewRealClock(),
-		skipRequestIDValidation:                false,
-		skipAssertionConditionValidation:       false,
-		skipSignatureValidation:                false,
-		validateResponseAndAssertionSignatures: false,
-		validateResponseSignature:              false,
-		validateAssertionSignature:             false,
+		clock:                            clockwork.NewRealClock(),
+		skipRequestIDValidation:          false,
+		skipAssertionConditionValidation: false,
+		skipSignatureValidation:          false,
+		validateResponseSignature:        false,
+		validateAssertionSignature:       false,
 	}
 }
 
@@ -79,16 +77,6 @@ func InsecureSkipSignatureValidation() Option {
 	}
 }
 
-// ValidateResponseAndAssertionSignatures enables signature validation to ensure both response and its assertions
-// are signed
-func ValidateResponseAndAssertionSignatures() Option {
-	return func(o interface{}) {
-		if o, ok := o.(*parseResponseOptions); ok {
-			o.validateResponseAndAssertionSignatures = true
-		}
-	}
-}
-
 // ValidateResponseSignature enables signature validation to ensure the response is at least signed
 func ValidateResponseSignature() Option {
 	return func(o interface{}) {
@@ -123,7 +111,6 @@ func (sp *ServiceProvider) ParseResponse(
 	const op = "saml.(ServiceProvider).ParseResponse"
 	opts := getParseResponseOptions(opt...)
 
-	callValidateSignature := opts.validateResponseAndAssertionSignatures || opts.validateResponseSignature || opts.validateAssertionSignature
 	switch {
 	case sp == nil:
 		return nil, fmt.Errorf("%s: missing service provider %w", op, ErrInternal)
@@ -131,10 +118,8 @@ func (sp *ServiceProvider) ParseResponse(
 		return nil, fmt.Errorf("%s: missing saml response: %w", op, ErrInvalidParameter)
 	case requestID == "":
 		return nil, fmt.Errorf("%s: missing request ID: %w", op, ErrInvalidParameter)
-	case opts.skipSignatureValidation && callValidateSignature:
+	case opts.skipSignatureValidation && (opts.validateResponseSignature || opts.validateAssertionSignature):
 		return nil, fmt.Errorf("%s: option `skip signature validation` cannot be true with any validate signature option : %w", op, ErrInvalidParameter)
-	case multipleSignatureOptionEnabled(opts.validateResponseAndAssertionSignatures, opts.validateResponseSignature, opts.validateAssertionSignature):
-		return nil, fmt.Errorf("%s: only one validate signature option can be set: %w", op, ErrInvalidParameter)
 	}
 
 	// We use github.com/russellhaering/gosaml2 for SAMLResponse signature and condition validation.
@@ -192,7 +177,7 @@ func (sp *ServiceProvider) ParseResponse(
 	}
 
 	samlResponse := core.Response{Response: *response}
-	if callValidateSignature {
+	if opts.validateResponseSignature || opts.validateAssertionSignature {
 		// func ip.ValidateEncodedResponse(...) above only requires either `response or all its `assertions` are signed,
 		// but does not require both. The validateSignature function will validate either response or assertion
 		// or both is surely signed depending on the parse response options given.
@@ -299,29 +284,18 @@ func parsePEMCertificate(cert []byte) (*x509.Certificate, error) {
 func validateSignature(response *core.Response, op string, opts parseResponseOptions) error {
 	// validate child object assertions
 	for _, assert := range response.Assertions() {
-		if !assert.SignatureValidated {
-			// note: at one time func ip.ValidateEncodedResponse(...) above allows all signed or all unsigned
-			// assertions, and will give error if there is a mix of both. We are still looping on all assertions
-			// instead of retrieving signature for one assertion, so we do not depend on dependency implementation.
-			if opts.validateAssertionSignature || opts.validateResponseAndAssertionSignatures {
-				return fmt.Errorf("%s: %w", op, ErrInvalidSignature)
-			}
-		}
-	}
-
-	// validate root object response
-	if !response.SignatureValidated {
-		if opts.validateResponseSignature || opts.validateResponseAndAssertionSignatures {
+		// note: at one time func ip.ValidateEncodedResponse(...) above allows all signed or all unsigned
+		// assertions, and will give error if there is a mix of both. We are still looping on all assertions
+		// instead of retrieving signature for one assertion, so we do not depend on dependency implementation.
+		if !assert.SignatureValidated && opts.validateAssertionSignature {
 			return fmt.Errorf("%s: %w", op, ErrInvalidSignature)
 		}
 	}
 
-	return nil
-}
-
-func multipleSignatureOptionEnabled(a bool, b bool, c bool) bool {
-	if (a && b) || (b && c) || (a && c) {
-		return true
+	// validate root object response
+	if !response.SignatureValidated && opts.validateResponseSignature {
+		return fmt.Errorf("%s: %w", op, ErrInvalidSignature)
 	}
-	return false
+
+	return nil
 }
