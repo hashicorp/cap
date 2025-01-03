@@ -23,6 +23,8 @@ func TestClient_Authenticate(t *testing.T) {
 		Name:  "test-logger",
 		Level: hclog.Error,
 	})
+
+	// Set up test directory
 	td := testdirectory.Start(t,
 		testdirectory.WithDefaults(t, &testdirectory.Defaults{AllowAnonymousBind: true}),
 		testdirectory.WithLogger(t, logger),
@@ -59,6 +61,21 @@ func TestClient_Authenticate(t *testing.T) {
 	td.SetUsers(users...)
 	td.SetGroups(groups...)
 	td.SetTokenGroups(tokenGroups)
+
+	// Set up test directory with duplicate users. This directory is used to test that we error when multiple users are found.
+	duplicatedUsers := append([]*gldap.Entry{}, users...)
+	duplicatedUsers = append(
+		duplicatedUsers,
+		users...,
+	)
+	tdWithDuplicatedUsers := testdirectory.Start(t,
+		testdirectory.WithDefaults(t, &testdirectory.Defaults{AllowAnonymousBind: true}),
+		testdirectory.WithLogger(t, logger),
+	)
+	tdWithDuplicatedUsers.SetUsers(duplicatedUsers...)
+	tdWithDuplicatedUsers.SetGroups(groups...)
+	tdWithDuplicatedUsers.SetTokenGroups(tokenGroups)
+
 	tests := []struct {
 		name               string
 		username           string
@@ -508,6 +525,22 @@ func TestClient_Authenticate(t *testing.T) {
 			},
 			opts:       []ldap.Option{ldap.WithGroups(), ldap.WithEmptyAnonymousGroupSearch()},
 			wantGroups: []string{groups[0].DN},
+		},
+		{
+			name:     "failed-with-anon-bind-upn-domain-multiple-users-returned",
+			username: "eve",
+			password: "password",
+			clientConfig: &ldap.ClientConfig{
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", tdWithDuplicatedUsers.Port())},
+				Certificates: []string{tdWithDuplicatedUsers.Cert()},
+				DiscoverDN:   true,
+				UserDN:       testdirectory.DefaultUserDN,
+				GroupDN:      testdirectory.DefaultGroupDN,
+				UPNDomain:    "example.com",
+			},
+			opts:            []ldap.Option{ldap.WithGroups()},
+			wantErr:         true,
+			wantErrContains: "LDAP search for binddn 0 or not unique",
 		},
 	}
 	for _, tc := range tests {
