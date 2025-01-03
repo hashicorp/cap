@@ -736,9 +736,10 @@ func (c *Client) getUserDN(bindDN, username string) (string, error) {
 		if err != nil {
 			return userDN, fmt.Errorf("%s: LDAP search failed for detecting user (baseDN: %q / filter: %q): %w", op, c.conf.UserDN, filter, err)
 		}
-		for _, e := range result.Entries {
-			userDN = e.DN
+		if len(result.Entries) != 1 {
+			return "", fmt.Errorf("%s: LDAP search for user 0 or not unique", op)
 		}
+		userDN = result.Entries[0].DN
 	} else {
 		userDN = bindDN
 	}
