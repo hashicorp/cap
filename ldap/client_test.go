@@ -457,6 +457,171 @@ func TestClient_connect(t *testing.T) {
 	})
 }
 
+func TestClient_getUserBindDN(t *testing.T) {
+	t.Parallel()
+	testCtx := context.Background()
+	logger := hclog.New(&hclog.LoggerOptions{
+		Name:  "test-logger",
+		Level: hclog.Error,
+	})
+	td := testdirectory.Start(nil,
+		testdirectory.WithDefaults(nil, &testdirectory.Defaults{AllowAnonymousBind: true}),
+		testdirectory.WithLogger(t, logger),
+	)
+	users := testdirectory.NewUsers(t, []string{"alice", "bob"})
+	users = append(
+		users,
+		testdirectory.NewUsers(
+			t,
+			[]string{"eve"},
+			testdirectory.WithDefaults(t, &testdirectory.Defaults{UPNDomain: "example.com"}))...,
+	)
+	td.SetUsers(users...)
+
+	duplicatedUsers := append([]*gldap.Entry{}, users...)
+	duplicatedUsers = append(
+		duplicatedUsers,
+		users...,
+	)
+	tdWithDuplicatedUsers := testdirectory.Start(t,
+		testdirectory.WithDefaults(t, &testdirectory.Defaults{AllowAnonymousBind: true}),
+		testdirectory.WithLogger(t, logger),
+	)
+	tdWithDuplicatedUsers.SetUsers(duplicatedUsers...)
+
+	cases := map[string]struct {
+		conf     *ClientConfig
+		username string
+
+		want            string
+		wantErr         bool
+		wantErrIs       error
+		wantErrContains string
+	}{
+		"fail: missing username": {
+			conf: &ClientConfig{
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
+			},
+			username: "",
+
+			wantErr:         true,
+			wantErrIs:       ErrInvalidParameter,
+			wantErrContains: "missing username",
+		},
+		"fail: missing all of discoverdn, binddn, bindpass, upndomain, userdn": {
+			conf: &ClientConfig{
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
+			},
+			username: "alice",
+
+			wantErr:         true,
+			wantErrIs:       ErrInvalidParameter,
+			wantErrContains: "cannot derive UserBindDN based on config (see combination of: discoverdn, binddn, bindpass, upndomain, userdn)",
+		},
+		"fail: search fails to find user": {
+			conf: &ClientConfig{
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
+				DiscoverDN:   true,
+			},
+			username: "nonexistent",
+
+			wantErr:         true,
+			wantErrContains: "LDAP search for binddn failed",
+		},
+		"fail: search returns multiple users": {
+			conf: &ClientConfig{
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", tdWithDuplicatedUsers.Port())},
+				Certificates: []string{tdWithDuplicatedUsers.Cert()},
+				DiscoverDN:   true,
+			},
+			username: "alice",
+
+			wantErr:         true,
+			wantErrContains: "LDAP search for binddn 0 or not unique",
+		},
+		"fail: invalid search filter": {
+			conf: &ClientConfig{
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
+				DiscoverDN:   true,
+				UserFilter:   "({{.BadFilter}}={{.Username}})",
+			},
+			username: "alice",
+
+			wantErr:         true,
+			wantErrContains: "search failed due to template parsing error",
+		},
+		"success: discoverdn": {
+			conf: &ClientConfig{
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
+				DiscoverDN:   true,
+			},
+			username: "alice",
+
+			want: "cn=alice,ou=people,dc=example,dc=org",
+		},
+		"success: binddn and bindpass": {
+			conf: &ClientConfig{
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
+				BindDN:       "cn=bob,ou=people,dc=example,dc=org",
+				BindPassword: "password",
+			},
+			username: "alice",
+
+			want: "cn=alice,ou=people,dc=example,dc=org",
+		},
+		"success: upndomain": {
+			conf: &ClientConfig{
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
+				UPNDomain:    "example.com",
+			},
+			username: "eve",
+
+			want: "eve@example.com",
+		},
+		"success: userdn": {
+			conf: &ClientConfig{
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
+				UserDN:       testdirectory.DefaultUserDN,
+			},
+			username: "alice",
+
+			want: "cn=alice,ou=people,dc=example,dc=org",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			assert, require := assert.New(t), require.New(t)
+			c, err := NewClient(testCtx, tc.conf)
+			require.NoError(err)
+			err = c.connect(testCtx)
+			require.NoError(err)
+			defer func() { c.Close(testCtx) }()
+			got, err := c.getUserBindDN(tc.username)
+			if tc.wantErr {
+				require.Error(err)
+				if tc.wantErrIs != nil {
+					assert.ErrorIs(err, tc.wantErrIs)
+				}
+				if tc.wantErrContains != "" {
+					assert.Contains(err.Error(), tc.wantErrContains)
+				}
+				return
+			}
+			require.NoError(err)
+			assert.Equal(tc.want, got)
+		})
+	}
+}
+
 func TestClient_getUserDN(t *testing.T) {
 	t.Parallel()
 	testCtx := context.Background()
@@ -523,6 +688,30 @@ func TestClient_getUserDN(t *testing.T) {
 			wantErrIs:       ErrInvalidParameter,
 			wantErrContains: "missing username",
 		},
+		"fail: upn domain search fails to find user": {
+			conf: &ClientConfig{
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", tdWithDuplicatedUsers.Port())},
+				Certificates: []string{tdWithDuplicatedUsers.Cert()},
+				UPNDomain:    "example.com",
+			},
+			bindDN:   "userPrincipalName=nonexistent@example.com,ou=people,dc=example,dc=org",
+			username: "nonexistent",
+
+			wantErr:         true,
+			wantErrContains: "LDAP search failed for detecting user",
+		},
+		"fail: upn domain search returns multiple users": {
+			conf: &ClientConfig{
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", tdWithDuplicatedUsers.Port())},
+				Certificates: []string{tdWithDuplicatedUsers.Cert()},
+				UPNDomain:    "example.com",
+			},
+			bindDN:   "userPrincipalName=eve@example.com,ou=people,dc=example,dc=org",
+			username: "eve",
+
+			wantErr:         true,
+			wantErrContains: "LDAP search for user 0 or not unique",
+		},
 		"success: no upn domain": {
 			conf: &ClientConfig{
 				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
@@ -555,30 +744,6 @@ func TestClient_getUserDN(t *testing.T) {
 			username: "eve",
 
 			want: "userPrincipalName=eve@example.com,ou=people,dc=example,dc=org",
-		},
-		"fail: upn domain search fails to detect user": {
-			conf: &ClientConfig{
-				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
-				Certificates: []string{td.Cert()},
-				UPNDomain:    "example.com",
-			},
-			bindDN:   "userPrincipalName=invalid-name@example.com,ou=people,dc=example,dc=org",
-			username: "invalid-name",
-
-			wantErr:         true,
-			wantErrContains: "LDAP search failed for detecting user",
-		},
-		"fail: upn domain search returns multiple users": {
-			conf: &ClientConfig{
-				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", tdWithDuplicatedUsers.Port())},
-				Certificates: []string{tdWithDuplicatedUsers.Cert()},
-				UPNDomain:    "example.com",
-			},
-			bindDN:   "userPrincipalName=eve@example.com,ou=people,dc=example,dc=org",
-			username: "eve",
-
-			wantErr:         true,
-			wantErrContains: "LDAP search for user 0 or not unique",
 		},
 	}
 
