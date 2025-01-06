@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-hclog"
-	"github.com/jimlambrt/gldap"
 	"github.com/jimlambrt/gldap/testdirectory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -476,18 +475,15 @@ func TestClient_getUserBindDN(t *testing.T) {
 			[]string{"eve"},
 			testdirectory.WithDefaults(t, &testdirectory.Defaults{UPNDomain: "example.com"}))...,
 	)
+	// Set up a duplicated user to test the case where the search returns multiple users
+	users = append(
+		users,
+		testdirectory.NewUsers(
+			t,
+			[]string{"mallory", "mallory"},
+		)...,
+	)
 	td.SetUsers(users...)
-
-	duplicatedUsers := append([]*gldap.Entry{}, users...)
-	duplicatedUsers = append(
-		duplicatedUsers,
-		users...,
-	)
-	tdWithDuplicatedUsers := testdirectory.Start(t,
-		testdirectory.WithDefaults(t, &testdirectory.Defaults{AllowAnonymousBind: true}),
-		testdirectory.WithLogger(t, logger),
-	)
-	tdWithDuplicatedUsers.SetUsers(duplicatedUsers...)
 
 	cases := map[string]struct {
 		conf     *ClientConfig
@@ -533,11 +529,11 @@ func TestClient_getUserBindDN(t *testing.T) {
 		},
 		"fail: search returns multiple users": {
 			conf: &ClientConfig{
-				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", tdWithDuplicatedUsers.Port())},
-				Certificates: []string{tdWithDuplicatedUsers.Cert()},
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
 				DiscoverDN:   true,
 			},
-			username: "alice",
+			username: "mallory",
 
 			wantErr:         true,
 			wantErrContains: "LDAP search for binddn 0 or not unique",
@@ -641,18 +637,16 @@ func TestClient_getUserDN(t *testing.T) {
 			[]string{"eve"},
 			testdirectory.WithDefaults(t, &testdirectory.Defaults{UPNDomain: "example.com"}))...,
 	)
+	// Set up a duplicated user to test the case where the search returns multiple users
+	users = append(
+		users,
+		testdirectory.NewUsers(
+			t,
+			[]string{"mallory", "mallory"},
+			testdirectory.WithDefaults(t, &testdirectory.Defaults{UPNDomain: "example.com"}),
+		)...,
+	)
 	td.SetUsers(users...)
-
-	duplicatedUsers := append([]*gldap.Entry{}, users...)
-	duplicatedUsers = append(
-		duplicatedUsers,
-		users...,
-	)
-	tdWithDuplicatedUsers := testdirectory.Start(t,
-		testdirectory.WithDefaults(t, &testdirectory.Defaults{AllowAnonymousBind: true}),
-		testdirectory.WithLogger(t, logger),
-	)
-	tdWithDuplicatedUsers.SetUsers(duplicatedUsers...)
 
 	tests := map[string]struct {
 		conf     *ClientConfig
@@ -690,8 +684,8 @@ func TestClient_getUserDN(t *testing.T) {
 		},
 		"fail: upn domain search fails to find user": {
 			conf: &ClientConfig{
-				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", tdWithDuplicatedUsers.Port())},
-				Certificates: []string{tdWithDuplicatedUsers.Cert()},
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
 				UPNDomain:    "example.com",
 			},
 			bindDN:   "userPrincipalName=nonexistent@example.com,ou=people,dc=example,dc=org",
@@ -702,12 +696,12 @@ func TestClient_getUserDN(t *testing.T) {
 		},
 		"fail: upn domain search returns multiple users": {
 			conf: &ClientConfig{
-				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", tdWithDuplicatedUsers.Port())},
-				Certificates: []string{tdWithDuplicatedUsers.Cert()},
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
 				UPNDomain:    "example.com",
 			},
-			bindDN:   "userPrincipalName=eve@example.com,ou=people,dc=example,dc=org",
-			username: "eve",
+			bindDN:   "userPrincipalName=mallory@example.com,ou=people,dc=example,dc=org",
+			username: "mallory",
 
 			wantErr:         true,
 			wantErrContains: "LDAP search for user 0 or not unique",

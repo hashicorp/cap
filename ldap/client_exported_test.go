@@ -23,8 +23,6 @@ func TestClient_Authenticate(t *testing.T) {
 		Name:  "test-logger",
 		Level: hclog.Error,
 	})
-
-	// Set up test directory
 	td := testdirectory.Start(t,
 		testdirectory.WithDefaults(t, &testdirectory.Defaults{AllowAnonymousBind: true}),
 		testdirectory.WithLogger(t, logger),
@@ -49,6 +47,15 @@ func TestClient_Authenticate(t *testing.T) {
 			testdirectory.WithDefaults(t, &testdirectory.Defaults{UPNDomain: "example.com"}),
 			testdirectory.WithMembersOf(t, "admin"))...,
 	)
+	// Set up a duplicated user to test the case where the search returns multiple users
+	users = append(
+		users,
+		testdirectory.NewUsers(
+			t,
+			[]string{"mallory", "mallory"},
+			testdirectory.WithDefaults(t, &testdirectory.Defaults{UPNDomain: "example.com"}),
+		)...,
+	)
 	// add some attributes that we always want to filter out of an AuthResult,
 	// so if we ever start seeing tests fail because of them; we know that we've
 	// messed up the default filtering
@@ -61,20 +68,6 @@ func TestClient_Authenticate(t *testing.T) {
 	td.SetUsers(users...)
 	td.SetGroups(groups...)
 	td.SetTokenGroups(tokenGroups)
-
-	// Set up test directory with duplicate users. This directory is used to test that we error when multiple users are found.
-	duplicatedUsers := append([]*gldap.Entry{}, users...)
-	duplicatedUsers = append(
-		duplicatedUsers,
-		users...,
-	)
-	tdWithDuplicatedUsers := testdirectory.Start(t,
-		testdirectory.WithDefaults(t, &testdirectory.Defaults{AllowAnonymousBind: true}),
-		testdirectory.WithLogger(t, logger),
-	)
-	tdWithDuplicatedUsers.SetUsers(duplicatedUsers...)
-	tdWithDuplicatedUsers.SetGroups(groups...)
-	tdWithDuplicatedUsers.SetTokenGroups(tokenGroups)
 
 	tests := []struct {
 		name               string
@@ -528,11 +521,11 @@ func TestClient_Authenticate(t *testing.T) {
 		},
 		{
 			name:     "failed-with-anon-bind-upn-domain-multiple-users-returned",
-			username: "eve",
+			username: "mallory",
 			password: "password",
 			clientConfig: &ldap.ClientConfig{
-				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", tdWithDuplicatedUsers.Port())},
-				Certificates: []string{tdWithDuplicatedUsers.Cert()},
+				URLs:         []string{fmt.Sprintf("ldaps://127.0.0.1:%d", td.Port())},
+				Certificates: []string{td.Cert()},
 				DiscoverDN:   true,
 				UserDN:       testdirectory.DefaultUserDN,
 				GroupDN:      testdirectory.DefaultGroupDN,
