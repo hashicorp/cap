@@ -1585,19 +1585,20 @@ func TestProvider_DiscoveryInfo(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name             string
-		data             string
-		trailingSlashIss bool
-		overrideHeader   string
-		overrideData     string
-		overrideIssuer   string
-		wantAuthURL      string
-		wantTokenURL     string
-		wantUserInfoURL  string
-		wantAlgorithms   []string
-		wantScopes       []string
-		wantErr          bool
-		wantErrContains  string
+		name              string
+		data              string
+		trailingSlashIss  bool
+		overrideHeader    string
+		overrideData      string
+		overrideIssuer    string
+		wantAuthURL       string
+		wantTokenURL      string
+		wantDeviceAuthURL string
+		wantUserInfoURL   string
+		wantAlgorithms    []string
+		wantScopes        []string
+		wantErr           bool
+		wantErrContains   string
 	}{
 		{
 			name: "basic_case",
@@ -1605,30 +1606,34 @@ func TestProvider_DiscoveryInfo(t *testing.T) {
 				"issuer": "ISSUER",
 				"authorization_endpoint": "https://example.com/auth",
 				"token_endpoint": "https://example.com/token",
+				"device_authorization_endpoint": "https://example.com/deviceauth",
 				"jwks_uri": "https://example.com/keys",
 				"id_token_signing_alg_values_supported": ["RS256", "RS384"],
 				"scopes_supported": ["openid", "profile"]
 			}`,
-			wantScopes:     []string{"openid", "profile"},
-			wantAuthURL:    "https://example.com/auth",
-			wantTokenURL:   "https://example.com/token",
-			wantAlgorithms: []string{"RS256", "RS384"},
+			wantScopes:        []string{"openid", "profile"},
+			wantAuthURL:       "https://example.com/auth",
+			wantTokenURL:      "https://example.com/token",
+			wantDeviceAuthURL: "https://example.com/deviceauth",
+			wantAlgorithms:    []string{"RS256", "RS384"},
 		},
 		{
-			name: "basic_case",
+			name: "basic_case2",
 			data: `{
 				"issuer": "ISSUER",
 				"authorization_endpoint": "https://example.com/auth",
 				"token_endpoint": "https://example.com/token",
+				"device_authorization_endpoint": "https://example.com/deviceauth",
 				"jwks_uri": "https://example.com/keys",
 				"id_token_signing_alg_values_supported": ["RS256", "RS384"],
 				"scopes_supported": ["openid", "profile"]
 			}`,
-			trailingSlashIss: true,
-			wantScopes:       []string{"openid", "profile"},
-			wantAuthURL:      "https://example.com/auth",
-			wantTokenURL:     "https://example.com/token",
-			wantAlgorithms:   []string{"RS256", "RS384"},
+			trailingSlashIss:  true,
+			wantScopes:        []string{"openid", "profile"},
+			wantAuthURL:       "https://example.com/auth",
+			wantTokenURL:      "https://example.com/token",
+			wantDeviceAuthURL: "https://example.com/deviceauth",
+			wantAlgorithms:    []string{"RS256", "RS384"},
 		},
 		{
 			name: "mismatched_issuer",
@@ -1636,6 +1641,7 @@ func TestProvider_DiscoveryInfo(t *testing.T) {
 				"issuer": "ISSUER",
 				"authorization_endpoint": "https://example.com/auth",
 				"token_endpoint": "https://example.com/token",
+				"device_authorization_endpoint": "https://example.com/deviceauth",
 				"jwks_uri": "https://example.com/keys",
 				"id_token_signing_alg_values_supported": ["RS256"]
 			}`,
@@ -1643,6 +1649,7 @@ func TestProvider_DiscoveryInfo(t *testing.T) {
 				"issuer": "https://example.com",
 				"authorization_endpoint": "https://example.com/auth",
 				"token_endpoint": "https://example.com/token",
+				"device_authorization_endpoint": "https://example.com/deviceauth",
 				"jwks_uri": "https://example.com/keys",
 				"id_token_signing_alg_values_supported": ["RS256"]
 			}`,
@@ -1655,6 +1662,7 @@ func TestProvider_DiscoveryInfo(t *testing.T) {
 				"issuer": "ISSUER",
 				"authorization_endpoint": "https://example.com/auth",
 				"token_endpoint": "https://example.com/token",
+				"device_authorization_endpoint": "https://example.com/deviceauth",
 				"jwks_uri": "https://example.com/keys",
 				"id_token_signing_alg_values_supported": ["RS256"]
 			}`,
@@ -1668,6 +1676,7 @@ func TestProvider_DiscoveryInfo(t *testing.T) {
 				"issuer": "ISSUER",
 				"authorization_endpoint": "https://example.com/auth",
 				"token_endpoint": "https://example.com/token",
+				"device_authorization_endpoint": "https://example.com/deviceauth",
 				"jwks_uri": "https://example.com/keys",
 				"id_token_signing_alg_values_supported": ["RS256"]
 			}`,
@@ -1725,9 +1734,23 @@ func TestProvider_DiscoveryInfo(t *testing.T) {
 			require.NoError(err)
 			assert.Equal(info.AuthURL, tt.wantAuthURL)
 			assert.Equal(info.TokenURL, tt.wantTokenURL)
+			assert.Equal(info.DeviceAuthURL, tt.wantDeviceAuthURL)
 			assert.Equal(info.UserInfoURL, tt.wantUserInfoURL)
 			assert.Equal(info.IdTokenSigningAlgsSupported, tt.wantAlgorithms)
 			assert.Equal(info.ScopesSupported, tt.wantScopes)
 		})
 	}
+}
+
+func TestProvider_Config(t *testing.T) {
+	t.Parallel()
+	tp := StartTestProvider(t)
+	p := testNewProvider(t, "client-id", "client-secret", "redirect", tp)
+
+	c := p.Config()
+	assert := assert.New(t)
+	assert.NotEqual(c.AuthURL, "")
+	assert.NotEqual(c.DeviceAuthURL, "")
+	assert.NotEqual(c.TokenURL, "")
+	assert.NotEqual(c.UserInfoURL, "")
 }

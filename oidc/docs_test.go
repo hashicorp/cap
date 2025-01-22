@@ -107,10 +107,11 @@ func ExampleWithProviderConfig() {
 		[]oidc.Alg{oidc.RS256},
 		[]string{"https://your_redirect_url/callback"},
 		oidc.WithProviderConfig(&oidc.ProviderConfig{
-			AuthURL:     "https://your_issuer/authorize",
-			TokenURL:    "https://your_issuer/token",
-			JWKSURL:     "https://your_issuer/.well-known/jwks.json",
-			UserInfoURL: "https://your_issuer/userinfo",
+			AuthURL:       "https://your_issuer/authorize",
+			TokenURL:      "https://your_issuer/token",
+			DeviceAuthURL: "https://your_issuer/authorize",
+			JWKSURL:       "https://your_issuer/.well-known/jwks.json",
+			UserInfoURL:   "https://your_issuer/userinfo",
 		}),
 	)
 	if err != nil {
@@ -120,7 +121,7 @@ func ExampleWithProviderConfig() {
 	fmt.Println(string(val))
 
 	// Output:
-	// {"ClientID":"your_client_id","ClientSecret":"[REDACTED: client secret]","Scopes":["openid"],"Issuer":"https://your_issuer/","SupportedSigningAlgs":["RS256"],"AllowedRedirectURLs":["https://your_redirect_url/callback"],"Audiences":null,"ProviderCA":"","RoundTripper":null,"ProviderConfig":{"AuthURL":"https://your_issuer/authorize","TokenURL":"https://your_issuer/token","UserInfoURL":"https://your_issuer/userinfo","JWKSURL":"https://your_issuer/.well-known/jwks.json"}}
+	// {"ClientID":"your_client_id","ClientSecret":"[REDACTED: client secret]","Scopes":["openid"],"Issuer":"https://your_issuer/","SupportedSigningAlgs":["RS256"],"AllowedRedirectURLs":["https://your_redirect_url/callback"],"Audiences":null,"ProviderCA":"","RoundTripper":null,"ProviderConfig":{"AuthURL":"https://your_issuer/authorize","TokenURL":"https://your_issuer/token","UserInfoURL":"https://your_issuer/userinfo","JWKSURL":"https://your_issuer/.well-known/jwks.json","DeviceAuthURL":"https://your_issuer/authorize"}}
 }
 
 func ExampleNewProvider() {
