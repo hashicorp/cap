@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	cass "github.com/hashicorp/cap/oidc/clientassertion"
 	"github.com/hashicorp/cap/oidc/internal/strutils"
 	"github.com/hashicorp/go-cleanhttp"
 	"golang.org/x/oauth2"
@@ -308,9 +309,7 @@ func (p *Provider) Exchange(ctx context.Context, oidcRequest Request, authorizat
 	}
 	if oidcRequest.ClientAssertionJWT() != "" {
 		authCodeOpts = append(authCodeOpts,
-			// client_assertion_type is *always* this value.
-			// https://www.rfc-editor.org/rfc/rfc7523.html#section-2.2
-			oauth2.SetAuthURLParam("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"),
+			oauth2.SetAuthURLParam("client_assertion_type", cass.ClientAssertionJWTType),
 			oauth2.SetAuthURLParam("client_assertion", oidcRequest.ClientAssertionJWT()),
 		)
 	}

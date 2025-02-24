@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/go-jose/go-jose/v3"
+	cass "github.com/hashicorp/cap/oidc/clientassertion"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
@@ -176,6 +177,8 @@ type TestProvider struct {
 	nowFunc           func() time.Time
 	pkceVerifier      CodeVerifier
 
+	clientAssertionJWT string
+
 	// privKey *ecdsa.PrivateKey
 	privKey crypto.PrivateKey
 	pubKey  crypto.PublicKey
@@ -234,6 +237,7 @@ func StartTestProvider(t TestingT, opt ...Option) *TestProvider {
 		replyExpiry:         *opts.withDefaults.Expiry,
 		nowFunc:             opts.withDefaults.NowFunc,
 		pkceVerifier:        opts.withDefaults.PKCEVerifier,
+		clientAssertionJWT:  opts.withDefaults.ClientAssertionJWT,
 		replySubject:        *opts.withDefaults.ExpectedSubject,
 		subjectInfo:         opts.withDefaults.SubjectInfo, // default is not to use a login form, so no passwords required for subjects
 		codes:               map[string]*codeState{},
@@ -440,6 +444,9 @@ type TestProviderDefaults struct {
 	// PKCEVerifier(oidc.CodeVerifier) configures the PKCE code_verifier
 	PKCEVerifier CodeVerifier
 
+	// ClientAssertionJWT includes a client_assertion JWT in token requests
+	ClientAssertionJWT string
+
 	// OmitAuthTime turn on/off the omitting of an auth_time claim from
 	// id_tokens from the /token endpoint.  If set to true, the test provider will
 	// not include the auth_time claim in issued id_tokens from the /token
@@ -533,6 +540,9 @@ func WithTestDefaults(defaults *TestProviderDefaults) Option {
 				}
 				if defaults.PKCEVerifier != nil {
 					o.withDefaults.PKCEVerifier = defaults.PKCEVerifier
+				}
+				if defaults.ClientAssertionJWT != "" {
+					o.withDefaults.ClientAssertionJWT = defaults.ClientAssertionJWT
 				}
 				if defaults.ExpectedSubject != nil {
 					o.withDefaults.ExpectedSubject = defaults.ExpectedSubject
@@ -892,6 +902,17 @@ func (p *TestProvider) PKCEVerifier() CodeVerifier {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.pkceVerifier
+}
+
+// SetClientAssertionJWT sets the client assertion JWT
+func (p *TestProvider) SetClientAssertionJWT(jwt string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if v, ok := interface{}(p.t).(HelperT); ok {
+		v.Helper()
+	}
+	require.NotEqual(p.t, "", jwt)
+	p.clientAssertionJWT = jwt
 }
 
 // SetUserInfoReply sets the UserInfo endpoint response.
@@ -1357,6 +1378,18 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		case req.FormValue("code_verifier") != "" && req.FormValue("code_verifier") != p.pkceVerifier.Verifier():
 			_ = p.writeTokenErrorResponse(w, http.StatusUnauthorized, "invalid_verifier", "unexpected verifier")
 			return
+		}
+
+		if t := req.FormValue("client_assertion_type"); t != "" {
+			// assume client_assertion_type, if set, is always the magic jwt string
+			if t != cass.ClientAssertionJWTType {
+				_ = p.writeTokenErrorResponse(w, http.StatusBadRequest, "invalid_client", "unknown client assertion type")
+				return
+			}
+			if req.FormValue("client_assertion") != p.clientAssertionJWT {
+				_ = p.writeTokenErrorResponse(w, http.StatusUnauthorized, "invalid_client", "bad client assertion value")
+				return
+			}
 		}
 
 		var sub string

@@ -11,6 +11,12 @@ import (
 	"github.com/hashicorp/go-uuid"
 )
 
+const (
+	// ClientAssertionJWTType is the proper value for client_assertion_type.
+	// https://www.rfc-editor.org/rfc/rfc7523.html#section-2.2
+	ClientAssertionJWTType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+)
+
 var (
 	// these may happen due to user error
 	ErrMissingClientID    = errors.New("missing client ID")

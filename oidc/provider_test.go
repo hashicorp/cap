@@ -501,6 +501,14 @@ func TestProvider_Exchange(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	cassJWT := "test-client-assertion-jwt"
+	reqWithClientAssertion, err := NewRequest(
+		1*time.Minute,
+		redirect,
+		WithClientAssertionJWT(cassJWT),
+	)
+	require.NoError(t, err)
+
 	type args struct {
 		ctx               context.Context
 		r                 Request
@@ -549,6 +557,17 @@ func TestProvider_Exchange(t *testing.T) {
 			},
 		},
 		{
+			name: "client-assertion-jwt",
+			p:    p,
+			args: args{
+				ctx:               ctx,
+				r:                 reqWithClientAssertion,
+				authRequest:       reqWithClientAssertion.State(),
+				authCode:          "test-code",
+				expectedAudiences: []string{"state-override"},
+			},
+		},
+		{
 			name:      "nil-config",
 			p:         &Provider{},
 			wantErr:   true,
@@ -590,6 +609,7 @@ func TestProvider_Exchange(t *testing.T) {
 				if tt.args.r.PKCEVerifier() != nil {
 					tp.SetPKCEVerifier(tt.args.r.PKCEVerifier())
 				}
+				tp.SetClientAssertionJWT(tt.args.r.ClientAssertionJWT())
 			}
 			if tt.args.expectedNonce != "" {
 				tp.SetExpectedAuthNonce(tt.args.expectedNonce)
