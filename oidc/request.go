@@ -83,6 +83,12 @@ type Request interface {
 	// See: https://tools.ietf.org/html/rfc7636
 	PKCEVerifier() CodeVerifier
 
+	// ClientAssertionJWT optionally specifies a signed JWT to be used in a
+	// client_assertion token request.
+	//
+	// See: https://oauth.net/private-key-jwt/
+	ClientAssertionJWT() string
+
 	// MaxAge: when authAfter is not a zero value (authTime.IsZero()) then the
 	// id_token's auth_time claim must be after the specified time.
 	//
@@ -175,6 +181,8 @@ type Req struct {
 	// with PKCE.  It suppies the required CodeVerifier for PKCE.
 	withVerifier CodeVerifier
 
+	withClientJWT string
+
 	// withMaxAge: when withMaxAge.authAfter is not a zero value
 	// (authTime.IsZero()) then the id_token's auth_time claim must be after the
 	// specified time.
@@ -216,6 +224,7 @@ var _ Request = (*Req)(nil)
 //	 * WithScopes
 //	 * WithImplicit
 //	 * WithPKCE
+//	 * WithClientJWT
 //	 * WithMaxAge
 //	 * WithPrompts
 //	 * WithDisplay
@@ -267,6 +276,7 @@ func NewRequest(expireIn time.Duration, redirectURL string, opt ...Option) (*Req
 		scopes:        opts.withScopes,
 		withImplicit:  opts.withImplicitFlow,
 		withVerifier:  opts.withVerifier,
+		withClientJWT: opts.withClientJWT,
 		withPrompts:   opts.withPrompts,
 		withDisplay:   opts.withDisplay,
 		withUILocales: opts.withUILocales,
@@ -319,6 +329,12 @@ func (r *Req) PKCEVerifier() CodeVerifier {
 		return nil
 	}
 	return r.withVerifier.Copy()
+}
+
+// ClientAssertionJWT implements the Request.ClientAssertionJWT() interface
+// function and returns the JWT string.
+func (r *Req) ClientAssertionJWT() string {
+	return r.withClientJWT
 }
 
 // Prompts() implements the Request.Prompts() interface function and returns a
@@ -442,6 +458,7 @@ type reqOptions struct {
 	withACRValues    []string
 	withState        string
 	withNonce        string
+	withClientJWT    string
 }
 
 // reqDefaults is a handy way to get the defaults at runtime and during unit
@@ -498,6 +515,21 @@ func WithPKCE(v CodeVerifier) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*reqOptions); ok {
 			o.withVerifier = v
+		}
+	}
+}
+
+// WithClientAssertionJWT provides an option to send a signed JWT as a
+// client_assertion.
+//
+// Option is valid for: Request
+//
+// See: https://oauth.net/private-key-jwt/
+func WithClientAssertionJWT(jwt string) Option {
+	return func(o interface{}) {
+		switch v := o.(type) {
+		case *reqOptions:
+			v.withClientJWT = jwt
 		}
 	}
 }

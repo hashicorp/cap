@@ -306,6 +306,14 @@ func (p *Provider) Exchange(ctx context.Context, oidcRequest Request, authorizat
 	if oidcRequest.PKCEVerifier() != nil {
 		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("code_verifier", oidcRequest.PKCEVerifier().Verifier()))
 	}
+	if oidcRequest.ClientAssertionJWT() != "" {
+		authCodeOpts = append(authCodeOpts,
+			// client_assertion_type is *always* this value.
+			// https://www.rfc-editor.org/rfc/rfc7523.html#section-2.2
+			oauth2.SetAuthURLParam("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"),
+			oauth2.SetAuthURLParam("client_assertion", oidcRequest.ClientAssertionJWT()),
+		)
+	}
 	oauth2Token, err := oauth2Config.Exchange(oidcCtx, authorizationCode, authCodeOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to exchange auth code with provider: %w", op, p.convertError(err))
