@@ -4,6 +4,7 @@ Canonical reference for changes, improvements, and bugfixes for cap.
 
 ## Next
 
+* feat (oidc): add WithClientAssertionJWT to enable "private key JWT" ([PR #155](https://github.com/hashicorp/cap/pull/155))
 * feat (oidc): add WithVerifier ([PR #141](https://github.com/hashicorp/cap/pull/141))
 * feat (ldap): add an option to enable sAMAccountname logins when upndomain is set ([PR #146](https://github.com/hashicorp/cap/pull/146))
 * feat (saml): enhancing signature validation in SAML Response ([PR #144](https://github.com/hashicorp/cap/pull/144))
