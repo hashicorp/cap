@@ -609,7 +609,9 @@ func TestProvider_Exchange(t *testing.T) {
 				if tt.args.r.PKCEVerifier() != nil {
 					tp.SetPKCEVerifier(tt.args.r.PKCEVerifier())
 				}
-				tp.SetClientAssertionJWT(tt.args.r.ClientAssertionJWT())
+				if jot := tt.args.r.ClientAssertionJWT(); jot != "" {
+					tp.SetClientAssertionJWT(jot)
+				}
 			}
 			if tt.args.expectedNonce != "" {
 				tp.SetExpectedAuthNonce(tt.args.expectedNonce)
