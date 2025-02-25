@@ -24,15 +24,15 @@ var (
 	ErrMissingAlgorithm   = errors.New("missing signing algorithm")
 	ErrMissingKeyOrSecret = errors.New("missing private key or client secret")
 	ErrBothKeyAndSecret   = errors.New("both private key and client secret provided")
-	// if these happen, either the user directly instantiated &ClientAssertion{}
+	// if these happen, either the user directly instantiated &JWT{}
 	// or there's a bug somewhere.
-	ErrMissingFuncIDGenerator = errors.New("missing IDgen func; please use New()")
-	ErrMissingFuncNow         = errors.New("missing now func; please use New()")
+	ErrMissingFuncIDGenerator = errors.New("missing IDgen func; please use NewJWT()")
+	ErrMissingFuncNow         = errors.New("missing now func; please use NewJWT()")
 )
 
-// New sets up a new ClientAssertion to sign private key JWTs
-func New(clientID string, audience []string, opts ...Option) (*ClientAssertion, error) {
-	a := &ClientAssertion{
+// NewJWT sets up a new JWT to sign with a private key or client secret
+func NewJWT(clientID string, audience []string, opts ...Option) (*JWT, error) {
+	j := &JWT{
 		clientID: clientID,
 		audience: audience,
 		headers:  make(map[string]string),
@@ -40,16 +40,16 @@ func New(clientID string, audience []string, opts ...Option) (*ClientAssertion, 
 		now:      time.Now,
 	}
 	for _, opt := range opts {
-		opt(a)
+		opt(j)
 	}
-	if err := a.Validate(); err != nil {
+	if err := j.Validate(); err != nil {
 		return nil, fmt.Errorf("new client assertion validation error: %w", err)
 	}
-	return a, nil
+	return j, nil
 }
 
-// ClientAssertion signs a JWT with either a private key or a secret
-type ClientAssertion struct {
+// JWT signs a JWT with either a private key or a secret
+type JWT struct {
 	// for JWT claims
 	clientID string
 	audience []string
@@ -68,12 +68,12 @@ type ClientAssertion struct {
 }
 
 // Validate validates the expected fields
-func (c *ClientAssertion) Validate() error {
+func (j *JWT) Validate() error {
 	var errs []error
-	if c.genID == nil {
+	if j.genID == nil {
 		errs = append(errs, ErrMissingFuncIDGenerator)
 	}
-	if c.now == nil {
+	if j.now == nil {
 		errs = append(errs, ErrMissingFuncNow)
 	}
 	// bail early if any internal func errors
@@ -81,30 +81,30 @@ func (c *ClientAssertion) Validate() error {
 		return errors.Join(errs...)
 	}
 
-	if c.clientID == "" {
+	if j.clientID == "" {
 		errs = append(errs, ErrMissingClientID)
 	}
-	if len(c.audience) == 0 {
+	if len(j.audience) == 0 {
 		errs = append(errs, ErrMissingAudience)
 	}
-	if c.alg == "" {
+	if j.alg == "" {
 		errs = append(errs, ErrMissingAlgorithm)
 	}
-	if c.key == nil && c.secret == "" {
+	if j.key == nil && j.secret == "" {
 		errs = append(errs, ErrMissingKeyOrSecret)
 	}
-	if c.key != nil && c.secret != "" {
+	if j.key != nil && j.secret != "" {
 		errs = append(errs, ErrBothKeyAndSecret)
 	}
 	return errors.Join(errs...)
 }
 
 // SignedToken returns a signed JWT in the compact serialization format
-func (c *ClientAssertion) SignedToken() (string, error) {
-	if err := c.Validate(); err != nil {
+func (j *JWT) SignedToken() (string, error) {
+	if err := j.Validate(); err != nil {
 		return "", err
 	}
-	builder, err := c.builder()
+	builder, err := j.builder()
 	if err != nil {
 		return "", err
 	}
@@ -115,37 +115,37 @@ func (c *ClientAssertion) SignedToken() (string, error) {
 	return token, nil
 }
 
-func (c *ClientAssertion) builder() (jwt.Builder, error) {
-	signer, err := c.signer()
+func (j *JWT) builder() (jwt.Builder, error) {
+	signer, err := j.signer()
 	if err != nil {
 		return nil, err
 	}
-	id, err := c.genID()
+	id, err := j.genID()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate token id: %w", err)
 	}
-	claims := c.claims(id)
+	claims := j.claims(id)
 	return jwt.Signed(signer).Claims(claims), nil
 }
 
-func (c *ClientAssertion) signer() (jose.Signer, error) {
+func (j *JWT) signer() (jose.Signer, error) {
 	sKey := jose.SigningKey{
-		Algorithm: c.alg,
+		Algorithm: j.alg,
 	}
 
 	// Validate() ensures these are mutually exclusive
-	if c.secret != "" {
-		sKey.Key = []byte(c.secret)
+	if j.secret != "" {
+		sKey.Key = []byte(j.secret)
 	}
-	if c.key != nil {
-		sKey.Key = c.key
+	if j.key != nil {
+		sKey.Key = j.key
 	}
 
 	sOpts := &jose.SignerOptions{
-		ExtraHeaders: make(map[jose.HeaderKey]interface{}, len(c.headers)),
+		ExtraHeaders: make(map[jose.HeaderKey]interface{}, len(j.headers)),
 	}
 	// note: extra headers can override "kid"
-	for k, v := range c.headers {
+	for k, v := range j.headers {
 		sOpts.ExtraHeaders[jose.HeaderKey(k)] = v
 	}
 
@@ -156,12 +156,12 @@ func (c *ClientAssertion) signer() (jose.Signer, error) {
 	return signer, nil
 }
 
-func (c *ClientAssertion) claims(id string) *jwt.Claims {
-	now := c.now().UTC()
+func (j *JWT) claims(id string) *jwt.Claims {
+	now := j.now().UTC()
 	return &jwt.Claims{
-		Issuer:    c.clientID,
-		Subject:   c.clientID,
-		Audience:  c.audience,
+		Issuer:    j.clientID,
+		Subject:   j.clientID,
+		Audience:  j.audience,
 		Expiry:    jwt.NewNumericDate(now.Add(5 * time.Minute)),
 		NotBefore: jwt.NewNumericDate(now.Add(-1 * time.Second)),
 		IssuedAt:  jwt.NewNumericDate(now),
@@ -169,38 +169,38 @@ func (c *ClientAssertion) claims(id string) *jwt.Claims {
 	}
 }
 
-// Options configure the ClientAssertion
-type Option func(*ClientAssertion)
+// Options configure the JWT
+type Option func(*JWT)
 
 // WithClientSecret sets a secret and algorithm to sign the JWT with
 func WithClientSecret(secret string, alg string) Option {
-	return func(c *ClientAssertion) {
-		c.secret = secret
-		c.alg = jose.SignatureAlgorithm(alg)
+	return func(j *JWT) {
+		j.secret = secret
+		j.alg = jose.SignatureAlgorithm(alg)
 	}
 }
 
 // WithRSAKey sets a private key to sign the JWT with
 func WithRSAKey(key *rsa.PrivateKey, alg string) Option {
-	return func(c *ClientAssertion) {
-		c.key = key
-		c.alg = jose.SignatureAlgorithm(alg)
+	return func(j *JWT) {
+		j.key = key
+		j.alg = jose.SignatureAlgorithm(alg)
 	}
 }
 
 // WithKeyID sets the "kid" header that OIDC providers use to look up the
 // public key to check the signed JWT
 func WithKeyID(keyID string) Option {
-	return func(c *ClientAssertion) {
-		c.headers["kid"] = keyID
+	return func(j *JWT) {
+		j.headers["kid"] = keyID
 	}
 }
 
 // WithHeaders sets extra JWT headers
 func WithHeaders(h map[string]string) Option {
-	return func(c *ClientAssertion) {
+	return func(j *JWT) {
 		for k, v := range h {
-			c.headers[k] = v
+			j.headers[k] = v
 		}
 	}
 }

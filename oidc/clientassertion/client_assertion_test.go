@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// any non-nil error from New()/Validate() will be errors.Join()ed.
+// any non-nil error from NewJWT()/Validate() will be errors.Join()ed.
 // this is so we can assert each error within.
 type joinedErrs interface {
 	Unwrap() []error
@@ -27,28 +27,28 @@ func assertJoinedErrs(t *testing.T, expect []error, actual error) {
 	require.ElementsMatch(t, expect, unwrapped)
 }
 
-// TestClientAssertionBare tests what errors we expect if &ClientAssertion{}
-// is instantiated directly, rather than using the constructor New().
-func TestClientAssertionBare(t *testing.T) {
-	ca := &ClientAssertion{}
+// TestJWTBare tests what errors we expect if &JWT{}
+// is instantiated directly, rather than using the constructor NewJWT().
+func TestJWTBare(t *testing.T) {
+	j := &JWT{}
 
 	// all public methods should return the same error(s)
 	expect := []error{ErrMissingFuncIDGenerator, ErrMissingFuncNow}
 
-	actual := ca.Validate()
+	actual := j.Validate()
 	assertJoinedErrs(t, expect, actual)
 
-	tokenStr, err := ca.SignedToken()
+	tokenStr, err := j.SignedToken()
 	assertJoinedErrs(t, expect, err)
 
 	assert.Equal(t, "", tokenStr)
 }
 
-func TestNew(t *testing.T) {
+func TestNewJWT(t *testing.T) {
 	t.Run("should run validate", func(t *testing.T) {
-		ca, err := New("", nil)
+		j, err := NewJWT("", nil)
 		require.ErrorContains(t, err, "validation error:")
-		assert.Nil(t, ca)
+		assert.Nil(t, j)
 	})
 
 	tCid := "test-client-id"
@@ -59,13 +59,13 @@ func TestNew(t *testing.T) {
 		cid   string
 		aud   []string
 		opts  []Option
-		check func(*testing.T, *ClientAssertion)
+		check func(*testing.T, *JWT)
 	}{
 		{
 			name: "with private key",
 			cid:  tCid, aud: tAud,
 			opts: []Option{WithRSAKey(&rsa.PrivateKey{}, "test-alg")},
-			check: func(t *testing.T, ca *ClientAssertion) {
+			check: func(t *testing.T, ca *JWT) {
 				require.NotNil(t, ca.key)
 				require.Equal(t, jose.SignatureAlgorithm("test-alg"), ca.alg)
 			},
@@ -74,7 +74,7 @@ func TestNew(t *testing.T) {
 			name: "with client secret",
 			cid:  tCid, aud: tAud,
 			opts: []Option{WithClientSecret("ssshhhh", "test-alg")},
-			check: func(t *testing.T, ca *ClientAssertion) {
+			check: func(t *testing.T, ca *JWT) {
 				require.Equal(t, "ssshhhh", ca.secret)
 				require.Equal(t, jose.SignatureAlgorithm("test-alg"), ca.alg)
 			},
@@ -86,7 +86,7 @@ func TestNew(t *testing.T) {
 				WithKeyID("kid"),
 				WithClientSecret("ssshhhh", "blah"),
 			},
-			check: func(t *testing.T, ca *ClientAssertion) {
+			check: func(t *testing.T, ca *JWT) {
 				require.Equal(t, "kid", ca.headers["kid"])
 			},
 		},
@@ -97,7 +97,7 @@ func TestNew(t *testing.T) {
 				WithHeaders(map[string]string{"h1": "v1", "h2": "v2"}),
 				WithClientSecret("ssshhhh", "test-alg"),
 			},
-			check: func(t *testing.T, ca *ClientAssertion) {
+			check: func(t *testing.T, ca *JWT) {
 				require.Equal(t, map[string]string{"h1": "v1", "h2": "v2"}, ca.headers)
 			},
 		},
@@ -105,15 +105,15 @@ func TestNew(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 
-			ca, err := New(tc.cid, tc.aud, tc.opts...)
+			j, err := NewJWT(tc.cid, tc.aud, tc.opts...)
 
 			require.NoError(t, err)
-			require.NotNil(t, ca)
-			require.Equal(t, tc.cid, ca.clientID)
-			require.Equal(t, tc.aud, ca.audience)
+			require.NotNil(t, j)
+			require.Equal(t, tc.cid, j.clientID)
+			require.Equal(t, tc.aud, j.audience)
 
 			if tc.check != nil {
-				tc.check(t, ca)
+				tc.check(t, j)
 			}
 
 		})
@@ -168,16 +168,16 @@ func TestValidate(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 
-			// New() runs Validate()
-			ca, err := New(tc.cid, tc.aud, tc.opts...)
+			// NewJWT() runs Validate()
+			j, err := NewJWT(tc.cid, tc.aud, tc.opts...)
 
 			require.NotNil(t, err)
 			require.ErrorContains(t, err, "validation error:")
 
-			err = errors.Unwrap(err) // New wraps the error from Validate() with fmt.Errorf("%w")
+			err = errors.Unwrap(err) // NewJWT wraps the error from Validate() with fmt.Errorf("%w")
 			assertJoinedErrs(t, tc.errs, err)
 
-			require.Nil(t, ca)
+			require.Nil(t, j)
 
 		})
 	}
@@ -225,15 +225,15 @@ func TestSignedToken(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			ca, err := New("test-client-id", []string{"test-aud"}, tc.opts...)
+			j, err := NewJWT("test-client-id", []string{"test-aud"}, tc.opts...)
 			require.NoError(t, err)
 
 			now := time.Now()
-			ca.now = func() time.Time { return now }
-			ca.genID = func() (string, error) { return "test-claim-id", nil }
+			j.now = func() time.Time { return now }
+			j.genID = func() (string, error) { return "test-claim-id", nil }
 
 			// method under test
-			tokenString, err := ca.SignedToken()
+			tokenString, err := j.SignedToken()
 
 			if tc.err != nil {
 				require.ErrorIs(t, err, tc.err)
@@ -248,7 +248,7 @@ func TestSignedToken(t *testing.T) {
 
 			// check headers
 			expectHeaders := jose.Header{
-				Algorithm: string(ca.alg),
+				Algorithm: string(j.alg),
 				KeyID:     "test-key-id",
 				ExtraHeaders: map[jose.HeaderKey]any{
 					"typ":  "JWT",
@@ -277,10 +277,10 @@ func TestSignedToken(t *testing.T) {
 
 	t.Run("error generating token id", func(t *testing.T) {
 		genIDErr := errors.New("failed to generate test id")
-		ca, err := New("a", []string{"a"}, WithClientSecret("ssshhhh", "HS256"))
+		j, err := NewJWT("a", []string{"a"}, WithClientSecret("ssshhhh", "HS256"))
 		require.NoError(t, err)
-		ca.genID = func() (string, error) { return "", genIDErr }
-		tokenString, err := ca.SignedToken()
+		j.genID = func() (string, error) { return "", genIDErr }
+		tokenString, err := j.SignedToken()
 		require.ErrorIs(t, err, genIDErr)
 		require.Equal(t, "", tokenString)
 	})

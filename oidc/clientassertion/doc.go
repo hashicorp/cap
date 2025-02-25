@@ -6,7 +6,7 @@ package clientassertion
 //
 // Example usage:
 //
-// cass, err := clientassertion.New("client-id", []string{"audience"},
+// cass, err := clientassertion.NewJWT("client-id", []string{"audience"},
 // 	clientassertion.WithRSAKey(rsaPrivateKey, "RS256"),
 // 	clientassertion.WithKeyID("jwks-key-id-or-x5t-etc"),
 // )
