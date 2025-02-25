@@ -3,7 +3,7 @@ package clientassertion
 import (
 	"crypto/rsa"
 
-	"github.com/go-jose/go-jose/v3"
+	"github.com/go-jose/go-jose/v4"
 )
 
 // Option configures the JWT

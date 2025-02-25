@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-jose/go-jose/v3"
-	"github.com/go-jose/go-jose/v3/jwt"
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -188,6 +188,7 @@ func TestSignedToken(t *testing.T) {
 	require.NoError(t, err)
 	pub, ok := key.Public().(*rsa.PublicKey)
 	require.True(t, ok, "couldn't get rsa.PublicKey from PrivateKey")
+	validSecret := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // 32 bytes for HS256
 
 	cases := []struct {
 		name     string
@@ -197,9 +198,9 @@ func TestSignedToken(t *testing.T) {
 	}{
 		{
 			name:     "valid secret",
-			claimKey: []byte("ssshhhh"),
+			claimKey: []byte(validSecret),
 			opts: []Option{
-				WithClientSecret("ssshhhh", "HS256"),
+				WithClientSecret(validSecret, "HS256"),
 				WithKeyID("test-key-id"),
 				WithHeaders(map[string]string{"xtra": "headies"}),
 			},
@@ -243,7 +244,7 @@ func TestSignedToken(t *testing.T) {
 			require.NoError(t, err)
 
 			// extract the token from the signed string
-			token, err := jwt.ParseSigned(tokenString)
+			token, err := jwt.ParseSigned(tokenString, []jose.SignatureAlgorithm{j.alg})
 			require.NoError(t, err)
 
 			// check headers
@@ -261,11 +262,11 @@ func TestSignedToken(t *testing.T) {
 
 			// check claims
 			expectClaims := jwt.Expected{
-				Issuer:   "test-client-id",
-				Subject:  "test-client-id",
-				Audience: []string{"test-aud"},
-				ID:       "test-claim-id",
-				Time:     now,
+				Issuer:      "test-client-id",
+				Subject:     "test-client-id",
+				AnyAudience: []string{"test-aud"},
+				ID:          "test-claim-id",
+				Time:        now,
 			}
 			var actualClaims jwt.Claims
 			err = token.Claims(tc.claimKey, &actualClaims)

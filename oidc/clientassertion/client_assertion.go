@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-jose/go-jose/v3"
-	"github.com/go-jose/go-jose/v3/jwt"
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/hashicorp/go-uuid"
 )
 
@@ -107,7 +107,7 @@ func (j *JWT) SignedToken() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	token, err := builder.CompactSerialize()
+	token, err := builder.Serialize()
 	if err != nil {
 		return "", fmt.Errorf("failed to sign token: %w", err)
 	}
