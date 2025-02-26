@@ -26,19 +26,21 @@ func TestNewRequest(t *testing.T) {
 
 	testVerifier, err := NewCodeVerifier()
 	require.NoError(t, err)
+	testJWT := &mockSerializer{s: "test-client-assertion-jwt"}
 
 	tests := []struct {
-		name            string
-		expireIn        time.Duration
-		redirectURL     string
-		opts            []Option
-		wantNowFunc     func() time.Time
-		wantRedirectURL string
-		wantAudiences   []string
-		wantScopes      []string
-		wantVerifier    CodeVerifier
-		wantErr         bool
-		wantIsErr       error
+		name                string
+		expireIn            time.Duration
+		redirectURL         string
+		opts                []Option
+		wantNowFunc         func() time.Time
+		wantRedirectURL     string
+		wantAudiences       []string
+		wantScopes          []string
+		wantVerifier        CodeVerifier
+		wantClientAssertion JWTSerializer
+		wantErr             bool
+		wantIsErr           error
 	}{
 		{
 			name:        "valid-with-all-options",
@@ -49,12 +51,14 @@ func TestNewRequest(t *testing.T) {
 				WithAudiences("bob", "alice"),
 				WithScopes("email", "profile"),
 				WithPKCE(testVerifier),
+				WithClientAssertionJWT(testJWT),
 			},
-			wantNowFunc:     testNow,
-			wantRedirectURL: "https://bob.com",
-			wantAudiences:   []string{"bob", "alice"},
-			wantScopes:      []string{oidc.ScopeOpenID, "email", "profile"},
-			wantVerifier:    testVerifier,
+			wantNowFunc:         testNow,
+			wantRedirectURL:     "https://bob.com",
+			wantAudiences:       []string{"bob", "alice"},
+			wantScopes:          []string{oidc.ScopeOpenID, "email", "profile"},
+			wantVerifier:        testVerifier,
+			wantClientAssertion: testJWT,
 		},
 		{
 			name:            "valid-no-opt",
@@ -90,6 +94,7 @@ func TestNewRequest(t *testing.T) {
 			assert.Equalf(got.Audiences(), tt.wantAudiences, "wanted \"%s\" but got \"%s\"", tt.wantAudiences, got.Audiences())
 			assert.Equalf(got.Scopes(), tt.wantScopes, "wanted \"%s\" but got \"%s\"", tt.wantScopes, got.Scopes())
 			assert.Equalf(got.PKCEVerifier(), tt.wantVerifier, "wanted \"%s\" but got \"%s\"", tt.wantVerifier, got.PKCEVerifier())
+			assert.Equal(got.ClientAssertionJWT(), tt.wantClientAssertion)
 		})
 	}
 }
@@ -146,6 +151,24 @@ func Test_WithPKCE(t *testing.T) {
 		opts = getReqOpts(WithPKCE(v))
 		testOpts = reqDefaults()
 		testOpts.withVerifier = v
+		assert.Equal(opts, testOpts)
+	})
+}
+
+func Test_WithClientAssertionJWT(t *testing.T) {
+	t.Parallel()
+	t.Run("reqOptions", func(t *testing.T) {
+		t.Parallel()
+		assert := assert.New(t)
+		opts := getReqOpts()
+		testOpts := reqDefaults()
+		assert.Equal(opts, testOpts)
+		assert.Empty(testOpts.withClientJWT)
+
+		j := &mockSerializer{s: "test-jwt"}
+		opts = getReqOpts(WithClientAssertionJWT(j))
+		testOpts = reqDefaults()
+		testOpts.withClientJWT = j
 		assert.Equal(opts, testOpts)
 	})
 }
