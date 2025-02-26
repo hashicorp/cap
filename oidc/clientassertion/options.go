@@ -53,7 +53,11 @@ func WithRSAKey(key *rsa.PrivateKey, alg RSAlgorithm) Option {
 // WithKeyID sets the "kid" header that OIDC providers use to look up the
 // public key to check the signed JWT
 func WithKeyID(keyID string) Option {
+	const op = "WithKeyID"
 	return func(j *JWT) error {
+		if keyID == "" {
+			return fmt.Errorf("%s: %w", op, ErrMissingKeyID)
+		}
 		j.headers["kid"] = keyID
 		return nil
 	}

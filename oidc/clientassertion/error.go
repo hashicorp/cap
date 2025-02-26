@@ -11,6 +11,7 @@ var (
 	ErrMissingClientID    = errors.New("missing client ID")
 	ErrMissingAudience    = errors.New("missing audience")
 	ErrMissingAlgorithm   = errors.New("missing signing algorithm")
+	ErrMissingKeyID       = errors.New("missing key ID")
 	ErrMissingKeyOrSecret = errors.New("missing private key or client secret")
 	ErrBothKeyAndSecret   = errors.New("both private key and client secret provided")
 
