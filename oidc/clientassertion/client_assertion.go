@@ -52,9 +52,16 @@ func NewJWT(clientID string, audience []string, opts ...Option) (*JWT, error) {
 		return nil, errors.Join(errs...)
 	}
 
-	if err := j.Validate(); err != nil {
+	if err := j.validate(); err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
+
+	// finally, make sure Serialize() works; we can't pre-validate everything,
+	// and this whole thing is useless if it can't Serialize()
+	if _, err := j.Serialize(); err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
 	return j, nil
 }
 
@@ -78,9 +85,23 @@ type JWT struct {
 	now   func() time.Time
 }
 
-// Validate validates the expected fields
-func (j *JWT) Validate() error {
-	const op = "JWT.Validate"
+// Serialize returns client assertion JWT which can be used by an OAuth 2.0 or
+// OIDC client to authenticate themselves to an authorization server
+func (j *JWT) Serialize() (string, error) {
+	const op = "JWT.Serialize"
+	builder, err := j.builder()
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", op, err)
+	}
+	token, err := builder.Serialize()
+	if err != nil {
+		return "", fmt.Errorf("%s: failed to sign token: %w", op, err)
+	}
+	return token, nil
+}
+
+func (j *JWT) validate() error {
+	const op = "JWT.validate"
 	var errs []error
 	if j.genID == nil {
 		errs = append(errs, ErrMissingFuncIDGenerator)
@@ -113,28 +134,7 @@ func (j *JWT) Validate() error {
 		return fmt.Errorf("%s: %w", op, errors.Join(errs...))
 	}
 
-	// finally, make sure Serialize() works; we can't pre-validate everything,
-	// and this whole thing is useless if it can't Serialize()
-	if _, err := j.Serialize(); err != nil {
-		return fmt.Errorf("%s: serialization error during validate: %w", op, err)
-	}
-
 	return nil
-}
-
-// Serialize returns client assertion JWT which can be used by an OAuth 2.0 or
-// OIDC client to authenticate themselves to an authorization server
-func (j *JWT) Serialize() (string, error) {
-	const op = "JWT.Serialize"
-	builder, err := j.builder()
-	if err != nil {
-		return "", fmt.Errorf("%s: %w", op, err)
-	}
-	token, err := builder.Serialize()
-	if err != nil {
-		return "", fmt.Errorf("%s: failed to sign token: %w", op, err)
-	}
-	return token, nil
 }
 
 func (j *JWT) builder() (jwt.Builder, error) {
@@ -168,7 +168,6 @@ func (j *JWT) signer() (jose.Signer, error) {
 	sOpts := &jose.SignerOptions{
 		ExtraHeaders: make(map[jose.HeaderKey]interface{}, len(j.headers)),
 	}
-	// note: extra headers can override "kid"
 	for k, v := range j.headers {
 		sOpts.ExtraHeaders[jose.HeaderKey(k)] = v
 	}
@@ -193,11 +192,11 @@ func (j *JWT) claims(id string) *jwt.Claims {
 	}
 }
 
-// Serializer is the primary interface impelmented by JWT.
-type Serializer interface {
+// serializer is the primary interface impelmented by JWT.
+type serializer interface {
 	Serialize() (string, error)
 }
 
 // ensure JWT implements Serializer, which is accepted by the oidc option
 // oidc.WithClientAssertionJWT.
-var _ Serializer = &JWT{}
+var _ serializer = &JWT{}

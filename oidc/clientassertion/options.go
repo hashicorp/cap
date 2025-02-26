@@ -10,6 +10,10 @@ import (
 	"github.com/go-jose/go-jose/v4"
 )
 
+// KeyIDHeader is the "kid" header on a JWT, which providers use to look up
+// the right public key to verify the JWT.
+const KeyIDHeader = "kid"
+
 // Option configures the JWT
 type Option func(*JWT) error
 
@@ -61,7 +65,7 @@ func WithHeaders(h map[string]string) Option {
 	const op = "WithHeaders"
 	return func(j *JWT) error {
 		for k, v := range h {
-			if k == "kid" {
+			if k == KeyIDHeader {
 				return fmt.Errorf(`%s: "kid" header not allowed; use WithKeyID instead`, op)
 			}
 			j.headers[k] = v
