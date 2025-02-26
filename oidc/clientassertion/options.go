@@ -5,7 +5,7 @@ package clientassertion
 
 import (
 	"crypto/rsa"
-	"errors"
+	"fmt"
 
 	"github.com/go-jose/go-jose/v4"
 )
@@ -35,9 +35,10 @@ func WithClientSecret(secret string, alg HSAlgorithm) Option {
 // * RS384
 // * RS512
 func WithRSAKey(key *rsa.PrivateKey, alg RSAlgorithm) Option {
+	const op = "WithRSAKey"
 	return func(j *JWT) error {
 		if err := alg.Validate(key); err != nil {
-			return err
+			return fmt.Errorf("%s: %w", op, err)
 		}
 		j.key = key
 		j.alg = jose.SignatureAlgorithm(alg)
@@ -54,14 +55,14 @@ func WithKeyID(keyID string) Option {
 	}
 }
 
-// WithHeaders sets extra JWT headers
+// WithHeaders sets extra JWT headers.
+// Do not set a "kid" header here; instead use WithKeyID.
 func WithHeaders(h map[string]string) Option {
+	const op = "WithHeaders"
 	return func(j *JWT) error {
 		for k, v := range h {
-			// disallow potential confusion arising from the "kid" header
-			// being set both by this and WithKeyID()
 			if k == "kid" {
-				return errors.New(`"kid" header not allowed in WithHeaders; use WithKeyID instead`)
+				return fmt.Errorf(`%s: "kid" header not allowed; use WithKeyID instead`, op)
 			}
 			j.headers[k] = v
 		}

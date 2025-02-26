@@ -22,22 +22,18 @@ const (
 	JWTTypeParam = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 )
 
-var (
-	// these may happen due to user error
-	ErrMissingClientID    = errors.New("missing client ID")
-	ErrMissingAudience    = errors.New("missing audience")
-	ErrMissingAlgorithm   = errors.New("missing signing algorithm")
-	ErrMissingKeyOrSecret = errors.New("missing private key or client secret")
-	ErrBothKeyAndSecret   = errors.New("both private key and client secret provided")
-	// if these happen, either the user directly instantiated &JWT{}
-	// or there's a bug somewhere.
-	ErrMissingFuncIDGenerator = errors.New("missing IDgen func; please use NewJWT()")
-	ErrMissingFuncNow         = errors.New("missing now func; please use NewJWT()")
-	ErrCreatingSigner         = errors.New("error creating jwt signer")
-)
-
-// NewJWT sets up a new JWT to sign with a private key or client secret
+// NewJWT creates a new JWT which will be signed with either a private key or
+// client secret.
+//
+// Supported Options:
+// * WithClientSecret
+// * WithRSAKey
+// * WithKeyID
+// * WithHeaders
+//
+// Either WithRSAKey or WithClientSecret must be used, but not both.
 func NewJWT(clientID string, audience []string, opts ...Option) (*JWT, error) {
+	const op = "NewJWT"
 	j := &JWT{
 		clientID: clientID,
 		audience: audience,
@@ -57,12 +53,13 @@ func NewJWT(clientID string, audience []string, opts ...Option) (*JWT, error) {
 	}
 
 	if err := j.Validate(); err != nil {
-		return nil, fmt.Errorf("new client assertion validation error: %w", err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 	return j, nil
 }
 
-// JWT signs a JWT with either a private key or a secret
+// JWT is used to create a client assertion JWT, a special JWT used by an OAuth
+// 2.0 or OIDC client to authenticate themselves to an authorization server
 type JWT struct {
 	// for JWT claims
 	clientID string
@@ -83,6 +80,7 @@ type JWT struct {
 
 // Validate validates the expected fields
 func (j *JWT) Validate() error {
+	const op = "JWT.Validate"
 	var errs []error
 	if j.genID == nil {
 		errs = append(errs, ErrMissingFuncIDGenerator)
@@ -92,7 +90,7 @@ func (j *JWT) Validate() error {
 	}
 	// bail early if any internal func errors
 	if len(errs) > 0 {
-		return errors.Join(errs...)
+		return fmt.Errorf("%s: %w", op, errors.Join(errs...))
 	}
 
 	if j.clientID == "" {
@@ -112,45 +110,49 @@ func (j *JWT) Validate() error {
 	}
 	// if any of those fail, we have no hope.
 	if len(errs) > 0 {
-		return errors.Join(errs...)
+		return fmt.Errorf("%s: %w", op, errors.Join(errs...))
 	}
 
 	// finally, make sure Serialize() works; we can't pre-validate everything,
 	// and this whole thing is useless if it can't Serialize()
 	if _, err := j.Serialize(); err != nil {
-		return fmt.Errorf("serialization error during validate: %w", err)
+		return fmt.Errorf("%s: serialization error during validate: %w", op, err)
 	}
 
 	return nil
 }
 
-// Serialize returns a signed JWT string
+// Serialize returns client assertion JWT which can be used by an OAuth 2.0 or
+// OIDC client to authenticate themselves to an authorization server
 func (j *JWT) Serialize() (string, error) {
+	const op = "JWT.Serialize"
 	builder, err := j.builder()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("%s: %w", op, err)
 	}
 	token, err := builder.Serialize()
 	if err != nil {
-		return "", fmt.Errorf("failed to sign token: %w", err)
+		return "", fmt.Errorf("%s: failed to sign token: %w", op, err)
 	}
 	return token, nil
 }
 
 func (j *JWT) builder() (jwt.Builder, error) {
+	const op = "builder"
 	signer, err := j.signer()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 	id, err := j.genID()
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate token id: %w", err)
+		return nil, fmt.Errorf("%s: failed to generate token id: %w", op, err)
 	}
 	claims := j.claims(id)
 	return jwt.Signed(signer).Claims(claims), nil
 }
 
 func (j *JWT) signer() (jose.Signer, error) {
+	const op = "signer"
 	sKey := jose.SigningKey{
 		Algorithm: j.alg,
 	}
@@ -173,7 +175,7 @@ func (j *JWT) signer() (jose.Signer, error) {
 
 	signer, err := jose.NewSigner(sKey, sOpts.WithType("JWT"))
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrCreatingSigner, err)
+		return nil, fmt.Errorf("%s: %w: %w", op, ErrCreatingSigner, err)
 	}
 	return signer, nil
 }
