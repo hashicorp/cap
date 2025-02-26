@@ -38,9 +38,17 @@ func NewJWT(clientID string, audience []string, opts ...Option) (*JWT, error) {
 		genID:    uuid.GenerateUUID,
 		now:      time.Now,
 	}
+
+	var errs []error
 	for _, opt := range opts {
-		opt(j)
+		if err := opt(j); err != nil {
+			errs = append(errs, err)
+		}
 	}
+	if len(errs) > 0 {
+		return nil, errors.Join(errs...)
+	}
+
 	if err := j.Validate(); err != nil {
 		return nil, fmt.Errorf("new client assertion validation error: %w", err)
 	}

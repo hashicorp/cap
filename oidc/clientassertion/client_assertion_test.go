@@ -53,6 +53,9 @@ func TestNewJWT(t *testing.T) {
 
 	tCid := "test-client-id"
 	tAud := []string{"test-audience"}
+	validKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	validSecret := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // 32 bytes for HS256
 
 	cases := []struct {
 		name  string
@@ -60,23 +63,24 @@ func TestNewJWT(t *testing.T) {
 		aud   []string
 		opts  []Option
 		check func(*testing.T, *JWT)
+		err   string
 	}{
 		{
 			name: "with private key",
 			cid:  tCid, aud: tAud,
-			opts: []Option{WithRSAKey(&rsa.PrivateKey{}, "test-alg")},
+			opts: []Option{WithRSAKey(validKey, RS256)},
 			check: func(t *testing.T, ca *JWT) {
 				require.NotNil(t, ca.key)
-				require.Equal(t, jose.SignatureAlgorithm("test-alg"), ca.alg)
+				require.Equal(t, jose.SignatureAlgorithm("RS256"), ca.alg)
 			},
 		},
 		{
 			name: "with client secret",
 			cid:  tCid, aud: tAud,
-			opts: []Option{WithClientSecret("ssshhhh", "test-alg")},
+			opts: []Option{WithClientSecret(validSecret, HS256)},
 			check: func(t *testing.T, ca *JWT) {
-				require.Equal(t, "ssshhhh", ca.secret)
-				require.Equal(t, jose.SignatureAlgorithm("test-alg"), ca.alg)
+				require.Equal(t, validSecret, ca.secret)
+				require.Equal(t, jose.SignatureAlgorithm(HS256), ca.alg)
 			},
 		},
 		{
@@ -84,7 +88,7 @@ func TestNewJWT(t *testing.T) {
 			cid:  tCid, aud: tAud,
 			opts: []Option{
 				WithKeyID("kid"),
-				WithClientSecret("ssshhhh", "blah"),
+				WithClientSecret(validSecret, HS256),
 			},
 			check: func(t *testing.T, ca *JWT) {
 				require.Equal(t, "kid", ca.headers["kid"])
@@ -95,11 +99,43 @@ func TestNewJWT(t *testing.T) {
 			cid:  tCid, aud: tAud,
 			opts: []Option{
 				WithHeaders(map[string]string{"h1": "v1", "h2": "v2"}),
-				WithClientSecret("ssshhhh", "test-alg"),
+				WithClientSecret(validSecret, HS256),
 			},
 			check: func(t *testing.T, ca *JWT) {
 				require.Equal(t, map[string]string{"h1": "v1", "h2": "v2"}, ca.headers)
 			},
+		},
+		{
+			name: "invalid alg for secret",
+			cid:  tCid, aud: tAud,
+			opts: []Option{
+				WithClientSecret(validSecret, "ruh-roh"),
+			},
+			err: ErrUnsupportedAlgorithm.Error(),
+		},
+		{
+			name: "invalid alg for key",
+			cid:  tCid, aud: tAud,
+			opts: []Option{
+				WithRSAKey(validKey, "ruh-roh"),
+			},
+			err: ErrUnsupportedAlgorithm.Error(),
+		},
+		{
+			name: "invalid client secret",
+			cid:  tCid, aud: tAud,
+			opts: []Option{
+				WithClientSecret("invalid secret", HS256),
+			},
+			err: ErrInvalidSecretLength.Error(),
+		},
+		{
+			name: "invalid key",
+			cid:  tCid, aud: tAud,
+			opts: []Option{
+				WithRSAKey(&rsa.PrivateKey{}, RS256),
+			},
+			err: "crypto/rsa: missing public modulus",
 		},
 	}
 	for _, tc := range cases {
@@ -107,10 +143,15 @@ func TestNewJWT(t *testing.T) {
 
 			j, err := NewJWT(tc.cid, tc.aud, tc.opts...)
 
-			require.NoError(t, err)
-			require.NotNil(t, j)
-			require.Equal(t, tc.cid, j.clientID)
-			require.Equal(t, tc.aud, j.audience)
+			if tc.err == "" {
+				require.NoError(t, err)
+				require.NotNil(t, j)
+				require.Equal(t, tc.cid, j.clientID)
+				require.Equal(t, tc.aud, j.audience)
+			} else {
+				require.Error(t, err)
+				require.ErrorContains(t, err, tc.err)
+			}
 
 			if tc.check != nil {
 				tc.check(t, j)
@@ -123,6 +164,9 @@ func TestNewJWT(t *testing.T) {
 func TestValidate(t *testing.T) {
 	tCid := "test-client-id"
 	tAud := []string{"test-audience"}
+	validKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	validSecret := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // 32 bytes for HS256
 	cases := []struct {
 		name string
 		cid  string
@@ -139,7 +183,7 @@ func TestValidate(t *testing.T) {
 			aud:  tAud,
 			errs: []error{ErrMissingClientID},
 			opts: []Option{
-				WithRSAKey(&rsa.PrivateKey{}, "algo"),
+				WithRSAKey(validKey, RS256),
 			},
 		},
 		{
@@ -147,7 +191,7 @@ func TestValidate(t *testing.T) {
 			cid:  tCid,
 			errs: []error{ErrMissingAudience},
 			opts: []Option{
-				WithRSAKey(&rsa.PrivateKey{}, "algo"),
+				WithRSAKey(validKey, RS256),
 			},
 		},
 		{
@@ -159,8 +203,8 @@ func TestValidate(t *testing.T) {
 			name: "both client and secret",
 			cid:  tCid, aud: tAud,
 			opts: []Option{
-				WithRSAKey(&rsa.PrivateKey{}, "algo"),
-				WithClientSecret("ssshhhh", "algo"),
+				WithRSAKey(validKey, RS256),
+				WithClientSecret(validSecret, HS256),
 			},
 			errs: []error{ErrBothKeyAndSecret},
 		},
@@ -213,14 +257,6 @@ func TestSignedToken(t *testing.T) {
 				WithKeyID("test-key-id"),
 				WithHeaders(map[string]string{"xtra": "headies"}),
 			},
-		},
-		{
-			name:     "invalid alg",
-			claimKey: pub,
-			opts: []Option{
-				WithRSAKey(key, "ruh-roh"),
-			},
-			err: jose.ErrUnsupportedAlgorithm,
 		},
 	}
 
@@ -278,7 +314,7 @@ func TestSignedToken(t *testing.T) {
 
 	t.Run("error generating token id", func(t *testing.T) {
 		genIDErr := errors.New("failed to generate test id")
-		j, err := NewJWT("a", []string{"a"}, WithClientSecret("ssshhhh", "HS256"))
+		j, err := NewJWT("a", []string{"a"}, WithClientSecret(validSecret, HS256))
 		require.NoError(t, err)
 		j.genID = func() (string, error) { return "", genIDErr }
 		tokenString, err := j.SignedToken()
