@@ -1382,7 +1382,7 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		if t := req.FormValue("client_assertion_type"); t != "" {
 			// assume client_assertion_type, if set, is always the magic jwt string
-			if t != cass.ClientAssertionJWTType {
+			if t != cass.JWTTypeParam {
 				_ = p.writeTokenErrorResponse(w, http.StatusBadRequest, "invalid_client", "unknown client assertion type")
 				return
 			}
