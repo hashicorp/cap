@@ -93,12 +93,13 @@ func NewProvider(c *Config) (*Provider, error) {
 			convertedAlgs = append(convertedAlgs, string(alg))
 		}
 		cfg := oidc.ProviderConfig{
-			IssuerURL:   c.Issuer,
-			AuthURL:     c.ProviderConfig.AuthURL,
-			JWKSURL:     c.ProviderConfig.JWKSURL,
-			TokenURL:    c.ProviderConfig.TokenURL,
-			UserInfoURL: c.ProviderConfig.UserInfoURL,
-			Algorithms:  convertedAlgs,
+			IssuerURL:     c.Issuer,
+			AuthURL:       c.ProviderConfig.AuthURL,
+			JWKSURL:       c.ProviderConfig.JWKSURL,
+			TokenURL:      c.ProviderConfig.TokenURL,
+			DeviceAuthURL: c.ProviderConfig.DeviceAuthURL,
+			UserInfoURL:   c.ProviderConfig.UserInfoURL,
+			Algorithms:    convertedAlgs,
 		}
 		p.provider = cfg.NewProvider(oidcCtx)
 
@@ -725,6 +726,9 @@ type DiscoveryInfo struct {
 	// TokenURL (REQUIRED): URL of the OP's OAuth 2.0 Token Endpoint
 	TokenURL string `json:"token_endpoint"`
 
+	// DeviceAuthURL (OPTIONAL, omitempty): URL of the OP's Device Authorization Endpoint
+	DeviceAuthURL string `json:"device_authorization_endpoint,omitempty"`
+
 	// UserInfoURL (OPTIONAL, omitempty): URL of the OP's UserInfo Endpoint
 	UserInfoURL string `json:"userinfo_endpoint,omitempty"`
 
@@ -825,4 +829,22 @@ func unmarshalRespJSON(r *http.Response, body []byte, v interface{}) error {
 		return fmt.Errorf("%s: Content-Type = application/json, but could not unmarshal it as JSON: %w", op, err)
 	}
 	return fmt.Errorf("%s: expected Content-Type = application/json, got %q and could not unmarshal it as JSON: %w", op, ct, err)
+}
+
+// Config returns the ProviderConfig for this Provider.
+// If it was supplied in the first place, just return it, but otherwise
+// construct it from what was discovered by and available from go-oidc.
+func (p *Provider) Config() ProviderConfig {
+	providerConfig := p.config.ProviderConfig
+	if providerConfig == nil {
+		// Note that JWKSURL is not available through the go-oidc api
+		endpoint := p.provider.Endpoint()
+		providerConfig = &ProviderConfig{
+			AuthURL:       endpoint.AuthURL,
+			TokenURL:      endpoint.TokenURL,
+			DeviceAuthURL: endpoint.DeviceAuthURL,
+			UserInfoURL:   p.provider.UserInfoEndpoint(),
+		}
+	}
+	return *providerConfig
 }
