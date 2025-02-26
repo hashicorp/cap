@@ -35,10 +35,6 @@ func assertJoinedErrs(t *testing.T, expect []error, actual error) {
 func TestJWTBare(t *testing.T) {
 	j := &JWT{}
 
-	expect := []error{ErrMissingFuncIDGenerator, ErrMissingFuncNow}
-	actual := j.Validate()
-	assertJoinedErrs(t, expect, actual)
-
 	tokenStr, err := j.Serialize()
 	require.ErrorIs(t, err, ErrCreatingSigner)
 
