@@ -2,6 +2,7 @@ package clientassertion
 
 import (
 	"crypto/rsa"
+	"errors"
 
 	"github.com/go-jose/go-jose/v4"
 )
@@ -54,6 +55,11 @@ func WithKeyID(keyID string) Option {
 func WithHeaders(h map[string]string) Option {
 	return func(j *JWT) error {
 		for k, v := range h {
+			// disallow potential confusion arising from the "kid" header
+			// being set both by this and WithKeyID()
+			if k == "kid" {
+				return errors.New(`"kid" header not allowed in WithHeaders; use WithKeyID instead`)
+			}
 			j.headers[k] = v
 		}
 		return nil
