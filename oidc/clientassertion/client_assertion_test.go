@@ -24,7 +24,9 @@ type joinedErrs interface {
 
 func assertJoinedErrs(t *testing.T, expect []error, actual error) {
 	t.Helper()
-	joined, ok := actual.(joinedErrs) // Validate() error is errors.Join()ed
+	// validate() error is wrapped, joined, wrapped errors
+	err := errors.Unwrap(actual)
+	joined, ok := err.(joinedErrs)
 	require.True(t, ok, "expected Join()ed errors from Validate(); got: %v", actual)
 	unwrapped := joined.Unwrap()
 	require.ElementsMatch(t, expect, unwrapped)
@@ -44,7 +46,7 @@ func TestJWTBare(t *testing.T) {
 func TestNewJWT(t *testing.T) {
 	t.Run("should run validate", func(t *testing.T) {
 		j, err := NewJWT("", nil)
-		require.ErrorContains(t, err, "validation error:")
+		require.ErrorContains(t, err, "validate:")
 		assert.Nil(t, j)
 	})
 
@@ -213,7 +215,7 @@ func TestValidate(t *testing.T) {
 			j, err := NewJWT(tc.cid, tc.aud, tc.opts...)
 
 			require.NotNil(t, err)
-			require.ErrorContains(t, err, "validation error:")
+			require.ErrorContains(t, err, "validate:")
 
 			err = errors.Unwrap(err) // NewJWT wraps the error from Validate() with fmt.Errorf("%w")
 			assertJoinedErrs(t, tc.errs, err)
