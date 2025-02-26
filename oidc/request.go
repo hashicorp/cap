@@ -83,11 +83,11 @@ type Request interface {
 	// See: https://tools.ietf.org/html/rfc7636
 	PKCEVerifier() CodeVerifier
 
-	// ClientAssertionJWT optionally specifies a signed JWT to be used in a
+	// ClientAssertionJWT optionally specifies a JWT Serializer to be used in a
 	// client_assertion token request.
 	//
 	// See: https://oauth.net/private-key-jwt/
-	ClientAssertionJWT() string
+	ClientAssertionJWT() JWTSerializer
 
 	// MaxAge: when authAfter is not a zero value (authTime.IsZero()) then the
 	// id_token's auth_time claim must be after the specified time.
@@ -181,7 +181,8 @@ type Req struct {
 	// with PKCE.  It suppies the required CodeVerifier for PKCE.
 	withVerifier CodeVerifier
 
-	withClientJWT string
+	// withClientJWT optionally sends a JWT as a client_assertion.
+	withClientJWT JWTSerializer
 
 	// withMaxAge: when withMaxAge.authAfter is not a zero value
 	// (authTime.IsZero()) then the id_token's auth_time claim must be after the
@@ -332,8 +333,8 @@ func (r *Req) PKCEVerifier() CodeVerifier {
 }
 
 // ClientAssertionJWT implements the Request.ClientAssertionJWT() interface
-// function and returns the JWT string.
-func (r *Req) ClientAssertionJWT() string {
+// function and returns a JWTSerializer.
+func (r *Req) ClientAssertionJWT() JWTSerializer {
 	return r.withClientJWT
 }
 
@@ -458,7 +459,7 @@ type reqOptions struct {
 	withACRValues    []string
 	withState        string
 	withNonce        string
-	withClientJWT    string
+	withClientJWT    JWTSerializer
 }
 
 // reqDefaults is a handy way to get the defaults at runtime and during unit
@@ -519,13 +520,18 @@ func WithPKCE(v CodeVerifier) Option {
 	}
 }
 
-// WithClientAssertionJWT provides an option to send a signed JWT as a
-// client_assertion.
+// JWTSerializer's Serialize method returns a signed JWT or an error.
+// clientassertion.JWT is a useful implementation of this interface.
+type JWTSerializer interface {
+	Serialize() (string, error)
+}
+
+// WithClientAssertionJWT will send a JWT as a client_assertion.
 //
 // Option is valid for: Request
 //
 // See: https://oauth.net/private-key-jwt/
-func WithClientAssertionJWT(jwt string) Option {
+func WithClientAssertionJWT(jwt JWTSerializer) Option {
 	return func(o interface{}) {
 		switch v := o.(type) {
 		case *reqOptions:

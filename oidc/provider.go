@@ -307,10 +307,16 @@ func (p *Provider) Exchange(ctx context.Context, oidcRequest Request, authorizat
 	if oidcRequest.PKCEVerifier() != nil {
 		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("code_verifier", oidcRequest.PKCEVerifier().Verifier()))
 	}
-	if oidcRequest.ClientAssertionJWT() != "" {
+	if oidcRequest.ClientAssertionJWT() != nil {
+		// by now, sufficient validation should have already occurred to prevent
+		// errors here, but err check again just in case.
+		token, err := oidcRequest.ClientAssertionJWT().Serialize()
+		if err != nil {
+			return nil, err
+		}
 		authCodeOpts = append(authCodeOpts,
 			oauth2.SetAuthURLParam("client_assertion_type", cass.ClientAssertionJWTType),
-			oauth2.SetAuthURLParam("client_assertion", oidcRequest.ClientAssertionJWT()),
+			oauth2.SetAuthURLParam("client_assertion", token),
 		)
 	}
 	oauth2Token, err := oauth2Config.Exchange(oidcCtx, authorizationCode, authCodeOpts...)

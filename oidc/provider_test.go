@@ -501,11 +501,11 @@ func TestProvider_Exchange(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	cassJWT := "test-client-assertion-jwt"
+	testJWT := &mockSerializer{s: "test-client-assertion-jwt"}
 	reqWithClientAssertion, err := NewRequest(
 		1*time.Minute,
 		redirect,
-		WithClientAssertionJWT(cassJWT),
+		WithClientAssertionJWT(testJWT),
 	)
 	require.NoError(t, err)
 
@@ -609,7 +609,9 @@ func TestProvider_Exchange(t *testing.T) {
 				if tt.args.r.PKCEVerifier() != nil {
 					tp.SetPKCEVerifier(tt.args.r.PKCEVerifier())
 				}
-				if jot := tt.args.r.ClientAssertionJWT(); jot != "" {
+				if j := tt.args.r.ClientAssertionJWT(); j != nil {
+					jot, err := j.Serialize()
+					require.NoError(err)
 					tp.SetClientAssertionJWT(jot)
 				}
 			}
@@ -1752,4 +1754,15 @@ func TestProvider_DiscoveryInfo(t *testing.T) {
 			assert.Equal(info.ScopesSupported, tt.wantScopes)
 		})
 	}
+}
+
+var _ JWTSerializer = &mockSerializer{}
+
+type mockSerializer struct {
+	s   string
+	err error
+}
+
+func (ms *mockSerializer) Serialize() (string, error) {
+	return ms.s, ms.err
 }

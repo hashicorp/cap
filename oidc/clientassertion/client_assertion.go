@@ -27,6 +27,7 @@ var (
 	// or there's a bug somewhere.
 	ErrMissingFuncIDGenerator = errors.New("missing IDgen func; please use NewJWT()")
 	ErrMissingFuncNow         = errors.New("missing now func; please use NewJWT()")
+	ErrCreatingSigner         = errors.New("error creating jwt signer")
 )
 
 // NewJWT sets up a new JWT to sign with a private key or client secret
@@ -103,14 +104,22 @@ func (j *JWT) Validate() error {
 	if j.key != nil && j.secret != "" {
 		errs = append(errs, ErrBothKeyAndSecret)
 	}
-	return errors.Join(errs...)
+	// if any of those fail, we have no hope.
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+
+	// finally, make sure Serialize() works; we can't pre-validate everything,
+	// and this whole thing is useless if it can't Serialize()
+	if _, err := j.Serialize(); err != nil {
+		return fmt.Errorf("serialization error during validate: %w", err)
+	}
+
+	return nil
 }
 
-// SignedToken returns a signed JWT in the compact serialization format
-func (j *JWT) SignedToken() (string, error) {
-	if err := j.Validate(); err != nil {
-		return "", err
-	}
+// Serialize returns a signed JWT string
+func (j *JWT) Serialize() (string, error) {
 	builder, err := j.builder()
 	if err != nil {
 		return "", err
@@ -158,7 +167,7 @@ func (j *JWT) signer() (jose.Signer, error) {
 
 	signer, err := jose.NewSigner(sKey, sOpts.WithType("JWT"))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create jwt signer: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrCreatingSigner, err)
 	}
 	return signer, nil
 }
@@ -175,3 +184,12 @@ func (j *JWT) claims(id string) *jwt.Claims {
 		ID:        id,
 	}
 }
+
+// Serializer is the primary interface impelmented by JWT.
+type Serializer interface {
+	Serialize() (string, error)
+}
+
+// ensure JWT implements Serializer, which is accepted by the oidc option
+// oidc.WithClientAssertionJWT.
+var _ Serializer = &JWT{}

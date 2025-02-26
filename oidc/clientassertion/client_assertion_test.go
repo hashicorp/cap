@@ -22,7 +22,7 @@ type joinedErrs interface {
 func assertJoinedErrs(t *testing.T, expect []error, actual error) {
 	t.Helper()
 	joined, ok := actual.(joinedErrs) // Validate() error is errors.Join()ed
-	require.True(t, ok, "expected Join()ed errors from Validate()")
+	require.True(t, ok, "expected Join()ed errors from Validate(); got: %v", actual)
 	unwrapped := joined.Unwrap()
 	require.ElementsMatch(t, expect, unwrapped)
 }
@@ -32,14 +32,12 @@ func assertJoinedErrs(t *testing.T, expect []error, actual error) {
 func TestJWTBare(t *testing.T) {
 	j := &JWT{}
 
-	// all public methods should return the same error(s)
 	expect := []error{ErrMissingFuncIDGenerator, ErrMissingFuncNow}
-
 	actual := j.Validate()
 	assertJoinedErrs(t, expect, actual)
 
-	tokenStr, err := j.SignedToken()
-	assertJoinedErrs(t, expect, err)
+	tokenStr, err := j.Serialize()
+	require.ErrorIs(t, err, ErrCreatingSigner)
 
 	assert.Equal(t, "", tokenStr)
 }
@@ -270,7 +268,7 @@ func TestSignedToken(t *testing.T) {
 			j.genID = func() (string, error) { return "test-claim-id", nil }
 
 			// method under test
-			tokenString, err := j.SignedToken()
+			tokenString, err := j.Serialize()
 
 			if tc.err != nil {
 				require.ErrorIs(t, err, tc.err)
@@ -317,7 +315,7 @@ func TestSignedToken(t *testing.T) {
 		j, err := NewJWT("a", []string{"a"}, WithClientSecret(validSecret, HS256))
 		require.NoError(t, err)
 		j.genID = func() (string, error) { return "", genIDErr }
-		tokenString, err := j.SignedToken()
+		tokenString, err := j.Serialize()
 		require.ErrorIs(t, err, genIDErr)
 		require.Equal(t, "", tokenString)
 	})

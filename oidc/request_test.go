@@ -26,6 +26,7 @@ func TestNewRequest(t *testing.T) {
 
 	testVerifier, err := NewCodeVerifier()
 	require.NoError(t, err)
+	testJWT := &mockSerializer{s: "test-client-assertion-jwt"}
 
 	tests := []struct {
 		name                string
@@ -37,7 +38,7 @@ func TestNewRequest(t *testing.T) {
 		wantAudiences       []string
 		wantScopes          []string
 		wantVerifier        CodeVerifier
-		wantClientAssertion string
+		wantClientAssertion JWTSerializer
 		wantErr             bool
 		wantIsErr           error
 	}{
@@ -50,14 +51,14 @@ func TestNewRequest(t *testing.T) {
 				WithAudiences("bob", "alice"),
 				WithScopes("email", "profile"),
 				WithPKCE(testVerifier),
-				WithClientAssertionJWT("test-client-assertion-jwt"),
+				WithClientAssertionJWT(testJWT),
 			},
 			wantNowFunc:         testNow,
 			wantRedirectURL:     "https://bob.com",
 			wantAudiences:       []string{"bob", "alice"},
 			wantScopes:          []string{oidc.ScopeOpenID, "email", "profile"},
 			wantVerifier:        testVerifier,
-			wantClientAssertion: "test-client-assertion-jwt",
+			wantClientAssertion: testJWT,
 		},
 		{
 			name:            "valid-no-opt",
@@ -164,7 +165,7 @@ func Test_WithClientAssertionJWT(t *testing.T) {
 		assert.Equal(opts, testOpts)
 		assert.Empty(testOpts.withClientJWT)
 
-		j := "test-jwt"
+		j := &mockSerializer{s: "test-jwt"}
 		opts = getReqOpts(WithClientAssertionJWT(j))
 		testOpts = reqDefaults()
 		testOpts.withClientJWT = j
