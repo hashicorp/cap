@@ -1,3 +1,6 @@
+// Package clientassertion signs JWTs with a Private Key or Client Secret
+// for use in OIDC client_assertion requests, A.K.A. private_key_jwt.
+// reference: https://oauth.net/private-key-jwt/
 package clientassertion
 
 import (
@@ -11,9 +14,9 @@ import (
 )
 
 const (
-	// ClientAssertionJWTType is the proper value for client_assertion_type.
+	// JWTTypeParam is the proper value for client_assertion_type.
 	// https://www.rfc-editor.org/rfc/rfc7523.html#section-2.2
-	ClientAssertionJWTType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+	JWTTypeParam = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 )
 
 var (

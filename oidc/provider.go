@@ -315,7 +315,7 @@ func (p *Provider) Exchange(ctx context.Context, oidcRequest Request, authorizat
 			return nil, err
 		}
 		authCodeOpts = append(authCodeOpts,
-			oauth2.SetAuthURLParam("client_assertion_type", cass.ClientAssertionJWTType),
+			oauth2.SetAuthURLParam("client_assertion_type", cass.JWTTypeParam),
 			oauth2.SetAuthURLParam("client_assertion", token),
 		)
 	}
