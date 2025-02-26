@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 // Package clientassertion signs JWTs with a Private Key or Client Secret
 // for use in OIDC client_assertion requests, A.K.A. private_key_jwt.
 // reference: https://oauth.net/private-key-jwt/
