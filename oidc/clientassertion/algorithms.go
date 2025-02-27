@@ -36,20 +36,24 @@ func (a HSAlgorithm) Validate(secret string) error {
 	if secret == "" {
 		return fmt.Errorf("%s: %w: empty", op, ErrInvalidSecretLength)
 	}
-	// verify secret length based on alg
-	var expectLen int
+	// rfc7518 https://datatracker.ietf.org/doc/html/rfc7518#section-3.2
+	// states:
+	//   A key of the same size as the hash output (for instance, 256 bits
+	//   for "HS256") or larger MUST be used
+	// e.g. 256 / 8 = 32 bytes
+	var minLen int
 	switch a {
 	case HS256:
-		expectLen = 32
+		minLen = 32
 	case HS384:
-		expectLen = 48
+		minLen = 48
 	case HS512:
-		expectLen = 64
+		minLen = 64
 	default:
 		return fmt.Errorf("%s: %w %q for client secret", op, ErrUnsupportedAlgorithm, a)
 	}
-	if len(secret) < expectLen {
-		return fmt.Errorf("%s: %w: %q must be %d bytes long", op, ErrInvalidSecretLength, a, expectLen)
+	if len(secret) < minLen {
+		return fmt.Errorf("%s: %w: %q must be at least %d bytes long", op, ErrInvalidSecretLength, a, minLen)
 	}
 	return nil
 }
