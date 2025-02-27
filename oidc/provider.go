@@ -312,7 +312,7 @@ func (p *Provider) Exchange(ctx context.Context, oidcRequest Request, authorizat
 		// errors here, but err check again just in case.
 		token, err := oidcRequest.ClientAssertionJWT().Serialize()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s: %w", op, err)
 		}
 		authCodeOpts = append(authCodeOpts,
 			oauth2.SetAuthURLParam("client_assertion_type", cass.JWTTypeParam),

@@ -95,7 +95,7 @@ func (j *JWT) Serialize() (string, error) {
 	}
 	token, err := builder.Serialize()
 	if err != nil {
-		return "", fmt.Errorf("%s: failed to sign token: %w", op, err)
+		return "", fmt.Errorf("%s: failed to serialize token: %w", op, err)
 	}
 	return token, nil
 }

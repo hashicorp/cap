@@ -35,7 +35,7 @@ const (
 func (a HSAlgorithm) Validate(secret string) error {
 	const op = "HSAlgorithm.Validate"
 	if secret == "" {
-		return fmt.Errorf("%w: empty", ErrInvalidSecretLength)
+		return fmt.Errorf("%s: %w: empty", op, ErrInvalidSecretLength)
 	}
 	// verify secret length based on alg
 	var expectLen int
