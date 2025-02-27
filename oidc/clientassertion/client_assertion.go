@@ -192,7 +192,7 @@ func (j *JWT) claims(id string) *jwt.Claims {
 	}
 }
 
-// serializer is the primary interface impelmented by JWT.
+// serializer is the primary interface implemented by JWT.
 type serializer interface {
 	Serialize() (string, error)
 }

@@ -15,10 +15,9 @@ type (
 	RSAlgorithm string
 )
 
+// JOSE asymmetric signing algorithm values as defined by RFC 7518.
+// See: https://tools.ietf.org/html/rfc7518#section-3.1
 const (
-	// JOSE asymmetric signing algorithm values as defined by RFC 7518.
-	// See: https://tools.ietf.org/html/rfc7518#section-3.1
-
 	HS256 HSAlgorithm = "HS256" // HMAC using SHA-256
 	HS384 HSAlgorithm = "HS384" // HMAC using SHA-384
 	HS512 HSAlgorithm = "HS512" // HMAC using SHA-512

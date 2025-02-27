@@ -58,7 +58,7 @@ func WithKeyID(keyID string) Option {
 		if keyID == "" {
 			return fmt.Errorf("%s: %w", op, ErrMissingKeyID)
 		}
-		j.headers["kid"] = keyID
+		j.headers[KeyIDHeader] = keyID
 		return nil
 	}
 }
