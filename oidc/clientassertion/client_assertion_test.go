@@ -35,6 +35,8 @@ func assertJoinedErrs(t *testing.T, actual error, expect []error) {
 // TestJWTBare tests what errors we expect if &JWT{}
 // is instantiated directly, rather than using a constructor.
 func TestJWTBare(t *testing.T) {
+	t.Parallel()
+
 	j := &JWT{}
 
 	tokenStr, err := j.Serialize()
@@ -44,69 +46,83 @@ func TestJWTBare(t *testing.T) {
 }
 
 func TestNewJWTWithRSAKey(t *testing.T) {
+	t.Parallel()
+
 	cid := "test-client-id"
 	aud := []string{"test-audience"}
 	validKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	// happy path
-	j, err := NewJWTWithRSAKey(cid, aud, RS256, validKey,
-		WithKeyID("key-id"), WithHeaders(map[string]string{"foo": "bar"}))
-	assert.NoError(t, err)
-	assert.NotNil(t, j)
-
-	// errors
-	j, err = NewJWTWithRSAKey("", []string{}, "", nil)
-	assertJoinedErrs(t, err, []error{
-		ErrMissingClientID, ErrMissingAudience, ErrMissingAlgorithm, ErrMissingKey,
+	t.Run("happy path", func(t *testing.T) {
+		j, err := NewJWTWithRSAKey(cid, aud, RS256, validKey,
+			WithKeyID("key-id"), WithHeaders(map[string]string{"foo": "bar"}))
+		assert.NoError(t, err)
+		assert.NotNil(t, j)
 	})
-	assert.Nil(t, j)
-	// bad algorithm
-	j, err = NewJWTWithRSAKey(cid, aud, "bad-alg", &rsa.PrivateKey{})
-	assert.ErrorIs(t, err, ErrUnsupportedAlgorithm)
-	// bad key; only checked if good alg
-	j, err = NewJWTWithRSAKey(cid, aud, RS256, &rsa.PrivateKey{})
-	assert.ErrorContains(t, err, "RSAlgorithm.Validate: crypto/rsa")
-	assert.Nil(t, j)
-	// bad With*s
-	j, err = NewJWTWithRSAKey(cid, aud, RS256, validKey,
-		WithKeyID(""), WithHeaders(map[string]string{"kid": "baz"}))
-	assert.ErrorIs(t, err, ErrMissingKeyID)
-	assert.ErrorIs(t, err, ErrKidHeader)
+
+	t.Run("multiple errors", func(t *testing.T) {
+		j, err := NewJWTWithRSAKey("", []string{}, "", nil)
+		assertJoinedErrs(t, err, []error{
+			ErrMissingClientID, ErrMissingAudience, ErrMissingAlgorithm, ErrMissingKey,
+		})
+		assert.Nil(t, j)
+	})
+	t.Run("bad algorithm", func(t *testing.T) {
+		_, err := NewJWTWithRSAKey(cid, aud, "bad-alg", &rsa.PrivateKey{})
+		assert.ErrorIs(t, err, ErrUnsupportedAlgorithm)
+	})
+	t.Run("bad key", func(t *testing.T) {
+		_, err = NewJWTWithRSAKey(cid, aud, RS256, &rsa.PrivateKey{})
+		assert.ErrorContains(t, err, "RSAlgorithm.Validate: crypto/rsa")
+	})
+	t.Run("bad Options", func(t *testing.T) {
+		_, err = NewJWTWithRSAKey(cid, aud, RS256, validKey,
+			WithKeyID(""), WithHeaders(map[string]string{"kid": "baz"}))
+		assert.ErrorIs(t, err, ErrMissingKeyID)
+		assert.ErrorIs(t, err, ErrKidHeader)
+	})
 }
 
 func TestNewJWTWithHMAC(t *testing.T) {
+	t.Parallel()
+
 	cid := "test-client-id"
 	aud := []string{"test-audience"}
 	validSecret := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // 32 bytes for HS256
 
-	// happy path
-	j, err := NewJWTWithHMAC(cid, aud, HS256, validSecret,
-		WithKeyID("key-id"), WithHeaders(map[string]string{"foo": "bar"}))
-	assert.NoError(t, err)
-	assert.NotNil(t, j)
-
-	// errors
-	j, err = NewJWTWithHMAC("", []string{}, "", "")
-	assertJoinedErrs(t, err, []error{
-		ErrMissingClientID, ErrMissingAudience, ErrMissingAlgorithm, ErrMissingSecret,
+	t.Run("happy path", func(t *testing.T) {
+		j, err := NewJWTWithHMAC(cid, aud, HS256, validSecret,
+			WithKeyID("key-id"), WithHeaders(map[string]string{"foo": "bar"}))
+		assert.NoError(t, err)
+		assert.NotNil(t, j)
 	})
-	assert.Nil(t, j)
-	// bad algorithm
-	j, err = NewJWTWithHMAC(cid, aud, "bad-alg", validSecret)
-	assert.ErrorIs(t, err, ErrUnsupportedAlgorithm)
-	// bad secret; only checked if good alg
-	j, err = NewJWTWithHMAC(cid, aud, HS256, "not-very-good")
-	assert.ErrorIs(t, err, ErrInvalidSecretLength)
-	assert.Nil(t, j)
-	// bad With*s
-	j, err = NewJWTWithHMAC(cid, aud, HS256, validSecret,
-		WithKeyID(""), WithHeaders(map[string]string{"kid": "baz"}))
-	assert.ErrorIs(t, err, ErrMissingKeyID)
-	assert.ErrorIs(t, err, ErrKidHeader)
+
+	t.Run("errors", func(t *testing.T) {
+		j, err := NewJWTWithHMAC("", []string{}, "", "")
+		assertJoinedErrs(t, err, []error{
+			ErrMissingClientID, ErrMissingAudience, ErrMissingAlgorithm, ErrMissingSecret,
+		})
+		assert.Nil(t, j)
+	})
+	t.Run("bad algorithm", func(t *testing.T) {
+		_, err := NewJWTWithHMAC(cid, aud, "bad-alg", validSecret)
+		assert.ErrorIs(t, err, ErrUnsupportedAlgorithm)
+	})
+	t.Run("bad secret", func(t *testing.T) {
+		_, err := NewJWTWithHMAC(cid, aud, HS256, "not-very-good")
+		assert.ErrorIs(t, err, ErrInvalidSecretLength)
+	})
+	t.Run("bad Options", func(t *testing.T) {
+		_, err := NewJWTWithHMAC(cid, aud, HS256, validSecret,
+			WithKeyID(""), WithHeaders(map[string]string{"kid": "baz"}))
+		assert.ErrorIs(t, err, ErrMissingKeyID)
+		assert.ErrorIs(t, err, ErrKidHeader)
+	})
 }
 
 func TestJWT_Serialize(t *testing.T) {
+	t.Parallel()
+
 	cid := "test-client-id"
 	aud := []string{"test-audience"}
 

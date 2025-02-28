@@ -35,7 +35,7 @@ const (
 // * WithHeaders
 func NewJWTWithRSAKey(clientID string, audience []string,
 	alg RSAlgorithm, key *rsa.PrivateKey, opts ...Option) (*JWT, error) {
-	const op = "NewJWTWithRSAKey"
+	const op = "clientassertion.NewJWTWithRSAKey"
 
 	j := &JWT{
 		clientID: clientID,
@@ -91,7 +91,7 @@ func NewJWTWithRSAKey(clientID string, audience []string,
 // * WithHeaders
 func NewJWTWithHMAC(clientID string, audience []string,
 	alg HSAlgorithm, secret string, opts ...Option) (*JWT, error) {
-	const op = "NewJWTWithHMAC"
+	const op = "clientassertion.NewJWTWithHMAC"
 	j := &JWT{
 		clientID: clientID,
 		audience: audience,
@@ -200,7 +200,7 @@ func (j *JWT) signer() (jose.Signer, error) {
 	}
 
 	sOpts := &jose.SignerOptions{
-		ExtraHeaders: make(map[jose.HeaderKey]interface{}, len(j.headers)),
+		ExtraHeaders: make(map[jose.HeaderKey]any, len(j.headers)),
 	}
 	for k, v := range j.headers {
 		sOpts.ExtraHeaders[jose.HeaderKey(k)] = v
