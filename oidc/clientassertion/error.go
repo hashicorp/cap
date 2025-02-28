@@ -8,19 +8,14 @@ import "errors"
 var (
 	// these may happen due to user error
 
-	ErrMissingClientID    = errors.New("missing client ID")
-	ErrMissingAudience    = errors.New("missing audience")
-	ErrMissingAlgorithm   = errors.New("missing signing algorithm")
-	ErrMissingKeyID       = errors.New("missing key ID")
-	ErrMissingKeyOrSecret = errors.New("missing private key or client secret")
-	ErrBothKeyAndSecret   = errors.New("both private key and client secret provided")
-
-	// if these happen, either the user directly instantiated &JWT{}
-	// or there's a bug somewhere.
-
-	ErrMissingFuncIDGenerator = errors.New("missing IDgen func; please use NewJWT()")
-	ErrMissingFuncNow         = errors.New("missing now func; please use NewJWT()")
-	ErrCreatingSigner         = errors.New("error creating jwt signer")
+	ErrMissingClientID  = errors.New("missing client ID")
+	ErrMissingAudience  = errors.New("missing audience")
+	ErrMissingAlgorithm = errors.New("missing signing algorithm")
+	ErrMissingKeyID     = errors.New("missing key ID")
+	ErrMissingKey       = errors.New("missing private key")
+	ErrMissingSecret    = errors.New("missing client secret")
+	ErrKidHeader        = errors.New(`"kid" not allowed in WithHeaders; use WithKeyID instead`)
+	ErrCreatingSigner   = errors.New("error creating jwt signer")
 
 	// algorithm errors
 

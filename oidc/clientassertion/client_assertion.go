@@ -7,6 +7,7 @@
 package clientassertion
 
 import (
+	"crypto/rsa"
 	"errors"
 	"fmt"
 	"time"
@@ -22,44 +23,112 @@ const (
 	JWTTypeParam = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 )
 
-// NewJWT creates a new JWT which will be signed with either a private key or
-// client secret.
+// NewJWTWithRSAKey creates a new JWT which will be signed with a private key.
+//
+// alg must be one of:
+// * RS256
+// * RS384
+// * RS512
 //
 // Supported Options:
-// * WithClientSecret
-// * WithRSAKey
 // * WithKeyID
 // * WithHeaders
-//
-// Either WithRSAKey or WithClientSecret must be used, but not both.
-func NewJWT(clientID string, audience []string, opts ...Option) (*JWT, error) {
-	const op = "NewJWT"
+func NewJWTWithRSAKey(clientID string, audience []string,
+	alg RSAlgorithm, key *rsa.PrivateKey, opts ...Option) (*JWT, error) {
+	const op = "NewJWTWithRSAKey"
+
 	j := &JWT{
 		clientID: clientID,
 		audience: audience,
+		alg:      jose.SignatureAlgorithm(alg),
+		key:      key,
 		headers:  make(map[string]string),
 		genID:    uuid.GenerateUUID,
 		now:      time.Now,
 	}
 
 	var errs []error
+	if clientID == "" {
+		errs = append(errs, ErrMissingClientID)
+	}
+	if len(audience) == 0 {
+		errs = append(errs, ErrMissingAudience)
+	}
+	if alg == "" {
+		errs = append(errs, ErrMissingAlgorithm)
+	}
+
+	// rsa-specific
+	if key == nil {
+		errs = append(errs, ErrMissingKey)
+	} else {
+		if err := alg.Validate(key); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
 	for _, opt := range opts {
 		if err := opt(j); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	if len(errs) > 0 {
-		return nil, errors.Join(errs...)
+		return nil, fmt.Errorf("%s: %w", op, errors.Join(errs...))
 	}
 
-	if err := j.validate(); err != nil {
-		return nil, fmt.Errorf("%s: %w", op, err)
+	return j, nil
+}
+
+// NewJWTWithHMAC creates a new JWT which will be signed with an HMAC secret.
+//
+// alg must be one of:
+// * HS256 with a >= 32 byte secret
+// * HS384 with a >= 48 byte secret
+// * HS512 with a >= 64 byte secret
+//
+// Supported Options:
+// * WithKeyID
+// * WithHeaders
+func NewJWTWithHMAC(clientID string, audience []string,
+	alg HSAlgorithm, secret string, opts ...Option) (*JWT, error) {
+	const op = "NewJWTWithHMAC"
+	j := &JWT{
+		clientID: clientID,
+		audience: audience,
+		alg:      jose.SignatureAlgorithm(alg),
+		secret:   secret,
+		headers:  make(map[string]string),
+		genID:    uuid.GenerateUUID,
+		now:      time.Now,
 	}
 
-	// finally, make sure Serialize() works; we can't pre-validate everything,
-	// and this whole thing is useless if it can't Serialize()
-	if _, err := j.Serialize(); err != nil {
-		return nil, fmt.Errorf("%s: %w", op, err)
+	var errs []error
+	if clientID == "" {
+		errs = append(errs, ErrMissingClientID)
+	}
+	if len(audience) == 0 {
+		errs = append(errs, ErrMissingAudience)
+	}
+	if alg == "" {
+		errs = append(errs, ErrMissingAlgorithm)
+	}
+
+	// hmac-specific
+	if secret == "" {
+		errs = append(errs, ErrMissingSecret)
+	} else {
+		if err := alg.Validate(secret); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	for _, opt := range opts {
+		if err := opt(j); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("%s: %w", op, errors.Join(errs...))
 	}
 
 	return j, nil
@@ -75,8 +144,9 @@ type JWT struct {
 
 	// for signer
 	alg jose.SignatureAlgorithm
-	// key may be any key type that jose.SigningKey accepts for its Key
-	key any
+	// key may be any type that jose.SigningKey accepts for its Key,
+	// but today we only support RSA keys.
+	key *rsa.PrivateKey
 	// secret may be used instead of key
 	secret string
 
@@ -100,43 +170,6 @@ func (j *JWT) Serialize() (string, error) {
 	return token, nil
 }
 
-func (j *JWT) validate() error {
-	const op = "JWT.validate"
-	var errs []error
-	if j.genID == nil {
-		errs = append(errs, ErrMissingFuncIDGenerator)
-	}
-	if j.now == nil {
-		errs = append(errs, ErrMissingFuncNow)
-	}
-	// bail early if any internal func errors
-	if len(errs) > 0 {
-		return fmt.Errorf("%s: %w", op, errors.Join(errs...))
-	}
-
-	if j.clientID == "" {
-		errs = append(errs, ErrMissingClientID)
-	}
-	if len(j.audience) == 0 {
-		errs = append(errs, ErrMissingAudience)
-	}
-	if j.alg == "" {
-		errs = append(errs, ErrMissingAlgorithm)
-	}
-	if j.key == nil && j.secret == "" {
-		errs = append(errs, ErrMissingKeyOrSecret)
-	}
-	if j.key != nil && j.secret != "" {
-		errs = append(errs, ErrBothKeyAndSecret)
-	}
-	// if any of those fail, we have no hope.
-	if len(errs) > 0 {
-		return fmt.Errorf("%s: %w", op, errors.Join(errs...))
-	}
-
-	return nil
-}
-
 func (j *JWT) builder() (jwt.Builder, error) {
 	const op = "builder"
 	signer, err := j.signer()
@@ -157,7 +190,7 @@ func (j *JWT) signer() (jose.Signer, error) {
 		Algorithm: j.alg,
 	}
 
-	// Validate() ensures these are mutually exclusive
+	// the different New* constructors ensure these are mutually exclusive.
 	if j.secret != "" {
 		sKey.Key = []byte(j.secret)
 	}

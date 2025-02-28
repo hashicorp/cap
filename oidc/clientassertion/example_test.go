@@ -14,11 +14,12 @@ import (
 )
 
 func ExampleJWT() {
+	cid := "client-id"
+	aud := []string{"audience"}
+
 	// With an HMAC client secret
 	secret := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // 32 bytes for HS256
-	j, err := NewJWT("client-id", []string{"audience"},
-		WithClientSecret(secret, HS256),
-	)
+	j, err := NewJWTWithHMAC(cid, aud, HS256, secret)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -55,8 +56,7 @@ func ExampleJWT() {
 	if !ok {
 		log.Fatal("couldn't get rsa.PublicKey from PrivateKey")
 	}
-	j, err = NewJWT("client-id", []string{"audience"},
-		WithRSAKey(privKey, RS256),
+	j, err = NewJWTWithRSAKey(cid, aud, RS256, privKey,
 		// note: for some providers, they key ID may be an x5t derivation
 		// of a cert generated from the private key.
 		// if your key has an associated JWKS endpoint, it will be the "kid"
