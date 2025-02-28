@@ -34,7 +34,8 @@ const (
 // * WithKeyID
 // * WithHeaders
 func NewJWTWithRSAKey(clientID string, audience []string,
-	alg RSAlgorithm, key *rsa.PrivateKey, opts ...Option) (*JWT, error) {
+	alg RSAlgorithm, key *rsa.PrivateKey, opts ...Option,
+) (*JWT, error) {
 	const op = "clientassertion.NewJWTWithRSAKey"
 
 	j := &JWT{
@@ -90,7 +91,8 @@ func NewJWTWithRSAKey(clientID string, audience []string,
 // * WithKeyID
 // * WithHeaders
 func NewJWTWithHMAC(clientID string, audience []string,
-	alg HSAlgorithm, secret string, opts ...Option) (*JWT, error) {
+	alg HSAlgorithm, secret string, opts ...Option,
+) (*JWT, error) {
 	const op = "clientassertion.NewJWTWithHMAC"
 	j := &JWT{
 		clientID: clientID,
