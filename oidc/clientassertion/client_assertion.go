@@ -159,29 +159,30 @@ type JWT struct {
 // OIDC client to authenticate themselves to an authorization server
 func (j *JWT) Serialize() (string, error) {
 	const op = "JWT.Serialize"
-	builder, err := j.builder()
+	signer, err := j.signer()
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", op, err)
 	}
+	id, err := j.genID()
+	if err != nil {
+		return "", fmt.Errorf("%s: failed to generate token id: %w", op, err)
+	}
+	now := j.now().UTC()
+	claims := &jwt.Claims{
+		Issuer:    j.clientID,
+		Subject:   j.clientID,
+		Audience:  j.audience,
+		Expiry:    jwt.NewNumericDate(now.Add(5 * time.Minute)),
+		NotBefore: jwt.NewNumericDate(now.Add(-1 * time.Second)),
+		IssuedAt:  jwt.NewNumericDate(now),
+		ID:        id,
+	}
+	builder := jwt.Signed(signer).Claims(claims)
 	token, err := builder.Serialize()
 	if err != nil {
 		return "", fmt.Errorf("%s: failed to serialize token: %w", op, err)
 	}
 	return token, nil
-}
-
-func (j *JWT) builder() (jwt.Builder, error) {
-	const op = "builder"
-	signer, err := j.signer()
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", op, err)
-	}
-	id, err := j.genID()
-	if err != nil {
-		return nil, fmt.Errorf("%s: failed to generate token id: %w", op, err)
-	}
-	claims := j.claims(id)
-	return jwt.Signed(signer).Claims(claims), nil
 }
 
 func (j *JWT) signer() (jose.Signer, error) {
@@ -210,19 +211,6 @@ func (j *JWT) signer() (jose.Signer, error) {
 		return nil, fmt.Errorf("%s: %w: %w", op, ErrCreatingSigner, err)
 	}
 	return signer, nil
-}
-
-func (j *JWT) claims(id string) *jwt.Claims {
-	now := j.now().UTC()
-	return &jwt.Claims{
-		Issuer:    j.clientID,
-		Subject:   j.clientID,
-		Audience:  j.audience,
-		Expiry:    jwt.NewNumericDate(now.Add(5 * time.Minute)),
-		NotBefore: jwt.NewNumericDate(now.Add(-1 * time.Second)),
-		IssuedAt:  jwt.NewNumericDate(now),
-		ID:        id,
-	}
 }
 
 // serializer is the primary interface implemented by JWT.
