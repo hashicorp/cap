@@ -419,6 +419,14 @@ func TestTestProvider_SetPKCEVerifier(t *testing.T) {
 	})
 }
 
+func TestTestProvider_SetClientAssertionJWT(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		tp := StartTestProvider(t)
+		tp.SetClientAssertionJWT("expected")
+		assert.Equal(t, "expected", tp.clientAssertionJWT)
+	})
+}
+
 func TestTestProvider_SetUserInfoReply(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		assert := assert.New(t)

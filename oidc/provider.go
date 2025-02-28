@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	cass "github.com/hashicorp/cap/oidc/clientassertion"
 	"github.com/hashicorp/cap/oidc/internal/strutils"
 	"github.com/hashicorp/go-cleanhttp"
 	"golang.org/x/oauth2"
@@ -305,6 +306,18 @@ func (p *Provider) Exchange(ctx context.Context, oidcRequest Request, authorizat
 	var authCodeOpts []oauth2.AuthCodeOption
 	if oidcRequest.PKCEVerifier() != nil {
 		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("code_verifier", oidcRequest.PKCEVerifier().Verifier()))
+	}
+	if oidcRequest.ClientAssertionJWT() != nil {
+		// by now, sufficient validation should have already occurred to prevent
+		// errors here, but err check again just in case.
+		token, err := oidcRequest.ClientAssertionJWT().Serialize()
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+		authCodeOpts = append(authCodeOpts,
+			oauth2.SetAuthURLParam("client_assertion_type", cass.JWTTypeParam),
+			oauth2.SetAuthURLParam("client_assertion", token),
+		)
 	}
 	oauth2Token, err := oauth2Config.Exchange(oidcCtx, authorizationCode, authCodeOpts...)
 	if err != nil {
