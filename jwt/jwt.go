@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/go-jose/go-jose/v3"
@@ -293,19 +294,16 @@ func validateAudience(expectedAudiences, audClaim []string) error {
 	}
 
 	for _, v := range expectedAudiences {
-		if contains(audClaim, v) {
+		if slices.Contains(audClaim, v) {
+			return nil
+		}
+
+		// optionally disregard trailing slash in audience claim
+		lastChar := v[len(v)-1]
+		if lastChar == '/' && slices.Contains(audClaim, v[:len(v)-1]) {
 			return nil
 		}
 	}
 
 	return errors.New("audience claim does not match any expected audience")
-}
-
-func contains(sl []string, st string) bool {
-	for _, s := range sl {
-		if s == st {
-			return true
-		}
-	}
-	return false
 }
