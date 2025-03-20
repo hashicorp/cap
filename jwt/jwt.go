@@ -41,14 +41,12 @@ func NewValidator(keySets ...KeySet) (*Validator, error) {
 	}
 
 	return &Validator{
-		keySets: keySets,
+		keySets:      keySets,
+		featureFlags: make(map[string]bool),
 	}, nil
 }
 
 func (v *Validator) SetFeatureFlag(name string, value bool) {
-	if v.featureFlags == nil {
-		v.featureFlags = make(map[string]bool)
-	}
 	v.featureFlags[name] = value
 }
 
@@ -307,7 +305,7 @@ func (v *Validator) validateAudience(expectedAudiences, audClaim []string) error
 		}
 
 		// optionally disregard trailing slash in audience claim if the ignoreTrailingSlashInAudience feature flag is set
-		if v.featureFlags != nil && v.featureFlags["ignoreTrailingSlashInAudience"] {
+		if v.featureFlags["ignoreTrailingSlashInAudience"] {
 			if audience == "" {
 				return errors.New("audience claim must not be empty")
 			}
