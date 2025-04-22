@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
 	"time"
 
 	"github.com/go-jose/go-jose/v3"
@@ -24,8 +23,7 @@ const DefaultLeewaySeconds = 150
 // a single or multiple KeySets and will attempt to verify the JWT by iterating
 // through the configured KeySets.
 type Validator struct {
-	keySets      []KeySet
-	featureFlags map[string]bool
+	keySets []KeySet
 }
 
 // NewValidator returns a Validator that uses the given KeySet to verify JWT signatures.
@@ -41,13 +39,8 @@ func NewValidator(keySets ...KeySet) (*Validator, error) {
 	}
 
 	return &Validator{
-		keySets:      keySets,
-		featureFlags: make(map[string]bool),
+		keySets: keySets,
 	}, nil
-}
-
-func (v *Validator) SetFeatureFlag(name string, value bool) {
-	v.featureFlags[name] = value
 }
 
 // Expected defines the expected claims values to assert when validating a JWT.
@@ -174,7 +167,7 @@ func (v *Validator) validateAll(ctx context.Context, token string, expected Expe
 	if expected.ID != "" && expected.ID != claims.ID {
 		return nil, fmt.Errorf("invalid ID (jti) claim")
 	}
-	if err := v.validateAudience(expected.Audiences, claims.Audience); err != nil {
+	if err := validateAudience(expected.Audiences, claims.Audience); err != nil {
 		return nil, fmt.Errorf("invalid audience (aud) claim: %w", err)
 	}
 
@@ -294,28 +287,25 @@ func validateSigningAlgorithm(token string, expectedAlgorithms []Alg) error {
 // validateAudience returns an error if audClaim does not contain any audiences
 // given by expectedAudiences. If expectedAudiences is empty, it skips validation
 // and returns nil.
-func (v *Validator) validateAudience(expectedAudiences, audClaim []string) error {
+func validateAudience(expectedAudiences, audClaim []string) error {
 	if len(expectedAudiences) == 0 {
 		return nil
 	}
 
-	for _, audience := range expectedAudiences {
-		if slices.Contains(audClaim, audience) {
+	for _, v := range expectedAudiences {
+		if contains(audClaim, v) {
 			return nil
-		}
-
-		// optionally disregard trailing slash in audience claim if the ignoreTrailingSlashInAudience feature flag is set
-		if v.featureFlags["ignoreTrailingSlashInAudience"] {
-			if audience == "" {
-				return errors.New("audience claim must not be empty")
-			}
-
-			lastChar := audience[len(audience)-1]
-			if lastChar == '/' && slices.Contains(audClaim, audience[:len(audience)-1]) {
-				return nil
-			}
 		}
 	}
 
 	return errors.New("audience claim does not match any expected audience")
+}
+
+func contains(sl []string, st string) bool {
+	for _, s := range sl {
+		if s == st {
+			return true
+		}
+	}
+	return false
 }
