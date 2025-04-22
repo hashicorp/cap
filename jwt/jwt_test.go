@@ -1593,10 +1593,9 @@ func Test_validateAudience(t *testing.T) {
 		featureFlags      map[string]bool
 	}
 	tests := []struct {
-		name         string
-		args         args
-		wantErr      bool
-		featureFlags map[string]bool
+		name    string
+		args    args
+		wantErr bool
 	}{
 		{
 			name: "skip validation for empty audiences",
@@ -1625,9 +1624,6 @@ func Test_validateAudience(t *testing.T) {
 				expectedAudiences: []string{"aud11/", "aud13"},
 				audClaim:          []string{"aud11", "aud0", "aud100"},
 			},
-			featureFlags: map[string]bool{
-				"normalize_bound_audiences": true,
-			},
 		},
 		{
 			name: "normalized bound audience without trailing slash matches aud claim",
@@ -1635,18 +1631,11 @@ func Test_validateAudience(t *testing.T) {
 				expectedAudiences: []string{"aud11", "aud13"},
 				audClaim:          []string{"aud11", "aud0", "aud100"},
 			},
-			featureFlags: map[string]bool{
-				"normalize_bound_audiences": true,
-			},
 		},
 	}
 	for _, tt := range tests {
-		v := Validator{
-			featureFlags: tt.featureFlags,
-		}
-
 		t.Run(tt.name, func(t *testing.T) {
-			err := v.validateAudience(tt.args.expectedAudiences, tt.args.audClaim)
+			err := validateAudience(tt.args.expectedAudiences, tt.args.audClaim)
 			if tt.wantErr {
 				require.Error(t, err)
 				return

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -24,12 +25,7 @@ const DefaultLeewaySeconds = 150
 // a single or multiple KeySets and will attempt to verify the JWT by iterating
 // through the configured KeySets.
 type Validator struct {
-	// keySets is a slice of KeySets that are used to verify JWT signatures.
 	keySets []KeySet
-
-	// featureFlags is a map of feature flags that can be used to enable or disable
-	// certain behaviors in the Validator.
-	featureFlags map[string]bool
 }
 
 // NewValidator returns a Validator that uses the given KeySet to verify JWT signatures.
@@ -45,19 +41,8 @@ func NewValidator(keySets ...KeySet) (*Validator, error) {
 	}
 
 	return &Validator{
-		keySets:      keySets,
-		featureFlags: make(map[string]bool),
+		keySets: keySets,
 	}, nil
-}
-
-// SetFeatureFlag sets the value of a feature flag.
-func (v *Validator) SetFeatureFlag(name string, value bool) {
-	v.featureFlags[name] = value
-}
-
-// GetFeatureFlag returns the value of a feature flag.
-func (v *Validator) GetFeatureFlag(name string) bool {
-	return v.featureFlags[name]
 }
 
 // Expected defines the expected claims values to assert when validating a JWT.
@@ -184,7 +169,7 @@ func (v *Validator) validateAll(ctx context.Context, token string, expected Expe
 	if expected.ID != "" && expected.ID != claims.ID {
 		return nil, fmt.Errorf("invalid ID (jti) claim")
 	}
-	if err := v.validateAudience(expected.Audiences, claims.Audience); err != nil {
+	if err := validateAudience(expected.Audiences, claims.Audience); err != nil {
 		return nil, fmt.Errorf("invalid audience (aud) claim: %w", err)
 	}
 
@@ -304,31 +289,25 @@ func validateSigningAlgorithm(token string, expectedAlgorithms []Alg) error {
 // validateAudience returns an error if audClaim does not contain any audiences
 // given by expectedAudiences. If expectedAudiences is empty, it skips validation
 // and returns nil.
-func (v *Validator) validateAudience(expectedAudiences, audClaim []string) error {
+func validateAudience(expectedAudiences, audClaim []string, opt ...Option) error {
 	if len(expectedAudiences) == 0 {
 		return nil
 	}
+
+	opts := getConfigOpts(opt...)
 
 	for _, audience := range expectedAudiences {
 		normalizedAudience := audience
 
 		// trim the trailing slash from the audience if it exists and the feature flag is enabled
-		if v.GetFeatureFlag("normalize_bound_audiences") {
+		if opts.withNormalizedAudiences {
 			normalizedAudience = strings.TrimSuffix(audience, "/")
 		}
-		if contains(audClaim, normalizedAudience) {
+
+		if slices.Contains(audClaim, normalizedAudience) {
 			return nil
 		}
 	}
 
 	return errors.New("audience claim does not match any expected audience")
-}
-
-func contains(sl []string, st string) bool {
-	for _, s := range sl {
-		if s == st {
-			return true
-		}
-	}
-	return false
 }
