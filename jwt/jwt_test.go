@@ -1596,6 +1596,7 @@ func Test_validateAudience(t *testing.T) {
 		name    string
 		args    args
 		wantErr bool
+		opts    []Option
 	}{
 		{
 			name: "skip validation for empty audiences",
@@ -1624,6 +1625,7 @@ func Test_validateAudience(t *testing.T) {
 				expectedAudiences: []string{"aud11/", "aud13"},
 				audClaim:          []string{"aud11", "aud0", "aud100"},
 			},
+			opts: []Option{WithNormalizedAudiences()},
 		},
 		{
 			name: "normalized bound audience without trailing slash matches aud claim",
@@ -1631,11 +1633,13 @@ func Test_validateAudience(t *testing.T) {
 				expectedAudiences: []string{"aud11", "aud13"},
 				audClaim:          []string{"aud11", "aud0", "aud100"},
 			},
+			opts: []Option{WithNormalizedAudiences()},
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateAudience(tt.args.expectedAudiences, tt.args.audClaim)
+			err := validateAudience(tt.args.expectedAudiences, tt.args.audClaim, tt.opts...)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
