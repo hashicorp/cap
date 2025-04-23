@@ -4,6 +4,11 @@ Canonical reference for changes, improvements, and bugfixes for cap.
 
 ## Next
 
+## 0.10.0
+
+* feat (jwt): add WithNormalizedAudiences to enable the removal of any trailing slashes on bound audiences before
+comparing against the audience claim ([PR #159](https://github.com/hashicorp/cap/pull/159])
+
 ## 0.9.0
 
 * feat (oidc): add WithClientAssertionJWT to enable "private key JWT" ([PR #155](https://github.com/hashicorp/cap/pull/155))
