@@ -105,8 +105,8 @@ type Expected struct {
 //     and "exp" (Expiration Time) claims and after the time given by the "iat"
 //     (Issued At) claim, with configurable leeway. See Expected.Now() for details
 //     on how the current time is provided for validation.
-func (v *Validator) Validate(ctx context.Context, token string, expected Expected) (map[string]interface{}, error) {
-	return v.validateAll(ctx, token, expected, false)
+func (v *Validator) Validate(ctx context.Context, token string, expected Expected, opts ...Option) (map[string]interface{}, error) {
+	return v.validateAll(ctx, token, expected, false, opts...)
 }
 
 // ValidateAllowMissingIatNbfExp validates JWTs of the JWS compact serialization form.
@@ -121,11 +121,11 @@ func (v *Validator) Validate(ctx context.Context, token string, expected Expecte
 //     of "nbf", "exp", and "iat" are missing, then this check is skipped. See
 //     Expected.Now() for details on how the current time is provided for
 //     validation.
-func (v *Validator) ValidateAllowMissingIatNbfExp(ctx context.Context, token string, expected Expected) (map[string]interface{}, error) {
-	return v.validateAll(ctx, token, expected, true)
+func (v *Validator) ValidateAllowMissingIatNbfExp(ctx context.Context, token string, expected Expected, opts ...Option) (map[string]interface{}, error) {
+	return v.validateAll(ctx, token, expected, true, opts...)
 }
 
-func (v *Validator) validateAll(ctx context.Context, token string, expected Expected, allowMissingIatExpNbf bool) (map[string]interface{}, error) {
+func (v *Validator) validateAll(ctx context.Context, token string, expected Expected, allowMissingIatExpNbf bool, opts ...Option) (map[string]interface{}, error) {
 	var allClaims map[string]interface{}
 	var err error
 
@@ -169,7 +169,7 @@ func (v *Validator) validateAll(ctx context.Context, token string, expected Expe
 	if expected.ID != "" && expected.ID != claims.ID {
 		return nil, fmt.Errorf("invalid ID (jti) claim")
 	}
-	if err := validateAudience(expected.Audiences, claims.Audience); err != nil {
+	if err := validateAudience(expected.Audiences, claims.Audience, opts...); err != nil {
 		return nil, fmt.Errorf("invalid audience (aud) claim: %w", err)
 	}
 
