@@ -1590,7 +1590,6 @@ func Test_validateAudience(t *testing.T) {
 	type args struct {
 		expectedAudiences []string
 		audClaim          []string
-		featureFlags      map[string]bool
 	}
 	tests := []struct {
 		name    string
