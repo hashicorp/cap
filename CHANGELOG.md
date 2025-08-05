@@ -4,6 +4,18 @@ Canonical reference for changes, improvements, and bugfixes for cap.
 
 ## Next
 
+
+## 0.10.0
+* fix: use constant time comparison when comparing token hashes ([PR #165](https://github.com/hashicorp/cap/pull/165))
+* Bump golang.org/x/oauth2 from 0.21.0 to 0.27.0 ([PR #164](https://github.com/hashicorp/cap/pull/164))
+* [Compliance] - PR Template Changes Required ([PR #163](https://github.com/hashicorp/cap/pull/163))
+* dep: Pin action/cache to a contianer shad ([PR #161](https://github.com/hashicorp/cap/pull/161))
+* Bump golang.org/x/net from 0.37.0 to 0.38.0 ([PR #160](https://github.com/hashicorp/cap/pull/160))
+* Vault 33101 - Optionally ignore trailing slash in bound audience ([PR #159](https://github.com/hashicorp/cap/pull/159))
+* Bump dependencies and update CI ([PR #158](https://github.com/hashicorp/cap/pull/158))
+
+
+
 ## 0.9.0
 
 * feat (oidc): add WithClientAssertionJWT to enable "private key JWT" ([PR #155](https://github.com/hashicorp/cap/pull/155))
