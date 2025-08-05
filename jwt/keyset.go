@@ -235,7 +235,7 @@ func unmarshalResp(r *http.Response, body []byte, v interface{}) error {
 		return nil
 	}
 	ct := r.Header.Get("Content-Type")
-	mediaType, _, parseErr := mime.ParseMediaType(ct)
+	mediaType, _, parseErr := mime.ParseMediaType(ct) // ParseMediaType normalizes media type to lower case.
 	if parseErr == nil && mediaType == "application/json" {
 		return fmt.Errorf("got Content-Type = application/json, but could not unmarshal as JSON: %v", err)
 	}

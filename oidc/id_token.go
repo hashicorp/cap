@@ -6,6 +6,7 @@ package oidc
 import (
 	"crypto/sha256"
 	"crypto/sha512"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -136,7 +137,7 @@ func (t IDToken) verifyHashClaim(claimName string, token string) (bool, error) {
 	_, _ = h.Write([]byte(token)) // hash documents that Write will never return an error
 	sum := h.Sum(nil)[:h.Size()/2]
 	actual := base64.RawURLEncoding.EncodeToString(sum)
-	if actual != tokenHash {
+	if subtle.ConstantTimeCompare([]byte(actual), []byte(tokenHash)) != 1 {
 		switch claimName {
 		case "at_hash":
 			return false, fmt.Errorf("%s: %w", op, ErrInvalidAtHash)
