@@ -4,6 +4,8 @@ Canonical reference for changes, improvements, and bugfixes for cap.
 
 ## Next
 
+* fix (ldap): fix slice append to be concurrent safe when searching for ldap
+  groups ( [PR #167](https://github.com/hashicorp/cap/pull/167))
 
 ## 0.10.0
 * fix: use constant time comparison when comparing token hashes ([PR #165](https://github.com/hashicorp/cap/pull/165))

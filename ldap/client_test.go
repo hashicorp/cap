@@ -5,11 +5,15 @@ package ldap
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net"
 	"testing"
+	"time"
 
+	"github.com/go-ldap/ldap/v3"
 	"github.com/hashicorp/go-hclog"
 	"github.com/jimlambrt/gldap/testdirectory"
 	"github.com/stretchr/testify/assert"
@@ -848,4 +852,164 @@ func freePort(t *testing.T) int {
 	require.NoError(err)
 	defer l.Close()
 	return l.Addr().(*net.TCPAddr).Port
+}
+
+// searcher provides a way to mock just the Search method of ldap.Conn for
+// testing.
+type searcher interface {
+	// Search performs an LDAP search operation.
+	Search(req *ldap.SearchRequest) (*ldap.SearchResult, error)
+}
+
+// mockConn implements the ldapConnector and simulates Search behavior for
+// testing.
+type mockConn struct {
+	searcher
+}
+
+// Implement required methods for ldapConnector interface, except for Search.
+// These methods can be no-ops or return default values as they are not used in
+// the tests.
+func (m *mockConn) Bind(username, password string) error { return nil }
+func (m *mockConn) Close() error                         { return nil }
+func (m *mockConn) Start()                               {}
+func (m *mockConn) IsClosing() bool                      { return false }
+func (m *mockConn) IsClosed() bool                       { return false }
+func (m *mockConn) SetTimeout(time.Duration)             {}
+func (m *mockConn) SearchWithPaging(req *ldap.SearchRequest, pagingSize uint32) (*ldap.SearchResult, error) {
+	return m.Search(req)
+}
+func (m *mockConn) StartTLS(config *tls.Config) error { return nil }
+func (m *mockConn) UnauthenticatedBind(username string) error {
+	return nil
+}
+
+type sidErrorSearcher struct {
+	searchCalls int
+	searcher
+}
+
+// Search simulates an LDAP search that returns one entry with a valid SID and
+// the 2nd search call returns an error to test the "unable to read the group
+// sid" warning in tokenGroupsSearch.
+func (s *sidErrorSearcher) Search(req *ldap.SearchRequest) (*ldap.SearchResult, error) {
+	if s.searchCalls == 0 {
+		s.searchCalls++
+		return &ldap.SearchResult{
+			Entries: []*ldap.Entry{
+				{
+					DN: "cn=test",
+					Attributes: []*ldap.EntryAttribute{
+						{
+							Name:       "tokenGroups",
+							Values:     []string{"irrelevant"},
+							ByteValues: [][]byte{{0x01, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x15, 0x00, 0x00, 0x00, 0xA0, 0x65, 0xCF, 0x7E, 0x78, 0x4B, 0x9B, 0x5F, 0xE7, 0x7C, 0x87, 0x70, 0x09, 0x1C, 0x01, 0x00}},
+						},
+					},
+				},
+			},
+		}, nil
+	}
+	return nil, errors.New("simulated group SID search error: unable to read the group sid")
+}
+
+func TestTokenGroupsSearch_GroupSIDSearchError_AppendsWarning(t *testing.T) {
+	client := &Client{
+		conf: &ClientConfig{},
+		conn: &mockConn{
+			searcher: &sidErrorSearcher{},
+		},
+	}
+	entries, warnings, err := client.tokenGroupsSearch("userDN")
+	assert.NoError(t, err)
+	assert.Empty(t, entries)
+	assert.Len(t, warnings, 1)
+	assert.Contains(t, string(warnings[0]), "unable to read the group sid")
+}
+
+type noSIDSearcher struct {
+	searchCalls int
+	searcher
+}
+
+// Search simulates a search that the 2nd call returns no entries, so it tests "unable
+// to find the group sid" warning in tokenGroupsSearch.
+func (s *noSIDSearcher) Search(req *ldap.SearchRequest) (*ldap.SearchResult, error) {
+	if s.searchCalls == 0 {
+		s.searchCalls++
+		return &ldap.SearchResult{
+			Entries: []*ldap.Entry{
+				{
+					DN: "cn=test",
+					Attributes: []*ldap.EntryAttribute{
+						{
+							Name:       "tokenGroups",
+							Values:     []string{"irrelevant"},
+							ByteValues: [][]byte{{0x01, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x15, 0x00, 0x00, 0x00, 0xA0, 0x65, 0xCF, 0x7E, 0x78, 0x4B, 0x9B, 0x5F, 0xE7, 0x7C, 0x87, 0x70, 0x09, 0x1C, 0x01, 0x00}},
+						},
+					},
+				},
+			},
+		}, nil
+	}
+	// On subsequent calls, return an empty result without error
+	return &ldap.SearchResult{}, nil
+}
+
+func TestTokenGroupsSearch_NoGroupSID_AppendsWarning(t *testing.T) {
+	client := &Client{
+		conf: &ClientConfig{},
+		conn: &mockConn{
+			searcher: &noSIDSearcher{},
+		},
+	}
+
+	entries, warnings, err := client.tokenGroupsSearch("userDN")
+	assert.NoError(t, err)
+	assert.Empty(t, entries)
+	assert.Len(t, warnings, 1)
+	assert.Contains(t, string(warnings[0]), "unable to find the group sid")
+}
+
+type badSIDSearcher struct {
+	searchCalls int
+	searcher
+}
+
+// Search simulates search that returns an entry with the "unable to read sid"
+// warning in tokenGroupsSearch.
+func (s *badSIDSearcher) Search(req *ldap.SearchRequest) (*ldap.SearchResult, error) {
+	if s.searchCalls == 0 {
+		s.searchCalls++
+		return &ldap.SearchResult{
+			Entries: []*ldap.Entry{
+				{
+					DN: "cn=test",
+					Attributes: []*ldap.EntryAttribute{
+						{
+							Name:       "tokenGroups",
+							Values:     []string{"irrelevant"},
+							ByteValues: [][]byte{{0x01, 0x05, 0x00}}, // incomplete SID bytes to trigger error
+						},
+					},
+				},
+			},
+		}, nil
+	}
+	return nil, errors.New("should not be called more than once")
+}
+
+func TestTokenGroupsSearch_BadGroupSID_AppendsWarning(t *testing.T) {
+	client := &Client{
+		conf: &ClientConfig{},
+		conn: &mockConn{
+			searcher: &badSIDSearcher{},
+		},
+	}
+
+	entries, warnings, err := client.tokenGroupsSearch("userDN")
+	assert.NoError(t, err)
+	assert.Empty(t, entries)
+	assert.Len(t, warnings, 1)
+	assert.Contains(t, string(warnings[0]), "unable to read sid")
 }
