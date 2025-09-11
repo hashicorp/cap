@@ -30,10 +30,22 @@ const (
 	schemeLDAPTLS = "ldaps"
 )
 
+// make an ldap.Conn interface so we can mock it out in tests
+type ldapConnector interface {
+	Bind(username, password string) error
+	UnauthenticatedBind(username string) error
+	Close() error
+	StartTLS(config *tls.Config) error
+	SetTimeout(d time.Duration)
+	Search(searchRequest *ldap.SearchRequest) (*ldap.SearchResult, error)
+	SearchWithPaging(searchRequest *ldap.SearchRequest, pagingSize uint32) (*ldap.SearchResult, error)
+}
+
 // Client provides a client for making requests to a directory service.
 type Client struct {
 	conf *ClientConfig
-	conn *ldap.Conn
+	// make this an inteface so we can mock it out in tests
+	conn ldapConnector
 }
 
 // Warning is a warning message
@@ -500,11 +512,15 @@ func (c *Client) tokenGroupsSearch(userDN string) ([]*ldap.Entry, []Warning, err
 						SizeLimit: 1,
 					})
 					if err != nil {
+						lock.Lock()
 						warnings = append(warnings, fmtWarning("%s: unable to read the group sid (baseDN: %q / filter: %q): %s", op, fmt.Sprintf("<SID=%s>", sidString), "(objectClass=*)", sidString))
+						lock.Unlock()
 						continue
 					}
 					if len(groupResult.Entries) == 0 {
+						lock.Lock()
 						warnings = append(warnings, fmtWarning("%s: unable to find the group sid (baseDN: %q / filter: %q): %s", op, fmt.Sprintf("<SID=%s>", sidString), "(objectClass=*)", sidString))
+						lock.Unlock()
 						continue
 					}
 					lock.Lock()
@@ -516,7 +532,9 @@ func (c *Client) tokenGroupsSearch(userDN string) ([]*ldap.Entry, []Warning, err
 		for _, sidBytes := range groupAttrValues {
 			sidString, err := sidBytesToString(sidBytes)
 			if err != nil {
+				lock.Lock()
 				warnings = append(warnings, fmtWarning("%s: unable to read sid: %s", op, err.Error()))
+				lock.Unlock()
 				continue
 			}
 			taskChan <- sidString
