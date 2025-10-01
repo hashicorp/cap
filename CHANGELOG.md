@@ -4,6 +4,8 @@ Canonical reference for changes, improvements, and bugfixes for cap.
 
 ## Next
 
+## 0.11.0
+
 * fix (ldap): fix slice append to be concurrent safe when searching for ldap
   groups ( [PR #167](https://github.com/hashicorp/cap/pull/167))
 
