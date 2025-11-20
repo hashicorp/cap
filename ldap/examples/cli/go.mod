@@ -1,6 +1,6 @@
 module github.com/hashicorp/cap/ldap/examples/cli
 
-go 1.23.0
+go 1.24.0
 
 require (
 	github.com/hashicorp/cap/ldap v0.0.0-20240327184157-0d025609db1e
@@ -29,9 +29,9 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/stretchr/testify v1.9.0 // indirect
-	golang.org/x/crypto v0.36.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/exp v0.0.0-20240325151524-a685a6edb6d8 // indirect
-	golang.org/x/sys v0.31.0 // indirect
-	golang.org/x/term v0.30.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/term v0.37.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
