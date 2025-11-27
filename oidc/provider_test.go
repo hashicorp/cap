@@ -1756,6 +1756,33 @@ func TestProvider_DiscoveryInfo(t *testing.T) {
 	}
 }
 
+func TestProvider_Claims(t *testing.T) {
+	t.Parallel()
+	assert, require := assert.New(t), require.New(t)
+	tp := StartTestProvider(t)
+	config := testNewConfig(
+		t,
+		"test-client-id",
+		"test-client-secret",
+		"https://test-redirect",
+		tp,
+	)
+	provider, err := NewProvider(config)
+	require.NoError(err)
+
+	providerMetadata := struct {
+		ScopesSupported        []string `json:"scopes_supported"`
+		SubjectTypesSupported  []string `json:"subject_types_supported"`
+		ResponseTypesSupported []string `json:"response_types_supported"`
+	}{}
+
+	err = provider.Claims(&providerMetadata)
+	require.NoError(err)
+	assert.ElementsMatch(providerMetadata.ScopesSupported, []string{"openid"})
+	assert.ElementsMatch(providerMetadata.SubjectTypesSupported, []string{"public"})
+	assert.ElementsMatch(providerMetadata.ResponseTypesSupported, []string{"code", "id_token", "token id_token"})
+}
+
 var _ JWTSerializer = &mockSerializer{}
 
 type mockSerializer struct {

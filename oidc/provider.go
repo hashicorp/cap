@@ -116,6 +116,14 @@ func NewProvider(c *Config) (*Provider, error) {
 	return p, nil
 }
 
+// Claims unmarshals raw fields returned by the server during discovery.
+func (p *Provider) Claims(v any) error {
+	if p == nil {
+		return fmt.Errorf("provider is nil")
+	}
+	return p.provider.Claims(v)
+}
+
 // Done with the provider's background resources and must be called for every
 // Provider created
 func (p *Provider) Done() {
