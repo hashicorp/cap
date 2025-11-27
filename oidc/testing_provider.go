@@ -176,6 +176,7 @@ type TestProvider struct {
 	invalidJWKs       bool
 	nowFunc           func() time.Time
 	pkceVerifier      CodeVerifier
+	additionalConfig  map[string]interface{}
 
 	clientAssertionJWT string
 
@@ -929,6 +930,12 @@ func (p *TestProvider) UserInfoReply() map[string]interface{} {
 	return p.replyUserinfo
 }
 
+func (p *TestProvider) SetAdditionalConfiguration(config map[string]interface{}) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.additionalConfig = config
+}
+
 // Addr returns the current base URL for the test provider's running webserver,
 // which can be used as an OIDC issuer for discovery and is also used for the
 // iss claim when issuing JWTs.
@@ -1178,29 +1185,25 @@ func (p *TestProvider) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		reply := struct {
-			Issuer                 string   `json:"issuer"`
-			AuthEndpoint           string   `json:"authorization_endpoint"`
-			TokenEndpoint          string   `json:"token_endpoint"`
-			JWKSURI                string   `json:"jwks_uri"`
-			UserinfoEndpoint       string   `json:"userinfo_endpoint,omitempty"`
-			SupportedAlgs          []string `json:"id_token_signing_alg_values_supported"`
-			SupportedScopes        []string `json:"scopes_supported"`
-			SubjectTypesSupported  []string `json:"subject_types_supported"`
-			ResponseTypesSupported []string `json:"response_types_supported"`
-		}{
-			Issuer:                 p.Addr(),
-			AuthEndpoint:           p.Addr() + authorize,
-			TokenEndpoint:          p.Addr() + token,
-			JWKSURI:                p.Addr() + wellKnownJwks,
-			UserinfoEndpoint:       p.Addr() + userInfo,
-			SupportedAlgs:          []string{string(p.alg)},
-			SupportedScopes:        p.supportedScopes,
-			SubjectTypesSupported:  []string{"public"},
-			ResponseTypesSupported: []string{"code", "id_token", "token id_token"},
+		reply := map[string]interface{}{
+			"issuer":                                p.Addr(),
+			"authorization_endpoint":                p.Addr() + authorize,
+			"token_endpoint":                        p.Addr() + token,
+			"jwks_uri":                              p.Addr() + wellKnownJwks,
+			"userinfo_endpoint":                     p.Addr() + userInfo,
+			"id_token_signing_alg_values_supported": []string{string(p.alg)},
+			"scopes_supported":                      p.supportedScopes,
+			"subject_types_supported":               []string{"public"},
+			"response_types_supported":              []string{"code", "id_token", "token id_token"},
 		}
 		if p.disableUserInfo {
-			reply.UserinfoEndpoint = ""
+			reply["userinfo_endpoint"] = ""
+		}
+
+		if p.additionalConfig != nil {
+			for k, v := range p.additionalConfig {
+				reply[k] = v
+			}
 		}
 
 		err := p.writeJSON(w, &reply)

@@ -1767,6 +1767,9 @@ func TestProvider_Claims(t *testing.T) {
 		"https://test-redirect",
 		tp,
 	)
+	tp.SetAdditionalConfiguration(map[string]interface{}{
+		"authorization_required": true,
+	})
 	provider, err := NewProvider(config)
 	require.NoError(err)
 
@@ -1774,6 +1777,7 @@ func TestProvider_Claims(t *testing.T) {
 		ScopesSupported        []string `json:"scopes_supported"`
 		SubjectTypesSupported  []string `json:"subject_types_supported"`
 		ResponseTypesSupported []string `json:"response_types_supported"`
+		AuthRequired           bool     `json:"authorization_required"`
 	}{}
 
 	err = provider.Claims(&providerMetadata)
@@ -1781,6 +1785,7 @@ func TestProvider_Claims(t *testing.T) {
 	assert.ElementsMatch(providerMetadata.ScopesSupported, []string{"openid"})
 	assert.ElementsMatch(providerMetadata.SubjectTypesSupported, []string{"public"})
 	assert.ElementsMatch(providerMetadata.ResponseTypesSupported, []string{"code", "id_token", "token id_token"})
+	assert.True(providerMetadata.AuthRequired)
 }
 
 var _ JWTSerializer = &mockSerializer{}
