@@ -116,7 +116,15 @@ func NewProvider(c *Config) (*Provider, error) {
 	return p, nil
 }
 
-// Claims unmarshals raw fields returned by the server during discovery.
+// Claims unmarshals raw fields returned by the provider during discovery.
+//
+// For a list of fields defined by the OpenID Connect spec see:
+// https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata
+// see also: https://datatracker.ietf.org/doc/html/rfc8414
+//
+// This list of fields may include 'authorization_response_iss_parameter_supported'
+// which can be used to prevent mix-up attacks.
+// https://datatracker.ietf.org/doc/html/rfc9207#section-3
 func (p *Provider) Claims(v any) error {
 	if p == nil {
 		return fmt.Errorf("provider is nil")

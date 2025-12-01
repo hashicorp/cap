@@ -930,6 +930,8 @@ func (p *TestProvider) UserInfoReply() map[string]interface{} {
 	return p.replyUserinfo
 }
 
+// SetAdditionalConfiguration sets additional provider metadata to be returned
+// during provider discovery.
 func (p *TestProvider) SetAdditionalConfiguration(config map[string]interface{}) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
