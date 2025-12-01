@@ -40,12 +40,12 @@ func main() {
 		configFile, err := os.Open(*cfgFilename)
 		defer configFile.Close()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, err.Error())
+			fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 			return
 		}
 		jsonParser := json.NewDecoder(configFile)
 		if err := jsonParser.Decode(&clientConfig); err != nil {
-			fmt.Fprintf(os.Stderr, err.Error())
+			fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 			return
 		}
 	}
