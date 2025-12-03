@@ -4,6 +4,8 @@ Canonical reference for changes, improvements, and bugfixes for cap.
 
 ## Next
 
+* feat (oidc): add Claims for exposing provider server metadata ([PR #172](https://github.com/hashicorp/cap/pull/172))
+
 ## 0.11.0
 
 * fix (ldap): fix slice append to be concurrent safe when searching for ldap
