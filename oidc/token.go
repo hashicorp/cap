@@ -172,7 +172,7 @@ func getTokenOpts(opt ...Option) tokenOptions {
 // UnmarshalClaims will retrieve the claims from the provided raw JWT token.
 func UnmarshalClaims(rawToken string, claims interface{}) error {
 	const op = "UnmarshalClaims"
-	parts := strings.SplitN(rawToken, ".", 3)
+	parts := strings.SplitN(rawToken, ".", 4)
 	if len(parts) != 3 {
 		return fmt.Errorf("%s: malformed jwt, expected 3 parts got %d: %w", op, len(parts), ErrInvalidParameter)
 	}
