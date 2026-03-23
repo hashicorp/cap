@@ -101,20 +101,27 @@ func TestServiceProvider_ParseResponse(t *testing.T) {
 			requestID: testRequestId,
 		},
 		{
+			name:      "success - with both options enabled of validating both signatures & with only response signed with no assertions signed",
+			sp:        testSp,
+			samlResp:  base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustResponseSigned()))),
+			opts:      []saml.Option{saml.ValidateResponseSignature(), saml.ValidateAssertionSignature()},
+			requestID: testRequestId,
+		},
+		{
 			name:            "missing signature",
 			sp:              testSp,
 			samlResp:        base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t))),
 			opts:            []saml.Option{},
 			requestID:       testRequestId,
-			wantErrContains: "response and/or assertions must be signed",
+			wantErrContains: "Missing signature referencing the top-level element",
 		},
 		{
-			name:            "error-invalid-signature - with both options enabled of validating both signatures & with only response signed",
+			name:            "error-invalid-signature - with both options enabled of validating both signatures & with only response signed and wrap attacked assertion",
 			sp:              testSp,
-			samlResp:        base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustResponseSigned()))),
+			samlResp:        base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithWrapAttackedAssertion()))),
 			opts:            []saml.Option{saml.ValidateResponseSignature(), saml.ValidateAssertionSignature()},
 			requestID:       testRequestId,
-			wantErrContains: "invalid signature",
+			wantErrContains: "Signature could not be verified",
 		},
 		{
 			name:            "error-invalid-signature - with both options enabled of validating both signatures & with only assertion signed",
@@ -129,14 +136,6 @@ func TestServiceProvider_ParseResponse(t *testing.T) {
 			sp:              testSp,
 			samlResp:        base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustAssertionSigned()))),
 			opts:            []saml.Option{saml.ValidateResponseSignature()},
-			requestID:       testRequestId,
-			wantErrContains: "invalid signature",
-		},
-		{
-			name:            "error-invalid-signature - with option of validate assertion signature & with just response signed",
-			sp:              testSp,
-			samlResp:        base64.StdEncoding.EncodeToString([]byte(tp.SamlResponse(t, testprovider.WithJustResponseSigned()))),
-			opts:            []saml.Option{saml.ValidateAssertionSignature()},
 			requestID:       testRequestId,
 			wantErrContains: "invalid signature",
 		},
@@ -498,7 +497,7 @@ NBp9UZome44qZAYH1iqrpmmjsfI9pJItsgWu3kXPjhSfj1AJGR1l9JGvJrHki1iHTA==</ds:X509Cer
 			</saml2:Subject>
 			<saml2:Conditions NotBefore="2023-08-25T14:32:53.680Z" NotOnOrAfter="2023-08-25T14:37:53.680Z">
 				<saml2:AudienceRestriction>
-					<! -- audience is intentionally invalid -->. 
+					<! -- audience is intentionally invalid -->.
 					<saml2:Audience>http://saml.julz/invalid-audience</saml2:Audience>
 				</saml2:AudienceRestriction>
 			</saml2:Conditions>

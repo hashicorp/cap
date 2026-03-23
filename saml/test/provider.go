@@ -431,9 +431,10 @@ func (p *TestProvider) parseRequestPost(request string) *core.AuthnRequest {
 }
 
 type responseOptions struct {
-	signResponseElem  bool
-	signAssertionElem bool
-	expired           bool
+	signResponseElem        bool
+	signAssertionElem       bool
+	wrapAttackAssertionElem bool
+	expired                 bool
 }
 
 type ResponseOption func(*responseOptions)
@@ -455,6 +456,13 @@ func WithResponseAndAssertionSigned() ResponseOption {
 	return func(o *responseOptions) {
 		o.signResponseElem = true
 		o.signAssertionElem = true
+	}
+}
+
+func WithWrapAttackedAssertion() ResponseOption {
+	return func(o *responseOptions) {
+		o.signResponseElem = true
+		o.wrapAttackAssertionElem = true
 	}
 }
 
@@ -582,6 +590,27 @@ func (p *TestProvider) SamlResponse(t *testing.T, opts ...ResponseOption) string
 			r.NoError(err)
 			doc.SetRoot(signed)
 		}
+	}
+
+	if opt.wrapAttackAssertionElem {
+		signCtx := dsig.NewDefaultSigningContext(p.keystore)
+		wrapCtx := dsig.NewDefaultSigningContext(dsig.RandomKeyStoreForTest())
+
+		// Sign the signature with a mismatched context but wrap it with the correct
+		// signature.
+		responseEl := doc.SelectElement("Response")
+		for _, assert := range responseEl.FindElements("Assertion") {
+			signedAssert, err := wrapCtx.SignEnveloped(assert)
+			r.NoError(err)
+
+			// replace signed assert object
+			responseEl.RemoveChildAt(assert.Index())
+			responseEl.AddChild(signedAssert)
+		}
+
+		signed, err := signCtx.SignEnveloped(doc.Root())
+		r.NoError(err)
+		doc.SetRoot(signed)
 	}
 
 	result, err := doc.WriteToString()
