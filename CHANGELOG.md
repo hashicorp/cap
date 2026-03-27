@@ -3,9 +3,9 @@
 Canonical reference for changes, improvements, and bugfixes for cap.
 
 ## Next
+* fix (saml): always validate response and assertion signatures when signatures are present ([PR #180](https://github.com/hashicorp/cap/pull/180))
 
 ## 0.12.0
-
 * feat (oidc): add Claims for exposing provider server metadata ([PR #172](https://github.com/hashicorp/cap/pull/172))
 
 ## 0.11.0
@@ -73,7 +73,7 @@ Canonical reference for changes, improvements, and bugfixes for cap.
 
 ### Features
 
-* SAML 
+* SAML
   * Adds support for SAML authentication (https://github.com/hashicorp/cap/pull/99).
 
 ### Improvements
@@ -105,7 +105,7 @@ Canonical reference for changes, improvements, and bugfixes for cap.
 ## 0.3.1
 
 ### Bug Fixes
-* Fixes integer overflow in `auth_time` claim validation when compiled for 32-bit 
+* Fixes integer overflow in `auth_time` claim validation when compiled for 32-bit
   architecture ([**PR**](https://github.com/hashicorp/cap/pull/76))
 
 ## 0.3.0
@@ -129,7 +129,7 @@ Canonical reference for changes, improvements, and bugfixes for cap.
 
 ## 0.2.0 (2022/04/08)
 * Add support for LDAP/AD authentication ([**PR**](https://github.com/hashicorp/cap/pull/47))
-  
+
 
 ## 0.1.1 (2021/06/24)
 
@@ -141,4 +141,3 @@ Canonical reference for changes, improvements, and bugfixes for cap.
 ## 0.1.0 (2021/05/21)
 
 v0.1.0 is the first release.  As a result there are no changes, improvements, or bugfixes from past versions.
-

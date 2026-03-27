@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"regexp"
+	"slices"
 
 	"github.com/jonboulle/clockwork"
 	saml2 "github.com/russellhaering/gosaml2"
@@ -77,7 +78,8 @@ func InsecureSkipSignatureValidation() Option {
 	}
 }
 
-// ValidateResponseSignature enables signature validation to ensure the response is at least signed
+// ValidateResponseSignature requires a valid signature on the top-level SAML
+// response envelope.
 func ValidateResponseSignature() Option {
 	return func(o interface{}) {
 		if o, ok := o.(*parseResponseOptions); ok {
@@ -86,7 +88,14 @@ func ValidateResponseSignature() Option {
 	}
 }
 
-// ValidateAssertionSignature enables signature validation to ensure the assertion is at least signed
+// ValidateAssertionSignature enables assertion-signature policy checks.
+//
+// Behavior:
+//   - If the response envelope is signed and valid, assertions are accepted as
+//     covered by that signature. Any assertion signatures that are present must
+//     still validate.
+//   - If the response envelope is not signed, each assertion must be signed and
+//     valid.
 func ValidateAssertionSignature() Option {
 	return func(o interface{}) {
 		if o, ok := o.(*parseResponseOptions); ok {
@@ -101,6 +110,8 @@ func ValidateAssertionSignature() Option {
 // - InsecureSkipRequestIDValidation
 // - InsecureSkipAssertionConditionValidation
 // - InsecureSkipSignatureValidation
+// - ValidateResponseSignature
+// - ValidateAssertionSignature
 // - WithAssertionConsumerServiceURL
 // - WithClock
 func (sp *ServiceProvider) ParseResponse(
@@ -282,20 +293,34 @@ func parsePEMCertificate(cert []byte) (*x509.Certificate, error) {
 }
 
 func validateSignature(response *core.Response, op string, opts parseResponseOptions) error {
-	// validate child object assertions
-	for _, assert := range response.Assertions() {
-		// note: at one time func ip.ValidateEncodedResponse(...) above allows all signed or all unsigned
-		// assertions, and will give error if there is a mix of both. We are still looping on all assertions
-		// instead of retrieving signature for one assertion, so we do not depend on dependency implementation.
-		if !assert.SignatureValidated && opts.validateAssertionSignature {
-			return fmt.Errorf("%s: %w", op, ErrInvalidSignature)
+	switch {
+	case response.SignatureValidated:
+		// When decoding a signed response, the internal decoder will automatically
+		// verify the validity of both the response signature and any assertions
+		// that are signed. Any unsigned assertions will be handled by the response
+		// envelope signature. Only when all of this is true will the internal
+		// decoder set the SignatureValidated field be set to true.
+		return nil
+	case !response.SignatureValidated && opts.validateResponseSignature:
+		// Our response envelope is not signed but we require it
+		return fmt.Errorf("%s: %w", op, ErrInvalidSignature)
+	case !response.SignatureValidated && opts.validateAssertionSignature:
+		// Our response envelope is not signed but we require that each assertion
+		// is signed. The internal decoder will have set SignatureValidated on
+		// each assertion in this code path. We can use to determine whether or not
+		// it is valid.
+		for assert := range slices.Values(response.Assertions()) {
+			// note: at one time func ip.ValidateEncodedResponse(...) above allows all signed or all unsigned
+			// assertions, and will give error if there is a mix of both. We are still looping on all assertions
+			// instead of retrieving signature for one assertion, so we do not depend on dependency implementation.
+			if !assert.SignatureValidated {
+				return fmt.Errorf("%s: %w", op, ErrInvalidSignature)
+			}
 		}
-	}
 
-	// validate root object response
-	if !response.SignatureValidated && opts.validateResponseSignature {
+		return nil
+	default:
+		// This ought to be unreachable but we'll catch here.
 		return fmt.Errorf("%s: %w", op, ErrInvalidSignature)
 	}
-
-	return nil
 }

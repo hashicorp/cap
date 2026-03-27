@@ -1,16 +1,16 @@
 module github.com/hashicorp/cap/saml
 
-go 1.23.0
+go 1.25.0
 
 require (
-	github.com/beevik/etree v1.2.0
+	github.com/beevik/etree v1.6.0
 	github.com/crewjam/go-xmlsec v0.0.0-20200414151428-d2b1a58f7262
 	github.com/crewjam/saml v0.4.14
 	github.com/hashicorp/go-uuid v1.0.3
-	github.com/jonboulle/clockwork v0.4.0
-	github.com/russellhaering/gosaml2 v0.9.1
-	github.com/russellhaering/goxmldsig v1.4.0
-	github.com/stretchr/testify v1.8.4
+	github.com/jonboulle/clockwork v0.5.0
+	github.com/russellhaering/gosaml2 v0.11.0
+	github.com/russellhaering/goxmldsig v1.6.0
+	github.com/stretchr/testify v1.11.1
 )
 
 require (
