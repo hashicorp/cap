@@ -45,3 +45,16 @@ the requirements of the interoperable SAML
 
 You can find the full demo code in the [`saml/demo`](./saml/demo/main.go)
 package.
+
+## ParseResponse signature validation policy
+
+`ParseResponse` always validates any signatures that are present, but the
+required signature policy is controlled by options:
+
+- `ValidateResponseSignature()`: requires a valid signature on the top-level
+    SAML `Response`.
+- `ValidateAssertionSignature()`: if the response is signed and valid,
+    assertions are accepted as covered by that signature; if the response is not
+    signed, each assertion must be signed and valid.
+- Using both options requires a valid response signature and validates any
+    assertion signatures that are present.
