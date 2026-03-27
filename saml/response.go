@@ -78,7 +78,8 @@ func InsecureSkipSignatureValidation() Option {
 	}
 }
 
-// ValidateResponseSignature enables signature validation to ensure the response is at least signed.
+// ValidateResponseSignature requires a valid signature on the top-level SAML
+// response envelope.
 func ValidateResponseSignature() Option {
 	return func(o interface{}) {
 		if o, ok := o.(*parseResponseOptions); ok {
@@ -87,11 +88,14 @@ func ValidateResponseSignature() Option {
 	}
 }
 
-// ValidateAssertionSignature enables signature validation to ensure that a
-// assertion signatures are properly signed. If the response itself is signed
-// then this will require that all assertions are either correctly signed or
-// valid as part of the signed response. If the response is not signed this will
-// validate that all assertions are at least signed.
+// ValidateAssertionSignature enables assertion-signature policy checks.
+//
+// Behavior:
+//   - If the response envelope is signed and valid, assertions are accepted as
+//     covered by that signature. Any assertion signatures that are present must
+//     still validate.
+//   - If the response envelope is not signed, each assertion must be signed and
+//     valid.
 func ValidateAssertionSignature() Option {
 	return func(o interface{}) {
 		if o, ok := o.(*parseResponseOptions); ok {
@@ -106,6 +110,8 @@ func ValidateAssertionSignature() Option {
 // - InsecureSkipRequestIDValidation
 // - InsecureSkipAssertionConditionValidation
 // - InsecureSkipSignatureValidation
+// - ValidateResponseSignature
+// - ValidateAssertionSignature
 // - WithAssertionConsumerServiceURL
 // - WithClock
 func (sp *ServiceProvider) ParseResponse(
