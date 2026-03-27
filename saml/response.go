@@ -290,7 +290,7 @@ func validateSignature(response *core.Response, op string, opts parseResponseOpt
 	switch {
 	case response.SignatureValidated:
 		// When decoding a signed response, the internal decoder will automatically
-		// verify the validaty of both the response signature and any assertions
+		// verify the validity of both the response signature and any assertions
 		// that are signed. Any unsigned assertions will be handled by the response
 		// envelope signature. Only when all of this is true will the internal
 		// decoder set the SignatureValidated field be set to true.
