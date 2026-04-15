@@ -7,11 +7,14 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/go-jose/go-jose/v3"
 	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/stretchr/testify/require"
 
@@ -639,6 +642,212 @@ func TestNewValidator(t *testing.T) {
 			require.NotNil(t, got)
 		})
 	}
+}
+
+// TestNewValidatorWithKeySetSearcher tests cases for creating a new Validator with a KeySetSearcher.
+func TestNewValidatorWithKeySetSearcher(t *testing.T) {
+	type args struct {
+		searcher KeySetSearcher
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "valid key searcher",
+			args: args{
+				searcher: func(ctx context.Context, keyID string) (KeySet, error) {
+					return nil, nil // Just for constructor validation
+				},
+			},
+		},
+		{
+			name: "nil key searcher",
+			args: args{
+				searcher: nil,
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewValidatorWithKeySetSearcher(tt.args.searcher)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, got)
+		})
+	}
+}
+
+// TestValidator_WithKeySetSearcher tests the KeySetSearcher code path.
+func TestValidator_WithKeySetSearcher(t *testing.T) {
+	tp := oidc.StartTestProvider(t)
+	tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
+
+	// Create the KeySet to be used to verify JWT signatures
+	keySet, err := NewJSONWebKeySet(context.Background(), tp.Addr()+wellKnownJWKS, tp.CACert())
+	require.NoError(t, err)
+
+	now := time.Now()
+	nowUnix := float64(now.Unix())
+	futureUnix := float64(now.Add(2 * jwt.DefaultLeeway).Unix())
+
+	t.Run("key searcher is called and signature verification succeeds", func(t *testing.T) {
+		claims := map[string]interface{}{
+			"iss": "https://example.com/",
+			"iat": nowUnix,
+			"exp": futureUnix,
+		}
+		token := oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
+
+		// Track whether key searcher is called
+		called := false
+		keySearcher := func(ctx context.Context, keyID string) (KeySet, error) {
+			called = true
+			require.Equal(t, testKeyID, keyID, "searcher should be called with kid from JWT header")
+			return keySet, nil
+		}
+
+		validator, err := NewValidatorWithKeySetSearcher(keySearcher)
+		require.NoError(t, err)
+
+		got, err := validator.Validate(context.Background(), token, Expected{
+			Issuer: "https://example.com/",
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		require.True(t, called, "key searcher should have been called")
+		require.Equal(t, "https://example.com/", got["iss"])
+	})
+
+	t.Run("error from key searcher is propagated", func(t *testing.T) {
+		keySearcher := func(ctx context.Context, keyID string) (KeySet, error) {
+			return nil, errors.New("key set not found")
+		}
+
+		validator, err := NewValidatorWithKeySetSearcher(keySearcher)
+		require.NoError(t, err)
+
+		claims := map[string]interface{}{
+			"iss": "https://example.com/",
+			"iat": nowUnix,
+			"exp": futureUnix,
+		}
+		token := oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
+
+		_, err = validator.Validate(context.Background(), token, Expected{})
+
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "key set not found")
+	})
+
+	t.Run("error when searcher returns nil KeySet", func(t *testing.T) {
+		keySearcher := func(ctx context.Context, keyID string) (KeySet, error) {
+			return nil, nil // Returns nil without error
+		}
+
+		validator, err := NewValidatorWithKeySetSearcher(keySearcher)
+		require.NoError(t, err)
+
+		claims := map[string]interface{}{
+			"iss": "https://example.com/",
+			"iat": nowUnix,
+			"exp": futureUnix,
+		}
+		token := oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
+
+		_, err = validator.Validate(context.Background(), token, Expected{})
+
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no key set found")
+	})
+
+	t.Run("error when JWT is missing kid header", func(t *testing.T) {
+		keySearcher := func(ctx context.Context, keyID string) (KeySet, error) {
+			return keySet, nil
+		}
+
+		validator, err := NewValidatorWithKeySetSearcher(keySearcher)
+		require.NoError(t, err)
+
+		claims := map[string]interface{}{
+			"iss": "https://example.com/",
+			"iat": nowUnix,
+			"exp": futureUnix,
+		}
+		// Create JWT without kid header by passing nil as keyID
+		token := oidc.TestSignJWT(t, priv, string(RS256), claims, nil)
+
+		_, err = validator.Validate(context.Background(), token, Expected{})
+
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "token missing kid header parameter")
+	})
+
+	t.Run("error when JWT is malformed", func(t *testing.T) {
+		keySearcher := func(ctx context.Context, keyID string) (KeySet, error) {
+			return keySet, nil
+		}
+
+		validator, err := NewValidatorWithKeySetSearcher(keySearcher)
+		require.NoError(t, err)
+
+		// Use a malformed JWT token
+		malformedToken := "not.a.valid.jwt.token"
+
+		_, err = validator.Validate(context.Background(), malformedToken, Expected{})
+
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "error parsing token")
+	})
+
+	t.Run("error when JWT has multiple signatures", func(t *testing.T) {
+		keySearcher := func(ctx context.Context, keyID string) (KeySet, error) {
+			return keySet, nil
+		}
+
+		validator, err := NewValidatorWithKeySetSearcher(keySearcher)
+		require.NoError(t, err)
+
+		// Create a valid JWT and then modify it to have multiple signatures
+		claims := map[string]interface{}{
+			"iss": "https://example.com/",
+			"iat": nowUnix,
+			"exp": futureUnix,
+		}
+		token := oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
+
+		// Parse the token and duplicate its signature
+		parsedJWS, err := jose.ParseSigned(token)
+		require.NoError(t, err)
+
+		// Manually create a JSON with duplicate signatures
+		var jwsMap map[string]interface{}
+		err = json.Unmarshal([]byte(parsedJWS.FullSerialize()), &jwsMap)
+		require.NoError(t, err)
+
+		sig := jwsMap["signature"].(string)
+		protected := jwsMap["protected"].(string)
+
+		// Create JSON with two identical signatures
+		multiSigJSON := fmt.Sprintf(`{
+			"payload": %q,
+			"signatures": [
+				{"protected": %q, "signature": %q},
+				{"protected": %q, "signature": %q}
+			]
+		}`, jwsMap["payload"], protected, sig, protected, sig)
+
+		_, err = validator.Validate(context.Background(), multiSigJSON, Expected{})
+
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "token with multiple signatures not supported")
+	})
 }
 
 // TestValidator_MultipleKeySets_Validate_Valid_JWT tests cases where a JWT is expected to be valid where the

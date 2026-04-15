@@ -18,12 +18,24 @@ import (
 // for validating the "nbf" (Not Before) and "exp" (Expiration Time) claims.
 const DefaultLeewaySeconds = 150
 
+// KeySetSearcher is an optional callback function that can be used to
+// implement dynamic KeySet lookup based on the key ID (kid) from the JWT header.
+// If provided to the Validator, it will be called to locate the appropriate KeySet
+// for signature verification instead of iterating through a static list of KeySets.
+type KeySetSearcher func(ctx context.Context, keyID string) (KeySet, error)
+
 // Validator validates JSON Web Tokens (JWT) by providing signature
-// verification and claims set validation. Validator can contain either
-// a single or multiple KeySets and will attempt to verify the JWT by iterating
-// through the configured KeySets.
+// verification and claims set validation. Validator can be configured with either:
+//   - One or more KeySets: The validator will attempt to verify the JWT by iterating
+//     through the configured KeySets until one succeeds.
+//   - A KeySetSearcher callback: The validator will extract the key ID from the JWT header
+//     and use the callback to locate the appropriate KeySet for signature verification.
+//
+// Use NewValidator to create a Validator with KeySets, or NewValidatorWithKeySetSearcher
+// to create a Validator with a KeySet searcher callback.
 type Validator struct {
-	keySets []KeySet
+	keySets     []KeySet
+	keySearcher KeySetSearcher
 }
 
 // NewValidator returns a Validator that uses the given KeySet to verify JWT signatures.
@@ -40,6 +52,18 @@ func NewValidator(keySets ...KeySet) (*Validator, error) {
 
 	return &Validator{
 		keySets: keySets,
+	}, nil
+}
+
+// NewValidatorWithKeySetSearcher returns a Validator that uses a KeySetSearcher
+// callback to dynamically locate KeySets based on the key ID from the JWT header.
+func NewValidatorWithKeySetSearcher(keySetSearcher KeySetSearcher) (*Validator, error) {
+	if keySetSearcher == nil {
+		return nil, errors.New("keySetSearcher must not be nil")
+	}
+
+	return &Validator{
+		keySearcher: keySetSearcher,
 	}, nil
 }
 
@@ -129,12 +153,49 @@ func (v *Validator) validateAll(ctx context.Context, token string, expected Expe
 
 	// Ensure that the token is signed by at least one of the given key sets
 	var tokenVerified bool
-	for _, keySet := range v.keySets {
-		// First, verify the signature to ensure subsequent validation is against verified claims
+
+	if v.keySearcher != nil {
+		// Use the KeySetSearcher callback to dynamically locate the appropriate KeySet based on the JWT's kid header
+		var jws *jose.JSONWebSignature
+		jws, err = jose.ParseSigned(token)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing token: %w", err)
+		}
+		if len(jws.Signatures) == 0 {
+			return nil, fmt.Errorf("token must be signed")
+		}
+		if len(jws.Signatures) > 1 {
+			return nil, fmt.Errorf("token with multiple signatures not supported")
+		}
+
+		// Extract the kid (key ID) from the JWS header to locate the appropriate KeySet
+		keyID := jws.Signatures[0].Header.KeyID
+		if keyID == "" {
+			return nil, fmt.Errorf("token missing kid header parameter")
+		}
+
+		var keySet KeySet
+		keySet, err = v.keySearcher(ctx, keyID)
+		if err != nil {
+			return nil, fmt.Errorf("error searching for key set with kid %s: %w", keyID, err)
+		}
+		if keySet == nil {
+			return nil, fmt.Errorf("no key set found with kid %s", keyID)
+		}
+
 		allClaims, err = keySet.VerifySignature(ctx, token)
 		if err == nil {
 			tokenVerified = true
-			break
+		}
+	} else {
+		// Ensure that the token is signed by at least one of the given key sets
+		for _, keySet := range v.keySets {
+			// First, verify the signature to ensure subsequent validation is against verified claims
+			allClaims, err = keySet.VerifySignature(ctx, token)
+			if err == nil {
+				tokenVerified = true
+				break
+			}
 		}
 	}
 
