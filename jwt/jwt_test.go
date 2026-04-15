@@ -5,7 +5,6 @@ package jwt
 
 import (
 	"context"
-	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
 	"errors"
@@ -14,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-jose/go-jose/v3"
 	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/stretchr/testify/require"
 
@@ -644,24 +642,6 @@ func TestNewValidator(t *testing.T) {
 	}
 }
 
-// signJWTWithKid is a test helper that signs a JWT with the kid header properly set.
-func signJWTWithKid(t *testing.T, key crypto.PrivateKey, alg string, claims map[string]interface{}, keyID string) string {
-	t.Helper()
-	require := require.New(t)
-
-	sig, err := jose.NewSigner(
-		jose.SigningKey{Algorithm: jose.SignatureAlgorithm(alg), Key: key},
-		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", keyID),
-	)
-	require.NoError(err)
-
-	raw, err := jwt.Signed(sig).
-		Claims(claims).
-		CompactSerialize()
-	require.NoError(err)
-	return raw
-}
-
 // TestNewValidatorWithKeySetSearcher tests cases for creating a new Validator with a KeySetSearcher.
 func TestNewValidatorWithKeySetSearcher(t *testing.T) {
 	type args struct {
@@ -720,7 +700,7 @@ func TestValidator_WithKeySetSearcher(t *testing.T) {
 			"iat": nowUnix,
 			"exp": futureUnix,
 		}
-		token := signJWTWithKid(t, priv, string(RS256), claims, testKeyID)
+		token := oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 
 		// Track whether key searcher is called
 		called := false
@@ -756,7 +736,7 @@ func TestValidator_WithKeySetSearcher(t *testing.T) {
 			"iat": nowUnix,
 			"exp": futureUnix,
 		}
-		token := signJWTWithKid(t, priv, string(RS256), claims, testKeyID)
+		token := oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 
 		_, err = validator.Validate(context.Background(), token, Expected{})
 
@@ -777,7 +757,7 @@ func TestValidator_WithKeySetSearcher(t *testing.T) {
 			"iat": nowUnix,
 			"exp": futureUnix,
 		}
-		token := signJWTWithKid(t, priv, string(RS256), claims, testKeyID)
+		token := oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 
 		_, err = validator.Validate(context.Background(), token, Expected{})
 

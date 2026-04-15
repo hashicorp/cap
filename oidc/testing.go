@@ -46,7 +46,7 @@ func TestSignJWT(t TestingT, key crypto.PrivateKey, alg string, claims interface
 
 	hdr := map[jose.HeaderKey]interface{}{}
 	if keyID != nil {
-		hdr["key_id"] = string(keyID)
+		hdr["kid"] = string(keyID)
 	}
 
 	sig, err := jose.NewSigner(
