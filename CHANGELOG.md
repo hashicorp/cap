@@ -5,6 +5,8 @@ Canonical reference for changes, improvements, and bugfixes for cap.
 ## Next
 * fix (saml): always validate response and assertion signatures when signatures are present ([PR #180](https://github.com/hashicorp/cap/pull/180))
 
+* feat (jwt): add optional KeySetSearcher callback to Validator for dynamic KeySet lookup ([PR #187](https://github.com/hashicorp/cap/pull/187))
+
 ## 0.12.0
 * feat (oidc): add Claims for exposing provider server metadata ([PR #172](https://github.com/hashicorp/cap/pull/172))
 

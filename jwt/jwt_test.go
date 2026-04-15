@@ -5,13 +5,16 @@ package jwt
 
 import (
 	"context"
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/go-jose/go-jose/v3"
 	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/stretchr/testify/require"
 
@@ -639,6 +642,148 @@ func TestNewValidator(t *testing.T) {
 			require.NotNil(t, got)
 		})
 	}
+}
+
+// signJWTWithKid is a test helper that signs a JWT with the kid header properly set.
+func signJWTWithKid(t *testing.T, key crypto.PrivateKey, alg string, claims map[string]interface{}, keyID string) string {
+	t.Helper()
+	require := require.New(t)
+
+	sig, err := jose.NewSigner(
+		jose.SigningKey{Algorithm: jose.SignatureAlgorithm(alg), Key: key},
+		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", keyID),
+	)
+	require.NoError(err)
+
+	raw, err := jwt.Signed(sig).
+		Claims(claims).
+		CompactSerialize()
+	require.NoError(err)
+	return raw
+}
+
+// TestNewValidatorWithKeySetSearcher tests cases for creating a new Validator with a KeySetSearcher.
+func TestNewValidatorWithKeySetSearcher(t *testing.T) {
+	type args struct {
+		searcher KeySetSearcher
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "valid key searcher",
+			args: args{
+				searcher: func(ctx context.Context, keyID string) (KeySet, error) {
+					return nil, nil // Just for constructor validation
+				},
+			},
+		},
+		{
+			name: "nil key searcher",
+			args: args{
+				searcher: nil,
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewValidatorWithKeySetSearcher(tt.args.searcher)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, got)
+		})
+	}
+}
+
+// TestValidator_WithKeySetSearcher tests the KeySetSearcher code path.
+func TestValidator_WithKeySetSearcher(t *testing.T) {
+	tp := oidc.StartTestProvider(t)
+	tp.SetSigningKeys(priv, priv.Public(), oidc.RS256, testKeyID)
+
+	// Create the KeySet to be used to verify JWT signatures
+	keySet, err := NewJSONWebKeySet(context.Background(), tp.Addr()+wellKnownJWKS, tp.CACert())
+	require.NoError(t, err)
+
+	now := time.Now()
+	nowUnix := float64(now.Unix())
+	futureUnix := float64(now.Add(2 * jwt.DefaultLeeway).Unix())
+
+	t.Run("key searcher is called and signature verification succeeds", func(t *testing.T) {
+		claims := map[string]interface{}{
+			"iss": "https://example.com/",
+			"iat": nowUnix,
+			"exp": futureUnix,
+		}
+		token := signJWTWithKid(t, priv, string(RS256), claims, testKeyID)
+
+		// Track whether key searcher is called
+		called := false
+		keySearcher := func(ctx context.Context, keyID string) (KeySet, error) {
+			called = true
+			require.Equal(t, testKeyID, keyID, "searcher should be called with kid from JWT header")
+			return keySet, nil
+		}
+
+		validator, err := NewValidatorWithKeySetSearcher(keySearcher)
+		require.NoError(t, err)
+
+		got, err := validator.Validate(context.Background(), token, Expected{
+			Issuer: "https://example.com/",
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		require.True(t, called, "key searcher should have been called")
+		require.Equal(t, "https://example.com/", got["iss"])
+	})
+
+	t.Run("error from key searcher is propagated", func(t *testing.T) {
+		keySearcher := func(ctx context.Context, keyID string) (KeySet, error) {
+			return nil, errors.New("key set not found")
+		}
+
+		validator, err := NewValidatorWithKeySetSearcher(keySearcher)
+		require.NoError(t, err)
+
+		claims := map[string]interface{}{
+			"iss": "https://example.com/",
+			"iat": nowUnix,
+			"exp": futureUnix,
+		}
+		token := signJWTWithKid(t, priv, string(RS256), claims, testKeyID)
+
+		_, err = validator.Validate(context.Background(), token, Expected{})
+
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "key set not found")
+	})
+
+	t.Run("error when searcher returns nil KeySet", func(t *testing.T) {
+		keySearcher := func(ctx context.Context, keyID string) (KeySet, error) {
+			return nil, nil // Returns nil without error
+		}
+
+		validator, err := NewValidatorWithKeySetSearcher(keySearcher)
+		require.NoError(t, err)
+
+		claims := map[string]interface{}{
+			"iss": "https://example.com/",
+			"iat": nowUnix,
+			"exp": futureUnix,
+		}
+		token := signJWTWithKid(t, priv, string(RS256), claims, testKeyID)
+
+		_, err = validator.Validate(context.Background(), token, Expected{})
+
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no key set found")
+	})
 }
 
 // TestValidator_MultipleKeySets_Validate_Valid_JWT tests cases where a JWT is expected to be valid where the
