@@ -4,6 +4,8 @@ Canonical reference for changes, improvements, and bugfixes for cap.
 
 ## Next
 
+## 0.13.0
+
 * feat (jwt): add optional callback to dynamically fetch key sets in validator ([PR #187](https://github.com/hashicorp/cap/pull/187))
 * fix (saml): always validate response and assertion signatures when signatures are present ([PR #180](https://github.com/hashicorp/cap/pull/180))
 
