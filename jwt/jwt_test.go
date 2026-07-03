@@ -5,6 +5,7 @@ package jwt
 
 import (
 	"context"
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
@@ -1920,6 +1921,188 @@ func Test_validateSigningAlgorithm(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+		})
+	}
+}
+
+// TestValidator_ClaimsConfusion_Rejected verifies that a JWT which smuggles a
+// Unicode homoglyph (or ASCII case variant) of a registered claim name past the
+// struct-based validation is rejected end-to-end.
+//
+// Without the guard, a payload such as {"sub":"root","ſub":"anon"} validates as
+// Subject=="anon" (the "ſub" homoglyph, U+017F, folds to "sub" and, because
+// json.Marshal sorts it after the ASCII "sub", overrides the struct field)
+// while the map handed back to the caller still reports map["sub"]=="root".
+func TestValidator_ClaimsConfusion_Rejected(t *testing.T) {
+	now := time.Now()
+	nowUnix := float64(now.Unix())
+	futureUnix := float64(now.Add(2 * time.Hour).Unix())
+
+	keySet, err := NewStaticKeySet([]crypto.PublicKey{priv.Public()})
+	require.NoError(t, err)
+
+	validator, err := NewValidator(keySet)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		claims   map[string]any
+		expected Expected
+	}{
+		{
+			name: "long s homoglyph of sub",
+			claims: map[string]any{
+				"sub":      "root", // canonical key the caller reads
+				"\u017Fub": "anon", // "ſub": folds to "sub", wins the struct field
+				"iat":      nowUnix,
+				"exp":      futureUnix,
+			},
+			expected: Expected{Subject: "anon"},
+		},
+		{
+			name: "long s homoglyph of iss",
+			claims: map[string]any{
+				"iss":      "https://evil.example/", // canonical key the caller reads
+				"i\u017Fs": "https://good.example/", // "iſs": folds to "iss"
+				"iat":      nowUnix,
+				"exp":      futureUnix,
+			},
+			expected: Expected{Issuer: "https://good.example/"},
+		},
+		{
+			name: "ascii uppercase variant of sub",
+			claims: map[string]any{
+				"sub": "root",
+				"SUB": "anon",
+				"iat": nowUnix,
+				"exp": futureUnix,
+			},
+			expected: Expected{Subject: "anon"},
+		},
+		{
+			name: "lone homoglyph without canonical twin",
+			claims: map[string]any{
+				"\u017Fub": "anon", // "ſub" alone still validates the struct field
+				"iat":      nowUnix,
+				"exp":      futureUnix,
+			},
+			expected: Expected{Subject: "anon"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			token := oidc.TestSignJWT(t, priv, string(RS256), tt.claims, []byte(testKeyID))
+
+			got, err := validator.Validate(context.Background(), token, tt.expected)
+			require.Error(t, err)
+			require.Nil(t, got)
+			require.Contains(t, err.Error(), "collides with registered claim")
+		})
+	}
+}
+
+// TestValidator_ClaimsConfusion_BenignTokenStillValid ensures the guard does
+// not reject ordinary tokens: canonical registered claims and unrelated custom
+// claims (including non-registered Unicode keys) pass through and are returned
+// unchanged.
+func TestValidator_ClaimsConfusion_BenignTokenStillValid(t *testing.T) {
+	now := time.Now()
+	nowUnix := float64(now.Unix())
+	futureUnix := float64(now.Add(2 * time.Hour).Unix())
+
+	keySet, err := NewStaticKeySet([]crypto.PublicKey{priv.Public()})
+	require.NoError(t, err)
+
+	validator, err := NewValidator(keySet)
+	require.NoError(t, err)
+
+	claims := map[string]any{
+		"iss":       "https://example.com/",
+		"sub":       "alice@example.com",
+		"role":      "admin", // custom claim, must pass through untouched
+		"n\u00e1me": "Alice", // "náme": non-registered Unicode key, must not be flagged
+		"iat":       nowUnix,
+		"exp":       futureUnix,
+	}
+	token := oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
+
+	got, err := validator.Validate(context.Background(), token, Expected{
+		Issuer:  "https://example.com/",
+		Subject: "alice@example.com",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "https://example.com/", got["iss"])
+	require.Equal(t, "alice@example.com", got["sub"])
+	require.Equal(t, "admin", got["role"])
+	require.Equal(t, "Alice", got["n\u00e1me"])
+}
+
+// Test_checkRegisteredClaimCollisions unit-tests the collision guard directly.
+func Test_checkRegisteredClaimCollisions(t *testing.T) {
+	tests := []struct {
+		name    string
+		claims  map[string]any
+		wantErr bool
+	}{
+		{
+			name: "only canonical registered claims",
+			claims: map[string]any{
+				"iss": "a", "sub": "b", "aud": "c",
+				"exp": 1, "nbf": 2, "iat": 3, "jti": "d",
+			},
+			wantErr: false,
+		},
+		{
+			name:    "custom non-colliding claims",
+			claims:  map[string]any{"sub": "b", "role": "admin", "email": "x@y.z"},
+			wantErr: false,
+		},
+		{
+			name:    "empty claims",
+			claims:  map[string]any{},
+			wantErr: false,
+		},
+		{
+			name:    "non-registered unicode key",
+			claims:  map[string]any{"n\u00e1me": "x"}, // "náme"
+			wantErr: false,
+		},
+		{
+			name:    "long s homoglyph of sub",
+			claims:  map[string]any{"sub": "x", "\u017Fub": "y"}, // "ſub"
+			wantErr: true,
+		},
+		{
+			name:    "long s homoglyph of iss without canonical twin",
+			claims:  map[string]any{"i\u017Fs": "y"}, // "iſs"
+			wantErr: true,
+		},
+		{
+			name:    "ascii uppercase SUB",
+			claims:  map[string]any{"SUB": "y"},
+			wantErr: true,
+		},
+		{
+			name:    "ascii mixed case Iss",
+			claims:  map[string]any{"Iss": "y"},
+			wantErr: true,
+		},
+		{
+			name:    "uppercase AUD",
+			claims:  map[string]any{"AUD": "y"},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := checkRegisteredClaimCollisions(tt.claims)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }

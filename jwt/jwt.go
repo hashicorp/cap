@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-jose/go-jose/v3"
@@ -17,6 +18,11 @@ import (
 // DefaultLeewaySeconds defines the amount of leeway that's used by default
 // for validating the "nbf" (Not Before) and "exp" (Expiration Time) claims.
 const DefaultLeewaySeconds = 150
+
+// registeredClaimNames are the JWT registered claim names (see RFC 7519,
+// section 4.1) that this package validates by decoding a token's claims into a
+// go-jose jwt.Claims struct.
+var registeredClaimNames = []string{"iss", "sub", "aud", "exp", "nbf", "iat", "jti"}
 
 // KeySetSearcher is an optional callback function that can be used to
 // implement dynamic KeySet lookup based on the key ID (kid) from the JWT header.
@@ -203,6 +209,18 @@ func (v *Validator) validateAll(ctx context.Context, token string, expected Expe
 		return nil, fmt.Errorf("error verifying token signature: %w", err)
 	}
 
+	// Guard against claims-confusion before trusting the struct-based
+	// validation below. The registered claims are validated by decoding
+	// allClaims into a jwt.Claims struct, but allClaims (a map) is also what's
+	// ultimately returned to the caller. If the token contains a key that isn't
+	// byte-identical to a registered claim name but collides with it under case
+	// folding (e.g. the Unicode long s "ſub" folding to "sub"), the value
+	// validated via the struct can differ from the value the caller reads from
+	// the map. Reject such tokens.
+	if err := checkRegisteredClaimCollisions(allClaims); err != nil {
+		return nil, err
+	}
+
 	// Validate the signing algorithm in the JWS header
 	if err := validateSigningAlgorithm(token, expected.SigningAlgorithms); err != nil {
 		return nil, fmt.Errorf("invalid algorithm (alg) header parameter: %w", err)
@@ -306,6 +324,37 @@ func (v *Validator) validateAll(ctx context.Context, token string, expected Expe
 	}
 
 	return allClaims, nil
+}
+
+// checkRegisteredClaimCollisions guards against a claims-confusion that arises
+// from the interaction of three encoding/json behaviors:
+//
+//   - A JWT's claims are decoded into a map[string]interface{}, which only
+//     deduplicates keys that match byte-for-byte.
+//   - Those claims are then re-marshaled and decoded into a jwt.Claims struct
+//     for validation. Struct field matching is case-insensitive under Unicode
+//     simple case folding, so a key such as "ſub" (U+017F, LATIN SMALL LETTER
+//     LONG S) or "SUB" populates the same field as "sub".
+//   - json.Marshal emits object keys sorted by UTF-8 byte value, so a folded
+//     variant like "ſub" (0xC5BF) sorts after its ASCII twin "sub" (0x73) and
+//     therefore wins when the struct field is populated.
+//
+// The effect is that the value used for validation (read from the struct) can
+// differ from the value returned to the caller (read from the map).
+func checkRegisteredClaimCollisions(allClaims map[string]any) error {
+	for key := range allClaims {
+		for _, name := range registeredClaimNames {
+			if key == name {
+				// exact, byte-for-byte match: this is the canonical registered
+				// claim.
+				continue
+			}
+			if strings.EqualFold(key, name) {
+				return fmt.Errorf("ambiguous claim: key %q collides with registered claim %q under case folding", key, name)
+			}
+		}
+	}
+	return nil
 }
 
 // validateSigningAlgorithm checks whether the JWS "alg" (Algorithm) header
