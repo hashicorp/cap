@@ -28,11 +28,17 @@ func IsWSL() (bool, error) {
 		return false, fmt.Errorf("Unable to read /proc/1/cgroup: %w", err)
 	}
 
+	mountinfoData, err := ioutil.ReadFile("/proc/1/mountinfo")
+	if err != nil {
+		return false, fmt.Errorf("Unable to read /proc/1/mountinfo: %w", err)
+	}
+
+	isContainer := strings.Contains(strings.ToLower(string(mountinfoData)), "/containers/")
 	isDocker := strings.Contains(strings.ToLower(string(cgroupData)), "/docker/")
 	isLxc := strings.Contains(strings.ToLower(string(cgroupData)), "/lxc/")
 	isMsLinux := strings.Contains(strings.ToLower(string(procData)), "microsoft")
 
-	return isMsLinux && !(isDocker || isLxc), nil
+	return isMsLinux && !(isContainer || isDocker || isLxc), nil
 }
 
 // OpenURL opens the specified URL in the default browser of the user. Source:
