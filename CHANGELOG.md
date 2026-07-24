@@ -4,6 +4,8 @@ Canonical reference for changes, improvements, and bugfixes for cap.
 
 ## Next
 
+* saml: fix InResponseTo request-correlation bypass ([PR #192](https://github.com/hashicorp/cap/pull/192))
+
 ## 0.13.0
 
 * feat (jwt): add optional callback to dynamically fetch key sets in validator ([PR #187](https://github.com/hashicorp/cap/pull/187))

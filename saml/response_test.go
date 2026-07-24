@@ -6,6 +6,7 @@ package saml_test
 import (
 	"encoding/base64"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -824,3 +825,62 @@ NBp9UZome44qZAYH1iqrpmmjsfI9pJItsgWu3kXPjhSfj1AJGR1l9JGvJrHki1iHTA==</ds:X509Cer
 			<!-- intentionally missing attribute stmt -->
 			</saml2:Assertion>
 	</saml2p:Response>`
+
+// TestServiceProvider_ParseResponseAcceptsSignedAssertionWithTamperedUnsignedResponseInResponseTo
+// verifies that SAML responses with stale assertions cannot correlate to fresh
+// requests.
+func TestServiceProvider_ParseResponseAcceptsSignedAssertionWithTamperedUnsignedResponseInResponseTo(t *testing.T) {
+	tp := testprovider.StartTestProvider(t)
+	defer tp.Close()
+
+	const (
+		entityID       = "http://hashicorp-cap.test"
+		acsURL         = "http://hashicorp-cap.test/saml/acs"
+		oldRequestID   = "test-request-id"
+		freshRequestID = "fresh-request-id"
+	)
+
+	cfg, err := saml.NewConfig(entityID, acsURL, fmt.Sprintf("%s/saml/metadata", tp.ServerURL()))
+	require.NoError(t, err)
+	sp, err := saml.NewServiceProvider(cfg)
+	require.NoError(t, err)
+
+	// The test provider emits an unsigned Response containing a signed
+	// Assertion. Both the Response and Assertion are initially bound to
+	// oldRequestID.
+	raw := tp.SamlResponse(t, testprovider.WithJustAssertionSigned())
+
+	// Mutate exactly the first InResponseTo occurrence: the unsigned Response
+	// envelope. The signed Assertion remains cryptographically bound to
+	// oldRequestID.
+	require.Equal(t, 2, strings.Count(raw, `InResponseTo="`+oldRequestID+`"`))
+	tampered := strings.Replace(raw, `InResponseTo="`+oldRequestID+`"`, `InResponseTo="`+freshRequestID+`"`, 1)
+	require.Contains(t, tampered, `InResponseTo="`+oldRequestID+`"`)
+	require.Contains(t, tampered, `InResponseTo="`+freshRequestID+`"`)
+
+	encoded := base64.StdEncoding.EncodeToString([]byte(tampered))
+
+	for _, tc := range []struct {
+		name string
+		opts []saml.Option
+	}{
+		{
+			name: "default signature policy",
+		},
+		{
+			name: "ValidateAssertionSignature",
+			opts: []saml.Option{saml.ValidateAssertionSignature()},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := sp.ParseResponse(encoded, freshRequestID, tc.opts...)
+			require.Error(t, err)
+			require.ErrorContains(t, err, "doesn't match the expected requestID")
+		})
+	}
+
+	t.Run("ValidateResponseSignature rejects unsigned envelope", func(t *testing.T) {
+		_, err := sp.ParseResponse(encoded, freshRequestID, saml.ValidateResponseSignature())
+		require.Error(t, err)
+	})
+}
