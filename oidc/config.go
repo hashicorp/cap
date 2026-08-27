@@ -1,4 +1,4 @@
-// Copyright IBM Corp. 2020, 2025
+// Copyright IBM Corp. 2020, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package oidc
@@ -106,6 +106,10 @@ type Config struct {
 	// provider that doesn't support OIDC discovery. It's probably better to use
 	// NewProvider(...) with discovery whenever possible.
 	ProviderConfig *ProviderConfig
+
+	// ProviderType is an optional identifier for the OIDC provider that enables
+	// provider aware behavior. Currently, the only supported value is ProviderTypeAzure.
+	ProviderType ProviderType
 }
 
 // NewConfig composes a new config for a provider.
@@ -114,7 +118,7 @@ type Config struct {
 // regardless of what additional scopes are requested via the WithScopes option
 // and duplicate scopes are allowed.
 //
-// Supported options: WithProviderCA, WithScopes, WithAudiences, WithNow, WithProviderConfig
+// Supported options: WithProviderCA, WithScopes, WithAudiences, WithNow, WithProviderConfig, WithProviderType
 func NewConfig(issuer string, clientID string, clientSecret ClientSecret, supported []Alg, allowedRedirectURLs []string, opt ...Option) (*Config, error) {
 	const op = "NewConfig"
 	opts := getConfigOpts(opt...)
@@ -130,6 +134,7 @@ func NewConfig(issuer string, clientID string, clientSecret ClientSecret, suppor
 		NowFunc:              opts.withNowFunc,
 		AllowedRedirectURLs:  allowedRedirectURLs,
 		ProviderConfig:       opts.withProviderConfig,
+		ProviderType:         opts.withProviderType,
 	}
 	if err := c.Validate(); err != nil {
 		return nil, fmt.Errorf("%s: invalid provider config: %w", op, err)
@@ -195,6 +200,11 @@ func (c *Config) Hash() (uint64, error) {
 			c.ProviderConfig.UserInfoURL,
 		)
 	}
+
+	if c.ProviderType != "" {
+		args = append(args, string(c.ProviderType))
+	}
+
 	if h, err = hashStrings(args...); err != nil {
 		return 0, fmt.Errorf("hashing error: %w", err)
 	}
@@ -303,6 +313,11 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("%s: missing UserInfoURL: %w", op, ErrInvalidParameter)
 		}
 	}
+
+	if c.ProviderType != "" && !SupportedProviderType(c.ProviderType) {
+		return fmt.Errorf("%s: unsupported provider type %s: %w", op, c.ProviderType, ErrInvalidParameter)
+	}
+
 	return nil
 }
 
@@ -322,6 +337,7 @@ type configOptions struct {
 	withNowFunc        func() time.Time
 	withProviderConfig *ProviderConfig
 	withRoundTripper   http.RoundTripper
+	withProviderType   ProviderType
 }
 
 // configDefaults is a handy way to get the defaults at runtime and
@@ -417,6 +433,16 @@ func WithProviderConfig(cfg *ProviderConfig) Option {
 	return func(o interface{}) {
 		if o, ok := o.(*configOptions); ok {
 			o.withProviderConfig = cfg
+		}
+	}
+}
+
+// WithProviderType provides an optional ProviderType for the Config that
+// enables provider specific behavior.
+func WithProviderType(providerType ProviderType) Option {
+	return func(o interface{}) {
+		if o, ok := o.(*configOptions); ok {
+			o.withProviderType = providerType
 		}
 	}
 }

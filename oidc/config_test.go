@@ -1,4 +1,4 @@
-// Copyright IBM Corp. 2020, 2025
+// Copyright IBM Corp. 2020, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package oidc
@@ -356,6 +356,41 @@ func TestNewConfig(t *testing.T) {
 			wantErr:   true,
 			wantIsErr: ErrInvalidParameter,
 		},
+		{
+			name: "with-provider-type",
+			args: args{
+				issuer:       "http://your_issuer/",
+				clientID:     "your_client_id",
+				clientSecret: "your_client_secret",
+				supported:    []Alg{RS512},
+				opt: []Option{
+					WithProviderType(ProviderTypeAzure),
+				},
+			},
+			want: &Config{
+				Issuer:               "http://your_issuer/",
+				ClientID:             "your_client_id",
+				ClientSecret:         "your_client_secret",
+				SupportedSigningAlgs: []Alg{RS512},
+				Scopes:               []string{oidc.ScopeOpenID},
+				ProviderType:         ProviderTypeAzure,
+			},
+		},
+		{
+			name: "unsupported-provider-type",
+			args: args{
+				issuer:       "http://your_issuer/",
+				clientID:     "your_client_id",
+				clientSecret: "your_client_secret",
+				supported:    []Alg{RS512},
+				opt: []Option{
+					WithProviderType(ProviderType("unknown")),
+				},
+			},
+			wantErr:         true,
+			wantIsErr:       ErrInvalidParameter,
+			wantErrContains: "unsupported provider type",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -380,6 +415,7 @@ func TestNewConfig(t *testing.T) {
 			assert.Equalf(tt.want.ProviderCA, got.ProviderCA, "ProviderCA = %v, want %v", got.ProviderCA, tt.want.ProviderCA)
 			testAssertEqualFunc(t, tt.want.NowFunc, got.NowFunc, "NowFunc = %p,want %p", tt.want.NowFunc, got.NowFunc)
 			assert.Equalf(tt.want.AllowedRedirectURLs, got.AllowedRedirectURLs, "AllowedRedirectURLs = %v, want %v", got.AllowedRedirectURLs, tt.want.AllowedRedirectURLs)
+			assert.Equalf(tt.want.ProviderType, got.ProviderType, "ProviderType = %v, want %v", got.ProviderType, tt.want.ProviderType)
 		})
 	}
 }
@@ -393,6 +429,19 @@ func TestConfig_Validate(t *testing.T) {
 		var c *Config
 		err := c.Validate()
 		assert.Truef(errors.Is(err, ErrNilParameter), "Config.Validate() = %v, want %v", err, ErrNilParameter)
+	})
+	t.Run("unsupported-provider-type", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		c := &Config{
+			Issuer:               "http://your_issuer/",
+			ClientID:             "your_client_id",
+			ClientSecret:         "your_client_secret",
+			SupportedSigningAlgs: []Alg{RS512},
+			ProviderType:         ProviderType("unknown"),
+		}
+		err := c.Validate()
+		require.Error(err)
+		assert.Truef(errors.Is(err, ErrInvalidParameter), "Config.Validate() = %v, want %v", err, ErrInvalidParameter)
 	})
 }
 
@@ -956,6 +1005,57 @@ func TestConfig_Hash(t *testing.T) {
 			),
 			wantEqual: false,
 		},
+		{
+			name: "diff-provider-type",
+			c1: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+				WithProviderType(ProviderTypeAzure),
+			),
+			c2: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+			),
+			wantEqual: false,
+		},
+		{
+			name: "equal-with-provider-type",
+			c1: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+				WithProviderType(ProviderTypeAzure),
+			),
+			c2: newCfg(
+				"https://www.alice.com",
+				"client-id", "client-secret",
+				[]Alg{RS256},
+				[]string{"www.alice.com/callback"},
+				WithScopes("email", "profile"),
+				WithAudiences("alice.com", "bob.com"),
+				WithProviderCA(pem),
+				WithNow(time.Now),
+				WithProviderType(ProviderTypeAzure),
+			),
+			wantEqual: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -976,6 +1076,15 @@ func TestConfig_Hash(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_WithProviderType(t *testing.T) {
+	t.Parallel()
+	assert := assert.New(t)
+	opts := getConfigOpts(WithProviderType(ProviderTypeAzure))
+	testOpts := configDefaults()
+	testOpts.withProviderType = ProviderTypeAzure
+	assert.Equal(opts, testOpts)
 }
 
 type testRoundTripper struct {
