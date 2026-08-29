@@ -318,6 +318,7 @@ func fetchIDPMetadata(metadataURL string) (*metadata.EntityDescriptorIDPSSO, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch identity provider metadata: %w", err)
 	}
+	defer res.Body.Close()
 
 	raw, err := io.ReadAll(res.Body)
 	if err != nil {
