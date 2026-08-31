@@ -1,4 +1,4 @@
-// Copyright IBM Corp. 2020, 2025
+// Copyright IBM Corp. 2020, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package oidc
@@ -57,9 +57,10 @@ func TestNewToken(t *testing.T) {
 			oauthToken: testUnderlying,
 			opts:       []Option{WithNow(testNow)},
 			want: &Tk{
-				idToken:    IDToken(testJWT),
-				underlying: testUnderlying,
-				nowFunc:    testNow,
+				idToken:          IDToken(testJWT),
+				underlying:       testUnderlying,
+				nowFunc:          testNow,
+				additionalClaims: map[string]any{},
 			},
 			wantIDToken:      IDToken(testJWT),
 			wantAccessToken:  AccessToken(testAccessToken),
@@ -75,8 +76,9 @@ func TestNewToken(t *testing.T) {
 			oauthToken: testUnderlying,
 			opts:       []Option{},
 			want: &Tk{
-				idToken:    IDToken(testJWT),
-				underlying: testUnderlying,
+				idToken:          IDToken(testJWT),
+				underlying:       testUnderlying,
+				additionalClaims: map[string]any{},
 			},
 			wantIDToken:      IDToken(testJWT),
 			wantAccessToken:  AccessToken(testAccessToken),
@@ -90,7 +92,8 @@ func TestNewToken(t *testing.T) {
 			name:    "valid-without-accessToken",
 			idToken: IDToken(testJWT),
 			want: &Tk{
-				idToken: IDToken(testJWT),
+				idToken:          IDToken(testJWT),
+				additionalClaims: map[string]any{},
 			},
 			wantIDToken: IDToken(testJWT),
 			wantExpired: true,
@@ -101,8 +104,9 @@ func TestNewToken(t *testing.T) {
 			idToken:    IDToken(testJWT),
 			oauthToken: testUnderlyingZeroExpiry,
 			want: &Tk{
-				idToken:    IDToken(testJWT),
-				underlying: testUnderlyingZeroExpiry,
+				idToken:          IDToken(testJWT),
+				underlying:       testUnderlyingZeroExpiry,
+				additionalClaims: map[string]any{},
 			},
 			wantIDToken:      IDToken(testJWT),
 			wantAccessToken:  AccessToken(testAccessToken),
@@ -155,5 +159,89 @@ func TestUnmarshalClaims(t *testing.T) {
 		err := UnmarshalClaims(jwt, &claims)
 		require.Error(err)
 		assert.Truef(errors.Is(err, ErrInvalidParameter), "wanted \"%s\" but got \"%s\"", ErrInvalidParameter, err)
+	})
+}
+
+func TestEffectiveClaims(t *testing.T) {
+	t.Parallel()
+
+	_, priv := TestGenerateKeys(t)
+	testIat := float64(time.Now().Unix())
+	testExp := float64(time.Now().Add(10 * time.Minute).Unix())
+	testJWT := TestSignJWT(t, priv, string(ES256), map[string]any{
+		"iss": "https://example.com/",
+		"iat": testIat,
+		"exp": testExp,
+		"aud": []string{"www.example.com"},
+		"sub": "alice@example.com",
+	}, nil)
+
+	t.Run("nil-claims", func(t *testing.T) {
+		t.Parallel()
+		tk := &Tk{idToken: IDToken(testJWT), additionalClaims: map[string]any{}}
+		err := tk.EffectiveClaims(nil)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrNilParameter)
+		assert.ErrorContains(t, err, "v is nil")
+	})
+	t.Run("empty-id-token", func(t *testing.T) {
+		t.Parallel()
+		tk := &Tk{idToken: IDToken(""), additionalClaims: map[string]any{}}
+		var claims map[string]any
+		err := tk.EffectiveClaims(&claims)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrInvalidParameter)
+		assert.ErrorContains(t, err, "id_token is empty")
+	})
+	t.Run("no-additional-claims", func(t *testing.T) {
+		t.Parallel()
+		tk := &Tk{idToken: IDToken(testJWT), additionalClaims: map[string]any{}}
+		var claims map[string]any
+		err := tk.EffectiveClaims(&claims)
+		require.NoError(t, err)
+		assert.EqualValues(t, map[string]any{
+			"iss": "https://example.com/",
+			"iat": testIat,
+			"exp": testExp,
+			"aud": []any{"www.example.com"},
+			"sub": "alice@example.com",
+		}, claims)
+	})
+	t.Run("azure-groups-overage", func(t *testing.T) {
+		t.Parallel()
+		tk := &Tk{
+			idToken: IDToken(testJWT),
+			additionalClaims: map[string]any{
+				"groups": []any{"group-a", "group-b"},
+			},
+		}
+		var claims map[string]any
+		err := tk.EffectiveClaims(&claims)
+		require.NoError(t, err)
+		assert.EqualValues(t, map[string]any{
+			"iss":    "https://example.com/",
+			"iat":    testIat,
+			"exp":    testExp,
+			"aud":    []any{"www.example.com"},
+			"sub":    "alice@example.com",
+			"groups": []any{"group-a", "group-b"},
+		}, claims)
+	})
+	t.Run("id-token-wins-conflict", func(t *testing.T) {
+		t.Parallel()
+		tk := &Tk{
+			idToken:          IDToken(testJWT),
+			additionalClaims: map[string]any{"sub": "alice2@example.com"},
+		}
+		var claims map[string]any
+		err := tk.EffectiveClaims(&claims)
+		require.NoError(t, err)
+		assert.EqualValues(t, map[string]any{
+			"iss": "https://example.com/",
+			"iat": testIat,
+			"exp": testExp,
+			"aud": []any{"www.example.com"},
+			"sub": "alice@example.com",
+		}, claims)
 	})
 }

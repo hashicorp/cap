@@ -1,4 +1,4 @@
-// Copyright IBM Corp. 2020, 2025
+// Copyright IBM Corp. 2020, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package oidc
@@ -53,6 +53,10 @@ type Tk struct {
 
 	// nowFunc is an optional function that returns the current time
 	nowFunc func() time.Time
+
+	// additionalClaims holds resolved claims that are populated post OIDC exchange for
+	// provider specific resolution that cannot be written back into the signed id_token.
+	additionalClaims map[string]any
 }
 
 // ensure that Tk implements the Token interface
@@ -70,9 +74,10 @@ func NewToken(i IDToken, t *oauth2.Token, opt ...Option) (*Tk, error) {
 	}
 	opts := getTokenOpts(opt...)
 	return &Tk{
-		idToken:    i,
-		underlying: t,
-		nowFunc:    opts.withNowFunc,
+		idToken:          i,
+		underlying:       t,
+		nowFunc:          opts.withNowFunc,
+		additionalClaims: make(map[string]any),
 	}, nil
 }
 
@@ -148,6 +153,34 @@ func (t *Tk) now() time.Time {
 		return t.nowFunc()
 	}
 	return time.Now() // fallback to this default
+}
+
+// EffectiveClaims merges additionalClaims and the id_token claims into v.
+// id_token claims take precedence over any overlapping keys in additionalClaims.
+//
+// Overage and/or distributed claims in the id_token are not removed.
+// When a OIDC provider is configured, such as the Azure provider, overage claims
+// are automatically resolved during exchange and require no additional resolution
+// from the caller.
+func (t *Tk) EffectiveClaims(v any) error {
+	const op = "Tk.EffectiveClaims"
+	if v == nil {
+		return fmt.Errorf("%s: v is nil: %w", op, ErrNilParameter)
+	}
+	if t.idToken == "" {
+		return fmt.Errorf("%s: id_token is empty: %w", op, ErrInvalidParameter)
+	}
+
+	if len(t.additionalClaims) > 0 {
+		b, err := json.Marshal(t.additionalClaims)
+		if err != nil {
+			return fmt.Errorf("%s: unable to marshal additional claims: %w", op, err)
+		}
+		if err := json.Unmarshal(b, v); err != nil {
+			return fmt.Errorf("%s: unable to unmarshal additional claims: %w", op, err)
+		}
+	}
+	return t.idToken.Claims(v)
 }
 
 // tokenOptions is the set of available options for Token functions
