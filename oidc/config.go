@@ -108,8 +108,7 @@ type Config struct {
 	ProviderConfig *ProviderConfig
 
 	// ProviderType is an optional identifier for the OIDC provider that enables
-	// provider specific logic. Examples include resolving group overage claims
-	// for Azure.
+	// provider aware behavior. Currently, the only supported value is ProviderTypeAzure.
 	ProviderType ProviderType
 }
 
@@ -119,7 +118,7 @@ type Config struct {
 // regardless of what additional scopes are requested via the WithScopes option
 // and duplicate scopes are allowed.
 //
-// Supported options: WithProviderCA, WithScopes, WithAudiences, WithNow, WithProviderConfig
+// Supported options: WithProviderCA, WithScopes, WithAudiences, WithNow, WithProviderConfig, WithProviderType
 func NewConfig(issuer string, clientID string, clientSecret ClientSecret, supported []Alg, allowedRedirectURLs []string, opt ...Option) (*Config, error) {
 	const op = "NewConfig"
 	opts := getConfigOpts(opt...)
