@@ -1,4 +1,4 @@
-// Copyright IBM Corp. 2020, 2025
+// Copyright IBM Corp. 2020, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package oidc
@@ -703,6 +703,85 @@ func TestProvider_Exchange(t *testing.T) {
 		assert.Truef(gotTk.Valid(), "gotTk.Valid() = %v, wanted true", gotTk.Valid())
 		assert.Truef(!gotTk.IsExpired(), "gotTk.Expired() = %v, wanted false", gotTk.IsExpired())
 	})
+	t.Run("azure-distributed-group-claims", func(t *testing.T) {
+		tp := StartTestProvider(t)
+		tp.SetAllowedRedirectURIs([]string{redirect})
+		tp.SetCustomClaims(map[string]any{
+			"_claim_names": map[string]any{
+				"groups": "src1",
+			},
+			"_claim_sources": map[string]any{
+				"src1": map[string]any{
+					"endpoint": "https://graph.microsoft.com/v1.0/users/test-user/getMemberObjects",
+				},
+			},
+		})
+		providerTransport := tp.HTTPClient().Transport
+		graphTransport := newTestRoundTripper(t)
+		graphTransport.transport = testRoundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			if req.URL.Hostname() == "graph.microsoft.com" {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"value":["group-1","group-2"]}`)),
+					Header:     make(http.Header),
+					Request:    req,
+				}, nil
+			}
+			return providerTransport.RoundTrip(req)
+		})
+		azureProvider := testNewProvider(
+			t,
+			clientID,
+			clientSecret,
+			redirect,
+			tp,
+			WithProviderType(ProviderTypeAzure),
+			WithRoundTripper(graphTransport),
+		)
+
+		validRequest, err := NewRequest(10*time.Second, redirect)
+		require.NoError(t, err)
+		const authCode = "test-code"
+		tp.SetExpectedAuthCode(authCode)
+		tp.SetExpectedAuthNonce(validRequest.Nonce())
+
+		gotTk, err := azureProvider.Exchange(ctx, validRequest, validRequest.State(), authCode)
+		require.NoError(t, err)
+		require.NotNil(t, gotTk)
+
+		var claims struct {
+			Groups []string `json:"groups"`
+		}
+		require.NoError(t, gotTk.EffectiveClaims(&claims))
+		require.NotEmpty(t, claims.Groups)
+		assert.ElementsMatch(t, []string{"group-1", "group-2"}, claims.Groups)
+	})
+	t.Run("azure-no-distributed-group-claims", func(t *testing.T) {
+		tp := StartTestProvider(t)
+		tp.SetAllowedRedirectURIs([]string{redirect})
+		azureProvider := testNewProvider(t, clientID, clientSecret, redirect, tp, WithProviderType(ProviderTypeAzure))
+
+		validRequest, err := NewRequest(10*time.Second, redirect)
+		require.NoError(t, err)
+		const authCode = "test-code"
+		tp.SetExpectedAuthCode(authCode)
+		tp.SetExpectedAuthNonce(validRequest.Nonce())
+
+		gotTk, err := azureProvider.Exchange(ctx, validRequest, validRequest.State(), authCode)
+		require.NoError(t, err)
+		require.NotNil(t, gotTk)
+
+		var claims map[string]any
+		require.NoError(t, gotTk.EffectiveClaims(&claims))
+		assert.NotEmpty(t, claims)
+		assert.NotContains(t, claims, "groups")
+	})
+}
+
+type testRoundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f testRoundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }
 
 func TestHTTPClient(t *testing.T) {
