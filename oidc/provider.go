@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/hashicorp/cap/oidc/azure"
 	cass "github.com/hashicorp/cap/oidc/clientassertion"
 	"github.com/hashicorp/cap/oidc/internal/strutils"
 	"github.com/hashicorp/go-cleanhttp"
@@ -366,6 +367,21 @@ func (p *Provider) Exchange(ctx context.Context, oidcRequest Request, authorizat
 			return nil, fmt.Errorf("%s: code hash failed verification: %w", op, err)
 		}
 	}
+
+	if p.config.ProviderType == ProviderTypeAzure {
+		client, err := p.HTTPClient()
+		if err != nil {
+			return nil, fmt.Errorf("%s: unable to create Azure HTTP client: %w", op, err)
+		}
+		claims, err := azure.ResolveGroupClaims(ctx, client, oauth2Token, claims)
+		if err != nil {
+			return nil, fmt.Errorf("%s: unable to resolve Azure group claims: %w", op, err)
+		}
+		// TODO: Merge fetched claims with existing additional claims when
+		// support for additional claim resolvers or providers is added.
+		t.additionalClaims = claims
+	}
+
 	return t, nil
 }
 

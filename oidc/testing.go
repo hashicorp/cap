@@ -179,15 +179,23 @@ func testNewConfig(t *testing.T, clientID, clientSecret, allowedRedirectURL stri
 
 	tp.SetClientCreds(clientID, clientSecret)
 	_, _, alg, _ := tp.SigningKeys()
+	configOpts := []Option{
+		WithProviderType(opts.withProviderType),
+		WithProviderConfig(opts.withProviderConfig),
+	}
+	// Use the test CA unless a custom transport is provided.
+	if opts.withRoundTripper == nil {
+		configOpts = append(configOpts, WithProviderCA(tp.CACert()))
+	} else {
+		configOpts = append(configOpts, WithRoundTripper(opts.withRoundTripper))
+	}
 	c, err := NewConfig(
 		tp.Addr(),
 		clientID,
 		ClientSecret(clientSecret),
 		[]Alg{alg},
 		[]string{allowedRedirectURL},
-		nil,
-		WithProviderCA(tp.CACert()),
-		WithProviderConfig(opts.withProviderConfig),
+		configOpts...,
 	)
 	require.NoError(err)
 	return c
@@ -206,7 +214,11 @@ func testNewProvider(t *testing.T, clientID, clientSecret, redirectURL string, t
 
 	opts := getConfigOpts(opt...)
 
-	tc := testNewConfig(t, clientID, clientSecret, redirectURL, tp, WithProviderConfig(opts.withProviderConfig))
+	tc := testNewConfig(t, clientID, clientSecret, redirectURL, tp,
+		WithRoundTripper(opts.withRoundTripper),
+		WithProviderType(opts.withProviderType),
+		WithProviderConfig(opts.withProviderConfig),
+	)
 	p, err := NewProvider(tc)
 	require.NoError(err)
 	t.Cleanup(p.Done)
