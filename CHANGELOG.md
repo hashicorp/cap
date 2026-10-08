@@ -4,6 +4,7 @@ Canonical reference for changes, improvements, and bugfixes for cap.
 
 ## Next
 
+* fix (jwt): distinguish explicit Unix-epoch time claims (value `0`) from missing claims during validation
 * saml: fix InResponseTo request-correlation bypass ([PR #192](https://github.com/hashicorp/cap/pull/192))
 
 ## 0.13.0
