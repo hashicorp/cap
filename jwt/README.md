@@ -8,12 +8,19 @@ Primary types provided by the package:
 
 * `KeySet`: Represents a set of keys that can be used to verify the signatures of JWTs.
   A KeySet is expected to be backed by a set of local or remote keys.
-  
+
 * `Validator`: Provides signature verification and claims set validation behavior for JWTs.
 
 * `Expected`: Defines the expected claims values to assert when validating a JWT.
 
 * `Alg`: Represents asymmetric signing algorithms.
+
+### Time claims
+
+Explicit NumericDate `0` values in `iat`, `nbf`, and `exp` represent the Unix epoch.
+Omitted or JSON `null` time claims are internally derived when relevant.
+`Validate` requires at least one non-null time claim.
+`ValidateAllowMissingIatNbfExp` skips time validation only when all three time claims are omitted or null.
 
 ### Examples:
 
