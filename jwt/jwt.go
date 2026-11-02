@@ -250,18 +250,9 @@ func (v *Validator) validateAll(ctx context.Context, token string, expected Expe
 		return nil, fmt.Errorf("invalid audience (aud) claim: %w", err)
 	}
 
-	if claims.IssuedAt == nil {
-		claims.IssuedAt = new(jwt.NumericDate)
-	}
-	if claims.Expiry == nil {
-		claims.Expiry = new(jwt.NumericDate)
-	}
-	if claims.NotBefore == nil {
-		claims.NotBefore = new(jwt.NumericDate)
-	}
 	// At least one of the "nbf" (Not Before), "exp" (Expiration Time), or "iat" (Issued At)
 	// claims are required to be set unless allowMissingIatExpNbf is set.
-	if *claims.IssuedAt == 0 && *claims.Expiry == 0 && *claims.NotBefore == 0 {
+	if claims.IssuedAt == nil && claims.Expiry == nil && claims.NotBefore == nil {
 		if allowMissingIatExpNbf {
 			return allClaims, nil
 		}
@@ -270,25 +261,31 @@ func (v *Validator) validateAll(ctx context.Context, token string, expected Expe
 
 	// If "exp" (Expiration Time) is not set, then set it to the latest of
 	// either the "iat" (Issued At) or "nbf" (Not Before) claims plus leeway.
-	if *claims.Expiry == 0 {
-		latestStart := *claims.IssuedAt
-		if *claims.NotBefore > *claims.IssuedAt {
+	if claims.Expiry == nil {
+		var latestStart jwt.NumericDate
+		switch {
+		case claims.IssuedAt != nil && claims.NotBefore != nil:
+			latestStart = max(*claims.IssuedAt, *claims.NotBefore)
+		case claims.IssuedAt != nil:
+			latestStart = *claims.IssuedAt
+		case claims.NotBefore != nil:
 			latestStart = *claims.NotBefore
 		}
 		leeway := expected.ExpirationLeeway.Seconds()
-		if expected.ExpirationLeeway.Seconds() < 0 {
+		if leeway < 0 {
 			leeway = 0
-		} else if expected.ExpirationLeeway.Seconds() == 0 {
+		} else if leeway == 0 {
 			leeway = DefaultLeewaySeconds
 		}
-		*claims.Expiry = jwt.NumericDate(int64(latestStart) + int64(leeway))
+		expiry := jwt.NumericDate(int64(latestStart) + int64(leeway))
+		claims.Expiry = &expiry
 	}
 
 	// If "nbf" (Not Before) is not set, then set it to the "iat" (Issued At) if set.
 	// Otherwise, set it to the "exp" (Expiration Time) minus leeway.
-	if *claims.NotBefore == 0 {
-		if *claims.IssuedAt != 0 {
-			*claims.NotBefore = *claims.IssuedAt
+	if claims.NotBefore == nil {
+		if claims.IssuedAt != nil {
+			claims.NotBefore = claims.IssuedAt
 		} else {
 			leeway := expected.NotBeforeLeeway.Seconds()
 			if expected.NotBeforeLeeway.Seconds() < 0 {
@@ -296,7 +293,8 @@ func (v *Validator) validateAll(ctx context.Context, token string, expected Expe
 			} else if expected.NotBeforeLeeway.Seconds() == 0 {
 				leeway = DefaultLeewaySeconds
 			}
-			*claims.NotBefore = jwt.NumericDate(int64(*claims.Expiry) - int64(leeway))
+			notBefore := jwt.NumericDate(int64(*claims.Expiry) - int64(leeway))
+			claims.NotBefore = &notBefore
 		}
 	}
 
