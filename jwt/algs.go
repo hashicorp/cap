@@ -3,7 +3,11 @@
 
 package jwt
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/go-jose/go-jose/v4"
+)
 
 // Alg represents asymmetric signing algorithms
 type Alg string
@@ -35,6 +39,14 @@ var supportedAlgorithms = map[Alg]bool{
 	PS384: true,
 	PS512: true,
 	EdDSA: true,
+}
+
+func joseSignatureAlgorithms() []jose.SignatureAlgorithm {
+	algorithms := make([]jose.SignatureAlgorithm, 0, len(supportedAlgorithms))
+	for algorithm := range supportedAlgorithms {
+		algorithms = append(algorithms, jose.SignatureAlgorithm(algorithm))
+	}
+	return algorithms
 }
 
 // SupportedSigningAlgorithm returns an error if any of the given Algs

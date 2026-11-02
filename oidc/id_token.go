@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"hash"
 
-	"github.com/go-jose/go-jose/v3"
+	"github.com/go-jose/go-jose/v4"
 )
 
 // IDToken is an oidc id_token.
@@ -104,7 +104,7 @@ func (t IDToken) verifyHashClaim(claimName string, token string) (bool, error) {
 		return false, nil
 	}
 
-	jws, err := jose.ParseSigned(string(t))
+	jws, err := jose.ParseSigned(string(t), joseSignatureAlgorithms())
 	if err != nil {
 		return false, fmt.Errorf("%s: malformed jwt (%v): %w", op, err, ErrMalformedToken)
 	}
