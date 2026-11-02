@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-jose/go-jose/v3"
-	"github.com/go-jose/go-jose/v3/jwt"
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/cap/oidc"
@@ -824,7 +824,7 @@ func TestValidator_WithKeySetSearcher(t *testing.T) {
 		token := oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
 
 		// Parse the token and duplicate its signature
-		parsedJWS, err := jose.ParseSigned(token)
+		parsedJWS, err := jose.ParseSigned(token, joseSignatureAlgorithms())
 		require.NoError(t, err)
 
 		// Manually create a JSON with duplicate signatures

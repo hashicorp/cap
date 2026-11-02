@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-jose/go-jose/v3"
-	"github.com/go-jose/go-jose/v3/jwt"
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 )
 
 // DefaultLeewaySeconds defines the amount of leeway that's used by default
@@ -163,7 +163,7 @@ func (v *Validator) validateAll(ctx context.Context, token string, expected Expe
 	if v.keySearcher != nil {
 		// Use the KeySetSearcher callback to dynamically locate the appropriate KeySet based on the JWT's kid header
 		var jws *jose.JSONWebSignature
-		jws, err = jose.ParseSigned(token)
+		jws, err = jose.ParseSigned(token, joseSignatureAlgorithms())
 		if err != nil {
 			return nil, fmt.Errorf("error parsing token: %w", err)
 		}
@@ -365,7 +365,7 @@ func validateSigningAlgorithm(token string, expectedAlgorithms []Alg) error {
 		return err
 	}
 
-	jws, err := jose.ParseSigned(token)
+	jws, err := jose.ParseSigned(token, joseSignatureAlgorithms())
 	if err != nil {
 		return err
 	}

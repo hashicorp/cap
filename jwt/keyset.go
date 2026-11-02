@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/go-jose/go-jose/v3/jwt"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/hashicorp/go-cleanhttp"
 	"golang.org/x/oauth2"
 )
@@ -154,7 +154,7 @@ func NewStaticKeySet(publicKeys []crypto.PublicKey) (KeySet, error) {
 // VerifySignature parses the given JWT, verifies its signature using local public keys, and
 // returns the claims in its payload. The given JWT must be of the JWS compact serialization form.
 func (ks *staticKeySet) VerifySignature(_ context.Context, token string) (map[string]interface{}, error) {
-	parsedJWT, err := jwt.ParseSigned(token)
+	parsedJWT, err := jwt.ParseSigned(token, joseSignatureAlgorithms())
 	if err != nil {
 		return nil, err
 	}
