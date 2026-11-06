@@ -1,10 +1,10 @@
 module github.com/hashicorp/cap
 
-go 1.25.13
+go 1.27
 
 require (
 	github.com/coreos/go-oidc/v3 v3.11.0
-	github.com/go-jose/go-jose/v4 v4.1.6
+	github.com/go-jose/go-jose/v4 v4.1.9
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-multierror v1.1.1
