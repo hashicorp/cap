@@ -5,6 +5,7 @@ package oidc
 
 import (
 	"crypto/sha256"
+	"crypto/sha3"
 	"crypto/sha512"
 	"crypto/subtle"
 	"encoding/base64"
@@ -122,6 +123,7 @@ func (t IDToken) verifyHashClaim(claimName string, token string) (bool, error) {
 	sigAlgorithm := Alg(sig.Header.Algorithm)
 
 	var h hash.Hash
+	var digest []byte
 	switch sigAlgorithm {
 	case RS256, ES256, PS256:
 		h = sha256.New()
@@ -129,13 +131,19 @@ func (t IDToken) verifyHashClaim(claimName string, token string) (bool, error) {
 		h = sha512.New384()
 	case RS512, ES512, PS512:
 		h = sha512.New()
+	case MLDSA44, MLDSA65, MLDSA87:
+		digest = sha3.SumSHAKE256([]byte(token), 64)
 	case EdDSA:
 		return false, nil
 	default:
 		return false, fmt.Errorf("%s: unsupported signing algorithm %s: %w", op, sigAlgorithm, ErrUnsupportedAlg)
 	}
-	_, _ = h.Write([]byte(token)) // hash documents that Write will never return an error
-	sum := h.Sum(nil)[:h.Size()/2]
+	if h != nil {
+		_, _ = h.Write([]byte(token))
+		digest = h.Sum(nil)
+	}
+
+	sum := digest[:len(digest)/2]
 	actual := base64.RawURLEncoding.EncodeToString(sum)
 	if subtle.ConstantTimeCompare([]byte(actual), []byte(tokenHash)) != 1 {
 		switch claimName {

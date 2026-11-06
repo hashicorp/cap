@@ -9,6 +9,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/sha3"
 	"crypto/sha512"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -123,6 +124,7 @@ func testHash(t *testing.T, signatureAlg Alg, data string) string {
 	t.Helper()
 	require := require.New(t)
 	var h hash.Hash
+	var digest []byte
 	switch signatureAlg {
 	case RS256, ES256, PS256:
 		h = sha256.New()
@@ -130,16 +132,20 @@ func testHash(t *testing.T, signatureAlg Alg, data string) string {
 		h = sha512.New384()
 	case RS512, ES512, PS512:
 		h = sha512.New()
+	case MLDSA44, MLDSA65, MLDSA87:
+		digest = sha3.SumSHAKE256([]byte(data), 64)
 	case EdDSA:
 		return "EdDSA-hash"
 	default:
 		require.FailNowf("", "testHash: unsupported signing algorithm %s", string(signatureAlg))
 	}
-	require.NotNil(h)
-	_, _ = h.Write([]byte(string(data))) // hash documents that Write will never return an error
-	sum := h.Sum(nil)[:h.Size()/2]
-	actual := base64.RawURLEncoding.EncodeToString(sum)
-	return actual
+	if h != nil {
+		_, _ = h.Write([]byte(data))
+		digest = h.Sum(nil)
+	}
+
+	sum := digest[:len(digest)/2]
+	return base64.RawURLEncoding.EncodeToString(sum)
 }
 
 // testDefaultJWT creates a default test JWT and is internally helpful, but for now we won't export it.

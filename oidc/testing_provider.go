@@ -11,6 +11,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/sha3"
 	"crypto/sha512"
 	"crypto/subtle"
 	"crypto/tls"
@@ -1091,6 +1092,7 @@ func (p *TestProvider) testHash(data string) string {
 	require := require.New(p.t)
 	require.NotEmptyf(data, "testHash: data to hash is empty")
 	var h hash.Hash
+	var digest []byte
 	switch p.alg {
 	case RS256, ES256, PS256:
 		h = sha256.New()
@@ -1098,16 +1100,20 @@ func (p *TestProvider) testHash(data string) string {
 		h = sha512.New384()
 	case RS512, ES512, PS512:
 		h = sha512.New()
+	case MLDSA44, MLDSA65, MLDSA87:
+		digest = sha3.SumSHAKE256([]byte(data), 64)
 	case EdDSA:
 		return "EdDSA-hash"
 	default:
 		require.FailNowf("", "testHash: unsupported signing algorithm %s", string(p.alg))
 	}
-	require.NotNil(h)
-	_, _ = h.Write([]byte(string(data))) // hash documents that Write will never return an error
-	sum := h.Sum(nil)[:h.Size()/2]
-	actual := base64.RawURLEncoding.EncodeToString(sum)
-	return actual
+	if h != nil {
+		_, _ = h.Write([]byte(data))
+		digest = h.Sum(nil)
+	}
+
+	sum := digest[:len(digest)/2]
+	return base64.RawURLEncoding.EncodeToString(sum)
 }
 
 // writeAuthErrorResponse writes a standard OIDC authentication error response.
