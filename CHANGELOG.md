@@ -5,6 +5,7 @@ Canonical reference for changes, improvements, and bugfixes for cap.
 ## Next
 
 * saml: fix InResponseTo request-correlation bypass ([PR #192](https://github.com/hashicorp/cap/pull/192))
+* fix (oidc): refuse an access_token posted to the implicit flow callback when the id_token has no at_hash claim ([Issue #212](https://github.com/hashicorp/cap/issues/212))
 
 ## 0.13.0
 
