@@ -9,6 +9,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -155,6 +156,42 @@ func Test_jsonWebKeySet_VerifySignature(t *testing.T) {
 					require.NoError(t, err)
 					tp.SetSigningKeys(priv, pub, oidc.EdDSA, testKeyID)
 					return oidc.TestSignJWT(t, priv, string(EdDSA), testJWTClaims(t), []byte(testKeyID))
+				},
+			},
+			want: testJWTClaims(t),
+		},
+		{
+			name: "verify jwt with MLDSA44 signature",
+			args: args{
+				token: func() string {
+					priv, err := mldsa.GenerateKey(mldsa.MLDSA44())
+					require.NoError(t, err)
+					tp.SetSigningKeys(priv, priv.PublicKey(), oidc.MLDSA44, testKeyID)
+					return oidc.TestSignJWT(t, priv, string(MLDSA44), testJWTClaims(t), []byte(testKeyID))
+				},
+			},
+			want: testJWTClaims(t),
+		},
+		{
+			name: "verify jwt with MLDSA65 signature",
+			args: args{
+				token: func() string {
+					priv, err := mldsa.GenerateKey(mldsa.MLDSA65())
+					require.NoError(t, err)
+					tp.SetSigningKeys(priv, priv.PublicKey(), oidc.MLDSA65, testKeyID)
+					return oidc.TestSignJWT(t, priv, string(MLDSA65), testJWTClaims(t), []byte(testKeyID))
+				},
+			},
+			want: testJWTClaims(t),
+		},
+		{
+			name: "verify jwt with MLDSA87 signature",
+			args: args{
+				token: func() string {
+					priv, err := mldsa.GenerateKey(mldsa.MLDSA87())
+					require.NoError(t, err)
+					tp.SetSigningKeys(priv, priv.PublicKey(), oidc.MLDSA87, testKeyID)
+					return oidc.TestSignJWT(t, priv, string(MLDSA87), testJWTClaims(t), []byte(testKeyID))
 				},
 			},
 			want: testJWTClaims(t),
