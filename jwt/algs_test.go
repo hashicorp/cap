@@ -21,7 +21,7 @@ func TestSupportedSigningAlgorithm(t *testing.T) {
 		{
 			name: "supported signing algorithms",
 			args: args{
-				algs: []Alg{RS256, RS384, RS512, ES256, ES384, ES512, PS256, PS384, PS512, EdDSA},
+				algs: []Alg{RS256, RS384, RS512, ES256, ES384, ES512, PS256, PS384, PS512, EdDSA, MLDSA44, MLDSA65, MLDSA87},
 			},
 		},
 		{

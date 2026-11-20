@@ -8,6 +8,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/rand"
 	"crypto/rsa"
 	"errors"
@@ -221,6 +222,36 @@ func TestIDToken_VerifyAccessToken(t *testing.T) {
 			}(),
 			accessToken:     "test-access-token",
 			WantNotVerified: true,
+		},
+		{
+			name: "MLDSA44",
+			alg:  MLDSA44,
+			priKey: func() crypto.PrivateKey {
+				k, err := mldsa.GenerateKey(mldsa.MLDSA44())
+				require.NoError(t, err)
+				return k
+			}(),
+			accessToken: "test-access-token",
+		},
+		{
+			name: "MLDSA65",
+			alg:  MLDSA65,
+			priKey: func() crypto.PrivateKey {
+				k, err := mldsa.GenerateKey(mldsa.MLDSA65())
+				require.NoError(t, err)
+				return k
+			}(),
+			accessToken: "test-access-token",
+		},
+		{
+			name: "MLDSA87",
+			alg:  MLDSA87,
+			priKey: func() crypto.PrivateKey {
+				k, err := mldsa.GenerateKey(mldsa.MLDSA87())
+				require.NoError(t, err)
+				return k
+			}(),
+			accessToken: "test-access-token",
 		},
 	}
 	for _, tt := range tests {
