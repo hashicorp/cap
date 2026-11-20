@@ -105,6 +105,22 @@ func Implicit(ctx context.Context, p *oidc.Provider, rw RequestReader, sFn Succe
 		if includeAccessToken {
 			reqAccessToken := req.FormValue("access_token")
 			if reqAccessToken != "" {
+				// at_hash is REQUIRED when an access_token is issued with
+				// the id_token in the implicit flow. Without the claim
+				// VerifyAccessToken has nothing to verify, so the
+				// access_token would be accepted unbound to the id_token.
+				// See: https://openid.net/specs/openid-connect-core-1_0.html#ImplicitIDToken
+				var claims map[string]interface{}
+				if err := reqIDToken.Claims(&claims); err != nil {
+					responseErr := fmt.Errorf("%s: unable to verify access_token: %w", op, err)
+					eFn(reqState, nil, responseErr, w, req)
+					return
+				}
+				if _, ok := claims["at_hash"].(string); !ok {
+					responseErr := fmt.Errorf("%s: unable to verify access_token: id_token has no at_hash claim: %w", op, oidc.ErrMissingClaim)
+					eFn(reqState, nil, responseErr, w, req)
+					return
+				}
 				if _, err := reqIDToken.VerifyAccessToken(oidc.AccessToken(reqAccessToken)); err != nil {
 					responseErr := fmt.Errorf("%s: unable to verify access_token: %w", op, err)
 					eFn(reqState, nil, responseErr, w, req)

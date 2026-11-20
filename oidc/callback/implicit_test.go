@@ -8,7 +8,9 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -260,6 +262,117 @@ func Test_ImplicitResponses(t *testing.T) {
 		assert.Equal("internal-callback-error", errResp.Error)
 		assert.Contains(errResp.Description, "invalid OIDC flow")
 	})
+}
+
+// Test_ImplicitAccessTokenHash asserts that, for an id_token signed with
+// ES256 (the test provider's alg), an access_token posted to the implicit
+// callback is only accepted when the id_token's at_hash claim verifies it.
+// See: https://openid.net/specs/openid-connect-core-1_0.html#ImplicitIDToken
+func Test_ImplicitAccessTokenHash(t *testing.T) {
+	ctx := context.Background()
+	clientID := "test-client-id"
+	clientSecret := "test-client-secret"
+	redirect := "https://rp.example/callback"
+	tp := oidc.StartTestProvider(t)
+	tp.SetAllowedRedirectURIs([]string{redirect})
+	p := testNewProvider(t, clientID, clientSecret, redirect, tp)
+
+	priv, _, alg, keyID := tp.SigningKeys()
+	// testAtHash assumes a signing alg which hashes with SHA-256
+	require.Equal(t, oidc.ES256, alg)
+	testAtHash := func(accessToken string) string {
+		sum := sha256.Sum256([]byte(accessToken))
+		return base64.RawURLEncoding.EncodeToString(sum[:len(sum)/2])
+	}
+	const testAccessToken = "test-access-token"
+
+	tests := []struct {
+		name            string
+		atHashClaim     map[string]interface{} // added to the id_token's claims
+		wantAccessToken string
+		wantErrContains []string
+	}{
+		{
+			name:            "matching-at-hash",
+			atHashClaim:     map[string]interface{}{"at_hash": testAtHash(testAccessToken)},
+			wantAccessToken: testAccessToken,
+		},
+		{
+			name:            "at-hash-of-another-access-token",
+			atHashClaim:     map[string]interface{}{"at_hash": testAtHash("another-access-token")},
+			wantErrContains: []string{"unable to verify access_token", oidc.ErrInvalidAtHash.Error()},
+		},
+		{
+			name:            "missing-at-hash",
+			wantErrContains: []string{"id_token has no at_hash claim", oidc.ErrMissingClaim.Error()},
+		},
+		{
+			name:            "null-at-hash",
+			atHashClaim:     map[string]interface{}{"at_hash": nil},
+			wantErrContains: []string{"id_token has no at_hash claim", oidc.ErrMissingClaim.Error()},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert, require := assert.New(t), require.New(t)
+			oidcReq, err := oidc.NewRequest(1*time.Minute, redirect, oidc.WithImplicitFlow(true))
+			require.NoError(err)
+
+			now := time.Now()
+			claims := map[string]interface{}{
+				"iss":   tp.Addr(),
+				"aud":   []string{clientID},
+				"sub":   "alice@example.com",
+				"nonce": oidcReq.Nonce(),
+				"iat":   now.Unix(),
+				"nbf":   now.Unix(),
+				"exp":   now.Add(1 * time.Minute).Unix(),
+			}
+			for k, v := range tt.atHashClaim {
+				claims[k] = v
+			}
+			idToken := oidc.TestSignJWT(t, priv, string(alg), claims, []byte(keyID))
+
+			var gotAccessToken *string
+			successFn := func(state string, tk oidc.Token, w http.ResponseWriter, req *http.Request) {
+				got := string(tk.AccessToken())
+				gotAccessToken = &got
+				testSuccessFn(state, tk, w, req)
+			}
+			handler, err := Implicit(ctx, p, &SingleRequestReader{oidcReq}, successFn, testFailFn)
+			require.NoError(err)
+
+			reqForm := url.Values{}
+			reqForm.Add("state", oidcReq.State())
+			reqForm.Add("id_token", idToken)
+			reqForm.Add("access_token", testAccessToken)
+
+			req, err := http.NewRequest("POST", "/callback", strings.NewReader(reqForm.Encode()))
+			require.NoError(err)
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, req)
+
+			contents, err := ioutil.ReadAll(rr.Body)
+			require.NoError(err)
+
+			if tt.wantErrContains != nil {
+				assert.Nil(gotAccessToken, "the success response func must not be called")
+				var errResp AuthenErrorResponse
+				require.NoError(json.Unmarshal(contents, &errResp))
+				assert.Equal("internal-callback-error", errResp.Error)
+				for _, want := range tt.wantErrContains {
+					assert.Contains(errResp.Description, want)
+				}
+				return
+			}
+			assert.Equal(http.StatusOK, rr.Code)
+			assert.Equal("login successful", string(contents))
+			require.NotNil(gotAccessToken)
+			assert.Equal(tt.wantAccessToken, *gotAccessToken)
+		})
+	}
 }
 
 // testPostFormToCallback is a helper that supports the TestProvider is
